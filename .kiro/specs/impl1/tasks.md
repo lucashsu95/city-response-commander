@@ -109,7 +109,7 @@ Ten differentiators that make this entry competitive. Each is concrete and prova
   - competition_quality_floor: TS declared primary; `fast-check` the PBT library; the only allowed Python boundary defined and CI-enforced; no mixed-language package.
   - demo_or_evidence_output: Committed language-boundary doc + CI check that fails on a seeded mixed-language fixture.
 
-- [-] TASK-003 Implement shared-schemas package (types, enums, schema_version)
+- [x] TASK-003 Implement shared-schemas package (types, enums, schema_version)
   - objective: Provide the canonical TypeScript types/enums shared across domain, backend, and frontend so contracts (§10, §12, §13) are defined once.
   - requirements_covered: REQ-001, REQ-011, REQ-012..REQ-022, R1, R13, R14
   - design_sections: §10 (all data models), §12, §13
@@ -133,7 +133,7 @@ Ten differentiators that make this entry competitive. Each is concrete and prova
   - competition_quality_floor: Every §10 data model has an exported type; enums match design exactly (5 status values, 3 narrative_type values); no `LLM-writable` marker on any core numeric/boolean field.
   - demo_or_evidence_output: Package builds; type-level + enum-completeness tests green; downstream packages import all model types.
 
-- [~] TASK-004 Implement ConfigProvider interface and LocalFileConfigProvider
+- [x] TASK-004 Implement ConfigProvider interface and LocalFileConfigProvider
   - objective: Provide the single entry point for configuration (`get`/`getAll`) with the offline local implementation so LOCAL_MOCK runs with zero AWS calls (§23.1).
   - requirements_covered: REQ-024 (DELIVERABLE hosting config), R-supporting (all)
   - design_sections: §23.1, §4.12
@@ -156,7 +156,7 @@ Ten differentiators that make this entry competitive. Each is concrete and prova
   - competition_quality_floor: `LocalFileConfigProvider` resolves the full config schema fully offline (zero AWS SDK on the local path); a missing required key yields a typed error, never a silent default.
   - demo_or_evidence_output: Unit tests for key resolution, prefix listing, env-override precedence + a test proving no network access.
 
-- [~] TASK-005 Implement SsmConfigProvider and environment profile selection
+- [x] TASK-005 Implement SsmConfigProvider and environment profile selection
   - objective: Provide the AWS-backed configuration implementation and the mechanism that selects LOCAL_MOCK / PERSONAL_AWS_DEV / COMPETITION_AWS, sharing one schema across all three (§23).
   - requirements_covered: REQ-024 (DELIVERABLE), R-supporting (all)
   - design_sections: §23, §23.1, §4.12
@@ -179,7 +179,7 @@ Ten differentiators that make this entry competitive. Each is concrete and prova
   - competition_quality_floor: Both providers satisfy one interface and identical key set; SSM unavailable → fail-closed typed error (no silent fallback to hard-coded values); correct provider selected per profile.
   - demo_or_evidence_output: Unit tests with a mocked SSM client + a contract test proving both providers expose identical keys.
 
-- [~] TASK-006 Define configuration schema keys and provisional policy knobs
+- [x] TASK-006 Define configuration schema keys and provisional policy knobs
   - objective: Enumerate every configurable key (endpoints, model IDs, buckets, feature flags, and all `policy.*` Strategy/OQ knobs) so provisional policies stay switchable without touching the Rule Engine (§30).
   - requirements_covered: R-supporting (all), REQ-005/013/016/018/019/022 (policy-dependent behavior)
   - design_sections: §23.1 (configurable keys), §11 (Strategies A–F), §30
@@ -202,7 +202,7 @@ Ten differentiators that make this entry competitive. Each is concrete and prova
   - competition_quality_floor: Every §23.1 key present and typed; each Strategy A–F has a mode key with ≥2 allowed values; provisional defaults never presented as official; central registry keeps OQ-001..011 policies switchable via config only.
   - demo_or_evidence_output: Schema-completeness test cross-checking the §23.1 key list + enum-bound validation tests.
 
-- [~] TASK-007 Implement OfficialSourceManifest, SHA-256 verifier, and 7-source STOP gate
+- [x] TASK-007 Implement OfficialSourceManifest, SHA-256 verifier, and 7-source STOP gate
   - objective: Compute and verify SHA-256 for the seven official sources at load/boot and STOP the decision pipeline on any mismatch, never using an unknown version silently (§10.0, §15, §21).
   - requirements_covered: REQ-032, R1 (authoritative read), REQ-001
   - design_sections: §10.0, §10.0a, §10.0b (7 expected hashes), §15, §21 (source hash verification)
@@ -226,7 +226,7 @@ Ten differentiators that make this entry competitive. Each is concrete and prova
   - competition_quality_floor: 7 official sources with exact UPPERCASE SHA-256; any mismatch/missing/unreadable → STOP decisioning (never silently use an unknown version); 5-file runtime vs 7-source provenance distinguished; 命題解說 = DOCX only, PDF = 命題文件 only.
   - demo_or_evidence_output: Unit tests (verified/mismatch/missing/unreadable) + STOP-gate abort test (TASK-056); `source_manifest_hash` exposed to DecisionCore.
 
-- [~] TASK-008 Implement DerivedArtifactManifest (mirrors are NOT source of truth)
+- [-] TASK-008 Implement DerivedArtifactManifest (mirrors are NOT source of truth)
   - objective: Register `.md`/`docx_extracted.txt` mirrors as `derived_searchable_mirror` in a separate manifest so they can never substitute for the official PDF/DOCX/SOP/CSV/JSON (§10.0c).
   - requirements_covered: REQ-032, R1
   - design_sections: §10.0c

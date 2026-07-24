@@ -10,9 +10,12 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@city-commander/shared-schemas": "*"
+    "@aws-sdk/client-ssm": "^3.540.0",
+    "@city-commander/shared-schemas": "*",
+    "js-yaml": "^4.1.0"
   },
   "devDependencies": {
+    "@types/js-yaml": "^4.0.9",
     "typescript": "^5.4.0"
   }
 }

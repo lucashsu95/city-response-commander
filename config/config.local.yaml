@@ -1,8 +1,13 @@
-# 城市交通應變 AI 指揮台 — 本地開發設定
-# 此設定僅供 LOCAL_MOCK 環境使用，不包含任何敏感資訊
+# 城市交通應變 AI 指揮台 — 本地開發設定 (LOCAL_MOCK)
+# 此設定僅供 LOCAL_MOCK 環境使用，不包含任何敏感資訊。
+# 所有機密一律經 Secrets Manager 取得，此檔不含憑證。
+#
+# 設定 schema 與 PERSONAL_AWS_DEV / COMPETITION_AWS (SSM Parameter Store) 共用同一組鍵。
+# 暫定政策 (PROVISIONAL_TEAM_POLICY / AWAITING_HOST_REPLY) 標註於 policy.* 區段。
 
 env: LOCAL_MOCK
 
+# ── Bedrock (Mock adapter in LOCAL_MOCK; real in AWS profiles) ──
 bedrock:
   region: ap-northeast-1
   model_id: anthropic.claude-3-sonnet-20240229-v1:0
@@ -11,57 +16,76 @@ bedrock:
     - amazon.titan-text-express-v1
   embedding_model_id: amazon.titan-embed-text-v1
 
+# ── Knowledge Base ──
 kb:
-  knowledge_base_id: ""
-  data_source_bucket: ""
+  knowledge_base_id: local-mock-kb
 
+# ── S3 ──
 s3:
-  raw_bucket: ""
-  sop_source_bucket: ""
-  artifact_bucket: ""
+  raw_bucket: local-raw-data
+  sop_source_bucket: local-sop-source
+  artifact_bucket: local-artifacts
 
+# ── API endpoints ──
 api:
   endpoint: http://localhost:3000
 
+# ── WebSocket endpoint ──
 ws:
   endpoint: ws://localhost:3001
 
+# ── Auth (disabled in LOCAL_MOCK) ──
 auth:
-  user_pool_id: ""
-  app_client_id: ""
+  user_pool_id: local-mock-pool
 
+# ── Observability ──
 observability:
   xray_enabled: false
 
+# ── Orchestration ──
 orchestration:
   mode: lambda_direct
 
+# ── Enrichment fan-out ──
 enrichment:
   fanout: stepfunctions
 
+# ── Frontend hosting ──
 frontend:
   hosting: amplify
 
+# ── Config provider selection ──
 config:
   provider: local_file
 
-# ── Policy knobs (PROVISIONAL — OQ-001~011) ──
+# ══════════════════════════════════════════════════════════════════════
+# Policy knobs — PROVISIONAL_TEAM_POLICY / AWAITING_HOST_REPLY
+# These map to Strategies A–F and OQ-001~011.
+# Defaults are provisional and overridable; switching a strategy is a
+# config-only change, never a Rule Engine edit (§30).
+# ══════════════════════════════════════════════════════════════════════
 policy:
+  # Strategy A: 事件時間對齊 (OQ-001)
   time_alignment:
-    mode: exact_or_latest_prior
+    mode: exact_or_latest_prior_per_entity
     max_staleness_minutes: 30
 
+  # Strategy B: affected_road 用途 (OQ-002)
   affected_road:
-    role: ignore
+    role: display_only
 
+  # Strategy C: ETE 受影響路段集合 (OQ-003)
   ete:
-    affected_set: incident_plus_alternatives
+    affected_set: directly_affected_roads_at_event_snapshot
 
+  # Strategy D: 事故錨點解析 (OQ-004)
   incident_anchor:
-    mode: llm_parse
+    mode: incident_anchor_from_location_text
 
+  # Strategy E: SOP5 受影響路口範圍 (OQ-010)
   affected_intersection_scope:
-    mode: all_intersections
+    mode: unresolved_manual_confirmation
 
+  # Strategy F: SOP6 多語觸發站集/時間快照 (OQ-005)
   multilingual_scope:
-    mode: all_stations
+    mode: current_snapshot_all_available_stations
