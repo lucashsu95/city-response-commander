@@ -1,8 +1,9 @@
 # CHT 城市應變分析 AI Agent - Data Audit Report
 
-**Document Version**: 2.0 (Clean Regeneration)
+**Document Version**: 2.1 (HG-001 AMENDMENT ADDENDUM)
 **Created**: 2026-07-20
-**Source Authority**: OFFICIAL_DOC + OFFICIAL_DATA + OFFICIAL_SOP
+**Amended**: 2026-07-24 (HG-001)
+**Source Authority**: OFFICIAL_DOC + OFFICIAL_DATA + OFFICIAL_SOP + ORGANIZER_GUIDANCE
 **Derivation Note**: docx_extracted.txt is a DERIVED_SEARCHABLE_MIRROR only; NOT_SOURCE_OF_TRUTH
 
 ---
@@ -338,3 +339,98 @@ See open_questions.md for the complete list of 11 open questions.
 | Event 3 has 22:30 records in both CSVs | PASS |
 
 **Overall**: ALL AUDIT ITEMS PASSED
+
+## 9. HG-001 Organizer Guidance Impact
+
+> This section records the impact of organizer guidance HG-001 on data observations. The original verified data facts in §1–§8 are preserved unchanged. No official source file was modified, and no official source hash changed.
+
+### 9.1 Data Observation Status
+
+**ACC_001（22:10，RD_TPE_002）**
+
+- The official `city_traffic_flow.csv` contains an exact 22:10 record only for RD_TPE_002, with `Saturation_Score = 1.00`.
+- Other relevant roads may require earlier observations under the as-of decision cutoff.
+- HG-001 permits the latest observation at or before the event cutoff. Future rows and interpolation are not used.
+- For the ETE road average, the amended policy requires one common exact timestamp across the final ETE road set.
+
+**EVT_002（BS_MRT_BL17，event timestamp 22:20）**
+
+- The latest BL17 observation at or before 22:20 is 22:15: `User_Count = 31000`, `Growth_Rate = 0.08`, `Roaming_User_Pct = 16%`.
+- The 22:30 record is after the event and is not used.
+- `affected_road = RD_TPE_001` is contextual information under `DISPLAY_AND_CONTEXT_ONLY`.
+
+**EVT_003（signal outage event，event timestamp 22:30）**
+
+- The event is evaluated under the same as-of cutoff rules.
+- SOP article 5 trigger semantics remain unchanged.
+
+### 9.2 Compliance with HG-001
+
+- Sparse observations remain valid data facts and are not labeled data defects.
+- No interpolation and no future-row reads.
+- No fabricated road, ETE, or Golden Scenario answer.
+- `ORGANIZER_GUIDANCE` is interpretive implementation guidance, not an official source-file correction.
+- The seven official source-file hashes remain unchanged.
+
+### 9.3 Golden Recalculation Audit
+
+| Event | Field | Pre-HG-001 value | HG-001 value | Evidence |
+|-------|-------|------------------|--------------|----------|
+| ACC_001 | ETE_minutes | 90（provisional） | **78.6** | Common ETE timestamp 22:00; RD_TPE_002=1.00, RD_TPE_004=0.78, RD_TPE_005=0.65; average=0.81; Critical base=60; penalty=18.6 |
+| ACC_001 | policy_mode | provisional walkthrough | `GLOBAL_AS_OF_EVENT_CUTOFF_LATEST_PRIOR_PER_ENTITY` | HG-001 |
+| EVT_002 | BL17 observation timestamp | unresolved | **22:15**（latest timestamp ≤ 22:20） | signaling_crowd_density.csv |
+| EVT_002 | affected_road role | ambiguous | `DISPLAY_AND_CONTEXT_ONLY` | HG-001 |
+| EVT_002 | article_2 trigger from affected_road | ambiguous | **not triggered** | HG-001 |
+| EVT_003 | ETE_minutes | not previously computed | **41.0** | Common ETE timestamp 22:30; RD_TPE_007=0.85, RD_TPE_011=0.85; Medium base=20; penalty=21.0 |
+| EVT_003 | policy_mode | not previously selected | `GLOBAL_AS_OF_EVENT_CUTOFF_LATEST_PRIOR_PER_ENTITY` | HG-001 |
+
+### 9.4 Golden Calculation Details
+
+#### ACC_001
+
+- Event timestamp and decision cutoff: 2026-05-20 22:10.
+- ETE affected set: incident RD_TPE_002, selected primary RD_TPE_004, selected secondary RD_TPE_005.
+- Latest common exact traffic timestamp at or before the event: 22:00.
+- Saturation sum: `1.00 + 0.78 + 0.65 = 2.43`.
+- Average: `2.43 / 3 = 0.81`.
+- Congestion penalty: `max(0, (0.81 - 0.5) × 60) = 18.6`.
+- Base clearance for Critical: `60`.
+- Final ETE: `60 + 18.6 = 78.6 minutes`.
+
+#### EVT_002
+
+- Event timestamp and decision cutoff: 2026-05-20 22:20.
+- Selected BL17 observation: 22:15.
+- `User_Count = 31000 > 25000`, so SOP article 3 triggers.
+- 22:30 is a future observation and is not used.
+- ETE is not applicable to this BS_ event under the selected policy.
+
+#### EVT_003
+
+- Event timestamp and decision cutoff: 2026-05-20 22:30.
+- ETE affected set: incident RD_TPE_007 and selected primary RD_TPE_011.
+- Both roads have exact 22:30 records.
+- Saturation average: `(0.85 + 0.85) / 2 = 0.85`.
+- Congestion penalty: `max(0, (0.85 - 0.5) × 60) = 21.0`.
+- Base clearance for Medium: `20`.
+- Final ETE: `20 + 21.0 = 41.0 minutes`.
+
+### 9.5 Source Hash Integrity
+
+| File | SHA-256（unchanged） |
+|------|----------------------|
+| 官方命題 PDF | 706B44C94313AAE751434E29EE3CFF6BE1351DAA76077933C5D6DBE5171C15D7 |
+| 官方命題解說 DOCX | 0BC38CA8B655308F0DB36E3CF02FAC1289E9509AD61C59C9673CF5A7505FF065 |
+| city_traffic_flow.csv | B31436B5280B95325DA7715E7F1D3059AE343CF6E69FB2C063A9C95A541D5F2A |
+| signaling_crowd_density.csv | BD9BC159083A6304C68FEF2DFC52E1C23251523882F9953A10928C26E9564073 |
+| road_network_geometry.json | 741D253538AAF2BB25C60DEC9D4A8E8DEFECC27112FA09C7A9F1512ADB286B18 |
+| emergency_traffic_sop.txt | 0C84F2F6F30E2EC18F56E9675AA1C1C6062EBEFAF14920D8CCAC732D41BCAF1D |
+| live_incidents.json | E90C8AE46AFD02A76C233F39CB0628254BE53555B9E48067C4EA3A48E41C0A63 |
+
+### 9.6 HG-001 Reference
+
+`cursor_spec/references/organizer_guidance_2026-07-24.md`
+
+- Sender: Ivan Su, 中華電信企業客戶分公司數據產品處.
+- Date: 2026-07-24.
+- Classification: `ORGANIZER_GUIDANCE`（NON_UNIQUE, configurable, not a SOP amendment, and not an eighth official runtime source）.
