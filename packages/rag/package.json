@@ -1,0 +1,19 @@
+{
+  "name": "@city-commander/rag",
+  "version": "0.1.0",
+  "private": true,
+  "description": "RAG 檢索與 SOP 知識庫整合 (Bedrock Knowledge Bases)",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@city-commander/shared-schemas": "*",
+    "@city-commander/config": "*"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0"
+  }
+}

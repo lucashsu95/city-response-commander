@@ -1,0 +1,14 @@
+{
+  "name": "@city-commander/infra",
+  "version": "0.1.0",
+  "private": true,
+  "description": "AWS CDK 基礎設施即程式碼 (IaC)",
+  "main": "dist/bin/app.js",
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0"
+  }
+}
