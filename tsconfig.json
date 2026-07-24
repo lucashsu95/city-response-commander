@@ -1,0 +1,13 @@
+{
+  "files": [],
+  "references": [
+    { "path": "packages/shared-schemas" },
+    { "path": "packages/config" },
+    { "path": "packages/domain" },
+    { "path": "packages/rag" },
+    { "path": "packages/backend" },
+    { "path": "packages/frontend" },
+    { "path": "packages/ai-generator" },
+    { "path": "infra" }
+  ]
+}
