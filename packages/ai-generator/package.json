@@ -1,8 +1,8 @@
 {
-  "name": "@city-commander/rag",
+  "name": "@city-commander/ai-generator",
   "version": "0.1.0",
   "private": true,
-  "description": "Bedrock RAG + 文字生成整合",
+  "description": "Bedrock AI 文字生成整合（建議書、多語、What-if）",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {

@@ -26,7 +26,7 @@ Lambda (DecisionFn + RendererFn)
     ↓
 Step Functions Express Workflow
     ↓
-Bedrock (RAG + 文字生成) + DynamoDB + S3
+Bedrock (AI 文字生成) + DynamoDB + S3
 ```
 
 ## 開發環境
@@ -34,7 +34,7 @@ Bedrock (RAG + 文字生成) + DynamoDB + S3
 - **TypeScript** (主要語言)
 - **React** (前端)
 - **AWS CDK** (基礎設施即程式碼)
-- **Amazon Bedrock** (生成式 AI)
+- **Amazon Bedrock** (AI 文字生成)
 
 ## 快速開始
 
@@ -58,7 +58,7 @@ city-response-commander/
 │   ├── config/           # 設定管理
 │   ├── domain/           # 決定性規則引擎
 │   ├── backend/          # Lambda + API
-│   ├── rag/              # Bedrock RAG 整合
+│   ├── ai-generator/     # Bedrock AI 文字生成
 │   └── frontend/         # React Dashboard
 ├── infra/                # CDK 基礎設施
 ├── config/               # 環境設定檔
