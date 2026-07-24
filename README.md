@@ -65,6 +65,35 @@ city-response-commander/
 └── docs/                 # 文件
 ```
 
+## 文件分類
+
+### 🎯 專案管理
+
+| 檔案 | 內容 |
+|------|------|
+| `docs/team-announcement.md` | 團隊分工公告（貼群組用） |
+| `docs/team-roles.md` | 工作包詳細任務 + 認領狀態 |
+| `docs/progress.md` | 7 天里程碑 + 每日進度追蹤 |
+
+### ⚙️ 技術規格
+
+| 檔案 | 內容 |
+|------|------|
+| `docs/spec.md` | 33 條 User Stories + 技術決策 |
+| `docs/language-boundary.md` | 語言邊界規範（TypeScript 為主） |
+
+### 📊 資料分析
+
+| 檔案 | 內容 |
+|------|------|
+| `docs/data_audit.md` | 7 個官方檔案的 SHA-256 驗證 |
+
+### 🎬 Demo 準備
+
+| 檔案 | 內容 |
+|------|------|
+| `docs/demo-scenario.md` | 3 個事件完整場景 + 畫面示意 |
+
 ## 官方資料
 
 本專案使用五個官方資料檔案：
