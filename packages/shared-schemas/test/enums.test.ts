@@ -153,16 +153,17 @@ describe('shared-schemas enums', () => {
   });
 
   describe('IncidentStatus', () => {
-    it('has exactly 4 values', () => {
+    it('has exactly 5 official-data values', () => {
       const values = Object.values(IncidentStatus);
-      expect(values).toHaveLength(4);
+      expect(values).toHaveLength(5);
     });
 
-    it('contains Closed, Blocked, Restricted, Open', () => {
+    it('contains Closed, Blocked, Restricted, Open, and Caution', () => {
       expect(IncidentStatus.Closed).toBe('Closed');
       expect(IncidentStatus.Blocked).toBe('Blocked');
       expect(IncidentStatus.Restricted).toBe('Restricted');
       expect(IncidentStatus.Open).toBe('Open');
+      expect(IncidentStatus.Caution).toBe('Caution');
     });
   });
 

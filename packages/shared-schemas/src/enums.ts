@@ -55,6 +55,7 @@ export enum IncidentStatus {
   Blocked = 'Blocked',
   Restricted = 'Restricted',
   Open = 'Open',
+  Caution = 'Caution',
 }
 
 /** 事件嚴重度 */
