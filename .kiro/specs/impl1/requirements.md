@@ -1,10 +1,14 @@
 # CHT 城市應變分析 AI Agent - Requirements Baseline
 
-**Document Version**: 2.1 (FINAL BASELINE)
+**Document Version**: 2.2 (HG-001 AMENDMENT CANDIDATE)
 **Created**: 2026-07-20
-**Source Authority**: OFFICIAL_DOC + OFFICIAL_DATA + OFFICIAL_SOP
+**Source Authority**: OFFICIAL_DOC + OFFICIAL_DATA + OFFICIAL_SOP + ORGANIZER_GUIDANCE
 **Derivation Note**: docx_extracted.txt is a DERIVED_SEARCHABLE_MIRROR only; NOT_SOURCE_OF_TRUTH
-**Baseline Status**: LOCKED_PENDING_HOST_REPLIES
+**Baseline Status**: AMENDED_BY_HG-001_PENDING_INDEPENDENT_REVIEW
+
+> **Note**: ORGANIZER_GUIDANCE is interpretive implementation guidance and is NOT a runtime official source. The seven official source files and their hashes remain unchanged. Guidance ID HG-001 is preserved verbatim in `cursor_spec/references/organizer_guidance_2026-07-24.md`.
+
+**Amended**: 2026-07-24 (HG-001)
 
 ---
 
@@ -98,7 +102,13 @@ AND system SHALL display signaling_crowd_density.csv data on the same timeline
 
 **Source Tag**: OFFICIAL_DOC / DOCX / 模組 1
 
-**Open Question Dependencies**: OQ-001
+**HG-001 Implementation Interpretation** (ORGANIZER_GUIDANCE, NON_UNIQUE):
+- `decision_cutoff_timestamp = event.timestamp`.
+- For each required entity, select the latest observation whose timestamp is less than or equal to the decision cutoff; do not use future rows or interpolation.
+- All fields for one entity come from the same selected row.
+- Dashboard disclosure includes the event timestamp, decision cutoff, every material input's observation timestamp, maximum staleness, selected policy mode, and HG-001.
+
+**Open Question Dependencies**: OQ-001 (RESOLVED via HG-001, ORGANIZER_GUIDANCE)
 
 **Verification Method**: Dashboard displays real-time or near-real-time data visualization with time-axis
 
@@ -135,7 +145,11 @@ THEN system SHALL automatically display warning popup
 
 **Source Tag**: OFFICIAL_DOC / DOCX / 模組 1
 
-**Open Question Dependencies**: OQ-001, OQ-005
+**HG-001 Implementation Interpretation** (ORGANIZER_GUIDANCE, NON_UNIQUE):
+- Automatic warnings use the same `decision_cutoff_timestamp` as the rest of the system.
+- All comparisons use each entity’s latest observation at or before the event cutoff.
+
+**Open Question Dependencies**: OQ-001 (RESOLVED via HG-001, ORGANIZER_GUIDANCE), OQ-005 (PARTIALLY RESOLVED via HG-001 — time dimension; station scope still OPEN)
 
 **Verification Method**: Automatic popup appears when SOP thresholds are met
 
@@ -188,7 +202,10 @@ AND system SHALL update guidance on display
 
 **Source Tag**: OFFICIAL_DOC / DOCX / 模組 2
 
-**Open Question Dependencies**: OQ-001
+**HG-001 Implementation Interpretation** (ORGANIZER_GUIDANCE, NON_UNIQUE):
+- The 60-second replanning uses the same `decision_cutoff_timestamp`; selected primary and secondary routes use latest-prior observations at that logical cutoff.
+
+**Open Question Dependencies**: OQ-001 (RESOLVED via HG-001, ORGANIZER_GUIDANCE)
 
 **Verification Method**: Route replanning completes within 60 seconds
 
@@ -299,7 +316,10 @@ AND system SHALL explain why alternative routes were excluded
 
 **Source Tag**: OFFICIAL_DOC / DOCX / 模組 4
 
-**Open Question Dependencies**: OQ-004, OQ-009
+**HG-001 Implementation Interpretation** (ORGANIZER_GUIDANCE, NON_UNIQUE):
+- The reasoning display includes selected-record metadata for every material input: `entity_id`, `observation_timestamp`, `staleness_minutes`, `exact_match`, `selection_mode`, and `guidance_id = HG-001`.
+
+**Open Question Dependencies**: OQ-004 (OPEN), OQ-009 (OPEN)
 
 **Verification Method**: Dashboard shows reasoning chain for all decisions
 
@@ -329,7 +349,13 @@ AND congestion_penalty = max(0, (avg_saturation - 0.5) * 60)
 - OFFICIAL_DOC / DOCX / 模組 4：「自動解析事故嚴重度並依 SOP 公式即時計算及顯示 ETE」
 - OFFICIAL_SOP / emergency_traffic_sop.txt / 第 7 條：「ETE_minutes、base_clearance、congestion_penalty 正式公式」
 
-**Open Question Dependencies**: OQ-001, OQ-003
+**HG-001 Implementation Interpretation** (ORGANIZER_GUIDANCE, NON_UNIQUE):
+- `ete_affected_set = stable_unique(incident.affected_segment, selected_primary_evacuation_route, selected_secondary_evacuation_routes)` in deterministic order: INCIDENT, PRIMARY, SECONDARY.
+- `ete_snapshot_timestamp` is the latest timestamp less than or equal to the event timestamp for which every road in `ete_affected_set` has an exact traffic record.
+- All ETE `Saturation_Score` values come from that exact timestamp. Mixed-timestamp averaging, interpolation, and future rows are prohibited.
+- If no common exact timestamp exists: `ete_calculation_status = INSUFFICIENT_COMMON_SNAPSHOT`, `ete_minutes = null`, `ete_lower_bound_minutes = base_clearance`, and `manual_confirmation_required = true`.
+
+**Open Question Dependencies**: OQ-001 (RESOLVED via HG-001), OQ-003 (RESOLVED via HG-001)
 
 **Verification Method**: ETE formula produces correct results per SOP specification
 
@@ -355,7 +381,11 @@ THEN system SHALL produce multilingual alert in the same response
 
 **Source Tag**: OFFICIAL_DOC + OFFICIAL_SOP / DOCX 模組 5 / SOP 第 6 條
 
-**Open Question Dependencies**: OQ-005
+**HG-001 Implementation Interpretation** (ORGANIZER_GUIDANCE, NON_UNIQUE):
+- The time dimension of SOP 6 uses the same `decision_cutoff_timestamp`, with latest-prior `Roaming_User_Pct` per station.
+- The station set represented by “any base station” remains configurable; HG-001 does not resolve that scope.
+
+**Open Question Dependencies**: OQ-005 (PARTIALLY RESOLVED via HG-001 — time cutoff resolved; station scope still OPEN)
 
 **Verification Method**: Multilingual alert produced when Roaming >= 30%
 
@@ -481,7 +511,10 @@ THEN candidate SHALL be listed as secondary evacuation only
 
 **Source Tag**: OFFICIAL_SOP / emergency_traffic_sop.txt / 第 2 條
 
-**Open Question Dependencies**: OQ-001, OQ-004, OQ-006, OQ-007, OQ-008
+**HG-001 Implementation Interpretation** (ORGANIZER_GUIDANCE, NON_UNIQUE):
+- Route comparison uses latest-prior as-of observations per road under the same `decision_cutoff_timestamp`.
+
+**Open Question Dependencies**: OQ-001 (RESOLVED via HG-001), OQ-004 (OPEN), OQ-006 (OPEN), OQ-007 (OPEN), OQ-008 (OPEN)
 
 **Verification Method**: Primary route selected per SOP-2 criteria
 
@@ -536,7 +569,10 @@ THEN message SHALL follow format: "<incident_road>封閉，請改道 <primary_ev
 
 **Source Tag**: OFFICIAL_SOP / emergency_traffic_sop.txt / 第 2 條
 
-**Open Question Dependencies**: OQ-003
+**HG-001 Implementation Interpretation** (ORGANIZER_GUIDANCE, NON_UNIQUE):
+- CMS output must not fabricate ETE when the calculation status is `INSUFFICIENT_COMMON_SNAPSHOT`. When ETE is unavailable, show the lower-bound `base_clearance` and a confirmation-required note.
+
+**Open Question Dependencies**: OQ-003 (RESOLVED via HG-001)
 
 **Verification Method**: CMS message matches exact template format
 
@@ -572,7 +608,11 @@ THEN system SHALL NOT trigger SOP-3
 
 **Source Tag**: OFFICIAL_SOP / emergency_traffic_sop.txt / 第 3 條
 
-**Open Question Dependencies**: OQ-001, OQ-002
+**HG-001 Implementation Interpretation** (ORGANIZER_GUIDANCE, NON_UNIQUE):
+- For BS_ events, use the BL17 latest-prior observation at or before the event cutoff. For the 22:20 event, this is 22:15; the 22:30 future row is never used.
+- `affected_road` is `DISPLAY_AND_CONTEXT_ONLY`: it does not trigger SOP article 2, convert a BS_ event into an RD_ event, enter the ETE set automatically, or create a mandatory local action.
+
+**Open Question Dependencies**: OQ-001 (RESOLVED via HG-001), OQ-002 (RESOLVED via HG-001)
 
 **Verification Method**: SOP-3 triggered per OR conditions, boundary tests verified
 
@@ -601,7 +641,10 @@ AND system SHALL proactively trigger SOP-3 shuttle mechanism
 
 **Source Tag**: OFFICIAL_SOP / emergency_traffic_sop.txt / 第 4 條
 
-**Open Question Dependencies**: OQ-001
+**HG-001 Implementation Interpretation** (ORGANIZER_GUIDANCE, NON_UNIQUE):
+- The SOP-4 historical peak is computed only from records at or before the same `decision_cutoff_timestamp`; future records are never used.
+
+**Open Question Dependencies**: OQ-001 (RESOLVED via HG-001)
 
 **Verification Method**: Both conditions must be met (AND logic)
 
@@ -682,7 +725,11 @@ THEN format SHALL be YYYY-MM-DD HH:MM
 
 **Source Tag**: OFFICIAL_SOP / emergency_traffic_sop.txt / 第 6 條
 
-**Open Question Dependencies**: OQ-005
+**HG-001 Implementation Interpretation** (ORGANIZER_GUIDANCE, NON_UNIQUE):
+- The current-state time dimension uses the same `decision_cutoff_timestamp`, with latest-prior `Roaming_User_Pct` per station.
+- The station-set scope represented by “any base station” remains configurable and unresolved by HG-001.
+
+**Open Question Dependencies**: OQ-005 (PARTIALLY RESOLVED via HG-001 — time cutoff resolved; station scope still OPEN)
 
 **Verification Method**: Multilingual message produced, boundary test verified
 
@@ -716,7 +763,13 @@ AND report SHALL include ETE value and calculation basis
 
 **Source Tag**: OFFICIAL_SOP / emergency_traffic_sop.txt / 第 7 條
 
-**Open Question Dependencies**: OQ-003
+**HG-001 Implementation Interpretation** (ORGANIZER_GUIDANCE, NON_UNIQUE):
+- The ETE road set is the incident road plus the selected primary route and selected secondary routes.
+- ETE uses one common exact timestamp across the full road set. Partial-set averaging is prohibited.
+- If a common snapshot is unavailable, the report discloses the insufficient-data status, `ete_lower_bound_minutes = base_clearance`, `congestion_penalty = null`, and `manual_confirmation_required = true`.
+- A BS-event contextual `affected_road` is never included in the ETE set.
+
+**Open Question Dependencies**: OQ-003 (RESOLVED via HG-001)
 
 **Verification Method**: ETE formula correctly implemented, report includes all required information
 
@@ -752,7 +805,11 @@ AND report SHALL include ETE value and calculation basis when ETE is applicable
 
 **Source Tag**: OFFICIAL_DOC / DOCX / 報告內容方向
 
-**Open Question Dependencies**: OQ-003, OQ-010, OQ-011
+**HG-001 Implementation Interpretation** (ORGANIZER_GUIDANCE, NON_UNIQUE):
+- The command-center report discloses the event timestamp, decision cutoff, each material input's observation timestamp, ETE common timestamp, ETE road set, per-road saturation values, formula inputs, ETE result, policy mode, and `guidance_id = HG-001`.
+- When ETE is `INSUFFICIENT_COMMON_SNAPSHOT`, the report states the lower bound, missing-common-snapshot condition, and `manual_confirmation_required` status.
+
+**Open Question Dependencies**: OQ-003 (RESOLVED via HG-001), OQ-010 (OPEN), OQ-011 (OPEN)
 
 **Verification Method**: Report contains all required sections
 
@@ -786,7 +843,11 @@ AND message SHALL be suitable for CMS and SMS display
 
 **Source Tag**: OFFICIAL_DOC / DOCX / 報告內容方向
 
-**Open Question Dependencies**: OQ-003, OQ-005
+**HG-001 Implementation Interpretation** (ORGANIZER_GUIDANCE, NON_UNIQUE):
+- Public messages use a deterministic ETE only when the ETE calculation is available. When unavailable, the CMS shows the lower-bound `base_clearance` and a confirmation-required note.
+- HG-001 resolves the time dimension of OQ-005; the station-set scope remains configurable.
+
+**Open Question Dependencies**: OQ-003 (RESOLVED via HG-001), OQ-005 (PARTIALLY RESOLVED via HG-001)
 
 **Verification Method**: SMS contains all required elements
 
@@ -1149,6 +1210,6 @@ AWS 為官方指定的正式競賽 Runtime/Deployment 必要條件，須提供 A
 
 ---
 
-**Document Version**: 2.1 (FINAL BASELINE)
+**Document Version**: 2.2 (HG-001 AMENDMENT CANDIDATE)
 **Created**: 2026-07-20
-**Source Authority**: OFFICIAL_DOC + OFFICIAL_DATA + OFFICIAL_SOP
+**Source Authority**: OFFICIAL_DOC + OFFICIAL_DATA + OFFICIAL_SOP + ORGANIZER_GUIDANCE
