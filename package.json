@@ -9,11 +9,18 @@
   ],
   "scripts": {
     "build": "npm run build --workspaces",
-    "test": "npm run test --workspaces",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "lint": "eslint 'packages/*/src/**/*.ts'",
-    "typecheck": "tsc --build"
+    "typecheck": "tsc --build",
+    "check:language-boundary": "tsx scripts/check-language-boundary.ts"
   },
   "engines": {
     "node": ">=18.0.0"
+  },
+  "devDependencies": {
+    "tsx": "^4.7.0",
+    "vitest": "^1.6.0",
+    "typescript": "^5.4.0"
   }
 }

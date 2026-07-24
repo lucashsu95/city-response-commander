@@ -1,0 +1,1290 @@
+{
+  "pbtResults": {},
+  "executionHistory": {
+    "TASK-001 Initialize monorepo workspace and folder structure": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892271066
+      },
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892293859
+      },
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892536064
+      }
+    ],
+    "TASK-002 Fix TypeScript/Python boundary and shared build conventions": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892271073
+      },
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892541015
+      },
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892769715
+      }
+    ],
+    "TASK-003 Implement shared-schemas package (types, enums, schema_version)": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892271081
+      },
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892780906
+      }
+    ],
+    "TASK-004 Implement ConfigProvider interface and LocalFileConfigProvider": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892271092
+      }
+    ],
+    "TASK-005 Implement SsmConfigProvider and environment profile selection": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892271128
+      }
+    ],
+    "TASK-006 Define configuration schema keys and provisional policy knobs": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892271139
+      }
+    ],
+    "TASK-007 Implement OfficialSourceManifest, SHA-256 verifier, and 7-source STOP gate": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892271146
+      }
+    ],
+    "TASK-008 Implement DerivedArtifactManifest (mirrors are NOT source of truth)": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892271156
+      }
+    ],
+    "TASK-009 Set up lint and format tooling": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892271170
+      }
+    ],
+    "TASK-010 Set up test frameworks (fast-check for TS, Hypothesis for Python)": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892271184
+      }
+    ],
+    "TASK-011 Establish CI skeleton (LOCAL_MOCK full deterministic run, no credentials)": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892271194
+      }
+    ],
+    "TASK-012 Enforce no-credentials-in-repo guard and .gitignore hygiene": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892271203
+      }
+    ],
+    "TASK-013 Parse city_traffic_flow.csv into RawTrafficRecord": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892271216
+      }
+    ],
+    "TASK-014 Parse signaling_crowd_density.csv and implement PercentParser": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892271223
+      }
+    ],
+    "TASK-015 Parse road_network_geometry.json into RoadSegment and load RoadNetworkModel": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892271230
+      }
+    ],
+    "TASK-016 Parse live_incidents.json into Incident": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892271238
+      }
+    ],
+    "TASK-017 Load emergency_traffic_sop.txt with article chunking metadata": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892271246
+      }
+    ],
+    "TASK-018 Implement timestamp normalization (raw immutable, normalized, display)": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892271253
+      }
+    ],
+    "TASK-019 Implement DataIngestionService orchestration (load + verify + read-only)": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892271260
+      }
+    ],
+    "TASK-020 Implement SnapshotSelector (Strategy A / TimeAlignmentStrategy)": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892271267
+      }
+    ],
+    "TASK-021 Implement RoadNetworkModel semantics (one-way alternatives, empty nearby, upstream/downstream)": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892271277
+      }
+    ],
+    "TASK-022 Implement ClassificationEngine (A/B grading)": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892271285
+      }
+    ],
+    "TASK-023 Implement RuleEngine article1 (trigger segments, measures, invoked_procedures)": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892271292
+      }
+    ],
+    "TASK-024 Implement RuleEngine article2 trigger and candidate qualification (3-AND)": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892271300
+      }
+    ],
+    "TASK-025 Implement EvacuationSelector (lowest-saturation primary, downstream secondary, congested-maintain, no-candidate)": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892271310
+      }
+    ],
+    "TASK-026 Implement IncidentAnchorResolutionStrategy (Strategy D) and conservative fallback": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892271319
+      }
+    ],
+    "TASK-027 Implement RuleEngine article3 (SOP-3 MRT shuttle)": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892271326
+      }
+    ],
+    "TASK-028 Implement RuleEngine article4 (SOP-4 dome dispersal)": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892271334
+      }
+    ],
+    "TASK-029 Implement RuleEngine article5 (SOP-5) and AffectedIntersectionScopeStrategy (E)": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892271344
+      }
+    ],
+    "TASK-030 Implement RuleEngine article6 (SOP-6 trigger) and MultilingualScopeStrategy (F)": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892271351
+      }
+    ],
+    "TASK-031 Implement ETECalculator (art.7) and EteAffectedSetStrategy (C)": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892271357
+      }
+    ],
+    "TASK-032 Implement AffectedRoadStrategy (Strategy B) for EVT_002 affected_road role": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892271364
+      }
+    ],
+    "TASK-033 Implement triggered/applied_formula/invoked_procedures separation and citation_article_set": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892271371
+      }
+    ],
+    "TASK-034 Implement EvidenceTraceBuilder": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892271377
+      }
+    ],
+    "TASK-035 Implement canonical core_hash (§10.11a-1) and DecisionCore assembly": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892271384
+      }
+    ],
+    "TASK-036 Property tests P1, P21, P34 (percent round-trip, time format, timestamp preservation)": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892271392
+      }
+    ],
+    "TASK-037 Property test P2 (official data read-only invariance)": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892271414
+      }
+    ],
+    "TASK-038 Property test P3 (Strategy A snapshot selection)": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892271430
+      }
+    ],
+    "TASK-039 Property tests P4, P5, P7 (classification, art.1 mapping, light mapping)": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892271439
+      }
+    ],
+    "TASK-040 Property test P6 (threshold auto-popup)": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892271448
+      }
+    ],
+    "TASK-041 Property tests P8, P9, P10, P11, P12 (SOP-2 trigger/qualification/selection/congestion/no-candidate)": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892271455
+      }
+    ],
+    "TASK-042 Property tests P13, P14, P15 (alternatives one-way, empty nearby, upstream/downstream)": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892271463
+      }
+    ],
+    "TASK-043 Property test P30 (anchor resolution + conservative fallback)": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892271470
+      }
+    ],
+    "TASK-044 Property tests P16, P17 (SOP-3 OR trigger + actions, SOP-4 dispersal)": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892271477
+      }
+    ],
+    "TASK-045 Property tests P18, P19, P31 (SOP-5 trigger, manual command, unresolved police scope)": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892271484
+      }
+    ],
+    "TASK-046 Property tests P20, P32 (SOP-6 trigger, current-snapshot scope)": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892271491
+      }
+    ],
+    "TASK-047 Property tests P22, P23 (ETE formula, non-negative penalty)": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892271498
+      }
+    ],
+    "TASK-048 Property tests P24, P25, P37 (report completeness, alert/CMS completeness, CMS permission split)": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892271504
+      }
+    ],
+    "TASK-049 Property tests P26, P27 (evidence chain, citation coverage)": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892271510
+      }
+    ],
+    "TASK-050 Property tests P29, P36 (bonus ja/ko languages, multilingual template no zh-only degradation)": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892271517
+      }
+    ],
+    "TASK-051 Canonical core_hash A/B/C tests (FIX 4)": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892271524
+      }
+    ],
+    "TASK-052 Boundary unit tests (all official numeric boundaries)": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892271530
+      }
+    ],
+    "TASK-053 Golden test ACC_001 (deterministic core)": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892271536
+      }
+    ],
+    "TASK-054 Golden test EVT_002 (SOP-3 evaluation, must-compute)": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892271544
+      }
+    ],
+    "TASK-055 Golden test EVT_003 (SOP-5)": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892271552
+      }
+    ],
+    "TASK-056 Failure-mode deterministic tests (source-hash STOP, no-candidate, unresolved anchor, unresolved police)": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892271562
+      }
+    ],
+    "TASK-057 Policy-switching contract tests (Strategies A–F, ≥2 impls each)": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892271570
+      }
+    ],
+    "TASK-058 Golden tests for SOP-4 DOME and SOP-6 stations": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892271579
+      }
+    ],
+    "TASK-059 Bootstrap CDK app, env-context profiles, and stack wiring": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892271585
+      }
+    ],
+    "TASK-060 DataStack: S3 buckets (raw, sop_source, artifact)": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892271592
+      }
+    ],
+    "TASK-061 DataStack: IdempotencyTable (DynamoDB) with TTL": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892271599
+      }
+    ],
+    "TASK-062 DataStack: DecisionCoreTable (immutable) DynamoDB": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892271607
+      }
+    ],
+    "TASK-063 DataStack: DecisionNarrativeTable (PK decision_id + SK narrative_type)": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892271613
+      }
+    ],
+    "TASK-064 DataStack: PublishRecordTable (DynamoDB)": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892271620
+      }
+    ],
+    "TASK-065 DataStack: connections table (WebSocket)": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892271627
+      }
+    ],
+    "TASK-066 DataStack: Bedrock Knowledge Base, data source, and vector store config": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892271634
+      }
+    ],
+    "TASK-067 ComputeStack: Lambda function definitions (all 10 runtime handlers)": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892271641
+      }
+    ],
+    "TASK-068 ComputeStack: Step Functions Express state machine (ASL)": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892271648
+      }
+    ],
+    "TASK-069 NetworkAuthStack: API Gateway HTTP API + routes + Cognito authorizer": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892271654
+      }
+    ],
+    "TASK-070 NetworkAuthStack: WebSocket API + routes": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892271662
+      }
+    ],
+    "TASK-071 NetworkAuthStack: Cognito user pool + groups (admin/operator/commander)": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892271668
+      }
+    ],
+    "TASK-072 FrontendStack: Amplify Hosting (or S3+CloudFront) with hosting switch": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892271676
+      }
+    ],
+    "TASK-073 SSM Parameter Store provisioning and env-param definitions": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892271684
+      }
+    ],
+    "TASK-074 Secrets Manager provisioning": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892271693
+      }
+    ],
+    "TASK-075 CloudWatch log groups, custom metrics, alarms, and optional X-Ray toggle": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892271699
+      }
+    ],
+    "TASK-076 IAM: InjectFnRole (precise allow/deny, FIX 2)": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892271705
+      }
+    ],
+    "TASK-077 IAM: DecisionFnRole (Deny IdempotencyTable writes)": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892271711
+      }
+    ],
+    "TASK-078 IAM: RendererFnRole (Deny DecisionCore write)": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892271721
+      }
+    ],
+    "TASK-079 IAM: WorkflowStatusFnRole (IdempotencyTable-only, fencing)": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892271728
+      }
+    ],
+    "TASK-080 IAM: RecoveryGateFnRole (read-only, ConsistentRead)": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892271736
+      }
+    ],
+    "TASK-081 IAM: ApiReadFnRole (read-only incl IdempotencyTable GetItem, FIX 1)": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892271744
+      }
+    ],
+    "TASK-082 IAM: PublishFnRole (Deny DecisionCore write)": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892271754
+      }
+    ],
+    "TASK-083 IAM: WsConnFnRole, OrchestratorRole, IngestionRole": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892271762
+      }
+    ],
+    "TASK-177 IAM: WhatIfFnRole (dedicated What-if runtime least privilege)": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892271769
+      }
+    ],
+    "TASK-178 Deployment-time KB ingestion mechanism (AWS CDK Custom Resource Provider Framework, NO runtime Lambda)": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892271777
+      }
+    ],
+    "TASK-179 Finalize Lambda execution-role bindings and exact cross-resource grants": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892271786
+      }
+    ],
+    "TASK-180 Finalize shared stack composition and concurrency-safe integration": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892271794
+      }
+    ],
+    "TASK-084 Teardown lifecycle, removal policies, and cdk destroy readiness (IaC only)": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892271800
+      }
+    ],
+    "TASK-085 Implement IdempotencyTable repository (conditional Put/Update, ConsistentRead reads)": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892271807
+      }
+    ],
+    "TASK-086 Implement InjectFn POST /inject handler + idempotency_key derivation + first lease acquisition": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892271815
+      }
+    ],
+    "TASK-087 Implement InjectFn StartExecution (lease holder only) + 202 / 503 start_failed": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892271821
+      }
+    ],
+    "TASK-088 Implement InjectFn same-key re-request routing (200/202 branches)": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892271827
+      }
+    ],
+    "TASK-089 Implement WorkflowStatusFn MARK_RUNNING (first state, $$.Execution.Id)": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892271833
+      }
+    ],
+    "TASK-090 Implement WorkflowStatusFn MARK_COMPLETED and MARK_PROCESSING_FAILED (fencing + apply-or-confirm)": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892271841
+      }
+    ],
+    "TASK-091 Implement WorkflowStatusFn RECONCILE_STALE_RUNNING (external fencing, FIX 3)": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892271847
+      }
+    ],
+    "TASK-092 Implement InjectFn stale-running orchestration (detect → RecoveryGate → RECONCILE)": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892271854
+      }
+    ],
+    "TASK-093 Implement RecoveryGateFn (read-only, strong-consistent judgment)": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892271861
+      }
+    ],
+    "TASK-094 Implement lease recovery transitions (start_failed/processing_failed/starting)": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892271870
+      }
+    ],
+    "TASK-095 Implement apply-or-confirm shared library (ALREADY_APPLIED / FENCED_STALE_EXECUTION)": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892271876
+      }
+    ],
+    "TASK-096 Implement CORE_IDENTITY_CONFLICT terminal handling + async 409 on later same-key POST (FIX 1)": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892271882
+      }
+    ],
+    "TASK-097 Wire Step Functions status actions, Choice Gate, and recovery_mode branch": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892271889
+      }
+    ],
+    "TASK-098 Injection/workflow lifecycle integration & failure-injection tests (P33)": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892271899
+      }
+    ],
+    "TASK-099 Implement DecisionFn handler (invoke deterministic core → DecisionCore payload)": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892271908
+      }
+    ],
+    "TASK-100 Implement DecisionCore immutable conditional Put (COMMITTED)": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892271915
+      }
+    ],
+    "TASK-101 Implement DecisionCore Put-failure identity classification (canonical core_hash)": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892271922
+      }
+    ],
+    "TASK-102 Wire MARK_CORE_COMMITTED checkpoint (evidence_source=DECISIONFN_COMMITTED)": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892271929
+      }
+    ],
+    "TASK-103 Implement decision.fast_path_ready emission (ready_event_id)": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892271935
+      }
+    ],
+    "TASK-104 Implement LatencyTrace instrumentation": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892271942
+      }
+    ],
+    "TASK-105 Wire Fast Path 5s team target and 60s official deadline measurement": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892271948
+      }
+    ],
+    "TASK-106 DecisionCore persistence integration tests (COMMITTED/ALREADY_COMMITTED/CONFLICT)": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892271955
+      }
+    ],
+    "TASK-107 Fast-path latency tests": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892279645
+      }
+    ],
+    "TASK-108 Implement SopRetriever (Bedrock KB Retrieve)": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892279652
+      }
+    ],
+    "TASK-109 Implement SopRetriever S3 article_no fallback": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892279658
+      }
+    ],
+    "TASK-110 Implement citation_article_set assembly (triggered ∪ applied_formula)": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892279666
+      }
+    ],
+    "TASK-111 Implement SchemaValidator (text-only; reject core-field overwrite)": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892279673
+      }
+    ],
+    "TASK-112 Implement Bedrock adapter (InvokeModel/Converse) + Mock adapter + model fallbacks": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892279680
+      }
+    ],
+    "TASK-113 Implement ReportComposer (REPORT item conditional Put)": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892279687
+      }
+    ],
+    "TASK-114 Implement PublicAlertComposer (PUBLIC_ALERT item, multilingual)": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892279697
+      }
+    ],
+    "TASK-115 Implement ExplanationComposer (EXPLANATION item from EvidenceTrace + citations)": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892279705
+      }
+    ],
+    "TASK-116 Implement DecisionNarrative writer (PK+SK conditional Put per branch)": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892279713
+      }
+    ],
+    "TASK-117 Implement multilingual template fallback (never zh-only)": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892279720
+      }
+    ],
+    "TASK-118 Implement missing_narrative_types recovery (ENRICHMENT_ONLY)": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892279727
+      }
+    ],
+    "TASK-119 Implement decision.enriched emission (after all 3 committed)": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892279735
+      }
+    ],
+    "TASK-120 RAG citation + Bedrock schema-validation + narrative concurrency integration tests": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892279741
+      }
+    ],
+    "TASK-121 Scaffold React/TS SPA and inject endpoints via ConfigProvider": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892279748
+      }
+    ],
+    "TASK-122 Implement WebSocket client + connection state machine + polling fallback": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892279755
+      }
+    ],
+    "TASK-123 Implement ready_event_id dedup (effectively-once presentation)": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892279762
+      }
+    ],
+    "TASK-124 Implement timeline playback UI (GET /timeline)": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892279770
+      }
+    ],
+    "TASK-125 Implement road/traffic visualization + A=red / B=yellow lights": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892279777
+      }
+    ],
+    "TASK-126 Implement crowd/signaling visualization": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892279785
+      }
+    ],
+    "TASK-127 Implement anomaly auto-popup (anomaly.detected)": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892279792
+      }
+    ],
+    "TASK-128 Implement incident injection UI (POST /inject, admin)": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892279799
+      }
+    ],
+    "TASK-129 Implement explanation-chain display (EvidenceTrace + citations)": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892279807
+      }
+    ],
+    "TASK-130 Implement route display (primary/secondary/excluded reasons)": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892279818
+      }
+    ],
+    "TASK-131 Implement ETE display + provisional markers": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892279825
+      }
+    ],
+    "TASK-132 Implement report + public-alert panels": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892279832
+      }
+    ],
+    "TASK-133 Implement execution status/error display (execution summary + processing.failed)": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892279839
+      }
+    ],
+    "TASK-134 Implement responsive design (REQ-030 bonus) and ja/ko UI (REQ-031 bonus)": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892279848
+      }
+    ],
+    "TASK-135 Frontend component/snapshot tests": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892279854
+      }
+    ],
+    "TASK-136 Implement WhatIfFn: POST /what-if handler (dedicated Lambda) + Cognito operator auth + untrusted-input handling": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892279861
+      }
+    ],
+    "TASK-137 Implement ScenarioParser (stage 1, Bedrock) NL→structured assumptions": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892279868
+      }
+    ],
+    "TASK-138 Implement SchemaValidator + DomainValidator (stage 2) + clarification_required": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892279876
+      }
+    ],
+    "TASK-139 Implement deterministic recompute (stage 3, does_not_mutate_state)": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892279883
+      }
+    ],
+    "TASK-140 Implement Bedrock explanation (stage 4) + SOP citation": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892279889
+      }
+    ],
+    "TASK-141 Implement What-if UI (dialog window)": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892279896
+      }
+    ],
+    "TASK-142 What-if 4-stage integration tests (P28, P35)": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892279906
+      }
+    ],
+    "TASK-143 What-if clarification/ambiguity failure tests": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892279913
+      }
+    ],
+    "TASK-144 Implement PublishFn handler + Cognito commander auth": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892279922
+      }
+    ],
+    "TASK-145 Implement PublishRecord state machine (draft→approved→published/publish_failed)": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892279933
+      }
+    ],
+    "TASK-146 Implement simulated CMS/SMS channels + one-click copy/export": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892279944
+      }
+    ],
+    "TASK-147 Implement audit_trail + optimistic lock": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892279952
+      }
+    ],
+    "TASK-148 Implement publish.status_changed event": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892279958
+      }
+    ],
+    "TASK-149 Implement DecisionReadModel merge (Core+Narrative+Publish+execution summary)": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892279965
+      }
+    ],
+    "TASK-150 Implement GET read handlers (/timeline,/roads,/crowd,/incidents,/decisions,/reports)": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892279973
+      }
+    ],
+    "TASK-151 Implement publish idempotency (no duplicate publish)": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892279979
+      }
+    ],
+    "TASK-152 Publish + read-model integration tests": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892279986
+      }
+    ],
+    "TASK-153 Implement CloudWatch structured logging (trace_id/decision_id, no credentials)": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892279993
+      }
+    ],
+    "TASK-154 Implement custom latency metrics + alarms": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892280001
+      }
+    ],
+    "TASK-155 Implement failure/fallback counters": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892280008
+      }
+    ],
+    "TASK-156 Implement unified structured error model": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892280014
+      }
+    ],
+    "TASK-157 Implement throttling + exponential backoff": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892280021
+      }
+    ],
+    "TASK-158 Implement Bedrock/KB/DynamoDB/WebSocket failure handling + fallbacks": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892280031
+      }
+    ],
+    "TASK-159 Implement stale-running + identity-conflict security alert": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892280039
+      }
+    ],
+    "TASK-160 Implement IAM-denial tests (least-privilege enforcement)": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892280046
+      }
+    ],
+    "TASK-161 Implement secrets redaction + Cognito fail-closed tests": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892280053
+      }
+    ],
+    "TASK-162 Wire optional X-Ray tracing": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892280061
+      }
+    ],
+    "TASK-163 Implement failure-injection suite (§21 matrix)": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892280068
+      }
+    ],
+    "TASK-164 Observability/resilience integration tests": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892280075
+      }
+    ],
+    "TASK-165 Author LOCAL_MOCK rehearsal runbook + script": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892280082
+      }
+    ],
+    "TASK-166 Author PERSONAL_AWS_DEV validation runbook": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892280090
+      }
+    ],
+    "TASK-167 Author COMPETITION_AWS deploy instructions runbook (P0a–P0d + step 1)": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892280096
+      }
+    ],
+    "TASK-168 Author source-manifest gate runbook (step 2, 7 SHA-256 STOP)": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892280102
+      }
+    ],
+    "TASK-169 Author smoke-test runbook + automated 3-event script": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892280110
+      }
+    ],
+    "TASK-170 Author latency-validation runbook + script (5s/60s + WS/polling)": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892280119
+      }
+    ],
+    "TASK-171 Author freeze-release + keep-Dashboard-URL runbook": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892280126
+      }
+    ],
+    "TASK-172 Author demo script + recorded-video plan": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892280133
+      }
+    ],
+    "TASK-173 Author evidence-export runbook + script (metrics/logs/artifacts)": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892280140
+      }
+    ],
+    "TASK-174 Author architecture-diagram export + GitHub delivery runbook": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892280149
+      }
+    ],
+    "TASK-175 Author post-judging cleanup runbook (cdk destroy, organizer-gated)": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892280159
+      }
+    ],
+    "TASK-176 Author residual-resource-check runbook + script": [
+      {
+        "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1784892280165
+      }
+    ]
+  }
+}
