@@ -1,8 +1,9 @@
 /**
  * Source Manifest Module
  *
- * Provides the OfficialSourceManifest, SHA-256 verifier, and STOP gate
- * for verifying the 7 official competition sources (§10.0, §15, §21).
+ * Provides the OfficialSourceManifest, SHA-256 verifier, STOP gate,
+ * and DerivedArtifactManifest for verifying and managing official
+ * and derived competition sources (§10.0, §10.0c, §15, §21).
  *
  * @module domain/source_manifest
  */
@@ -42,3 +43,20 @@ export type {
   FilePathResolver,
   BufferProvider,
 } from './manifest_gate.js';
+
+// ─── Derived Artifact Manifest (§10.0c) ────────────────────
+
+export {
+  DERIVED_ARTIFACT_TYPE,
+  DerivedArtifactManifest,
+  DerivedMirrorAsOfficialError,
+  assertDerivedTypeNotInOfficialSourceType,
+  rejectIfDerivedMirror,
+  buildDerivedArtifactManifest,
+  createDerivedArtifactEntry,
+} from './derived_artifact_manifest.js';
+
+export type {
+  DerivedArtifactType,
+  DerivedArtifactEntry,
+} from './derived_artifact_manifest.js';
