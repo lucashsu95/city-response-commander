@@ -3,5 +3,9 @@
 // ─── Source Manifest (§10.0, §15, §21) ─────────────────────
 export * from './source_manifest/index.js';
 
+// ─── Strategies (§11) ────────────────────────────
+export * from './strategies/affected_intersection_scope_strategy.js';
+
 // ─── Rule Engine (§9.4) ────────────────────
 export * from './rule_engine/article4.js';
+export * from './rule_engine/article5.js';
