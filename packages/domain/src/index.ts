@@ -5,6 +5,7 @@ export * from './source_manifest/index.js';
 
 // ─── Strategies (§11) ────────────────────────────
 export * from './strategies/affected_intersection_scope_strategy.js';
+export * from './strategies/affected_road_strategy.js';
 export * from './strategies/multilingual_scope_strategy.js';
 
 // ─── Rule Engine (§9.4) ────────────────────
