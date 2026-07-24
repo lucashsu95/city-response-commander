@@ -41,6 +41,8 @@ export type {
   SOPTrigger,
   DecisionCore,
   DecisionNarrative,
+  Disclosure,
+  RecommendationTemplate,
 } from './decision-core.js';
 
 // ─── API Contracts ─────────────────────────────────────────

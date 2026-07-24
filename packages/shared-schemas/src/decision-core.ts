@@ -94,6 +94,46 @@ export interface SOPTrigger {
   readonly data_values: Record<string, unknown>;
 }
 
+// ─── 決策揭露 (Disclosure) ──────────────────────────────────
+
+/**
+ * 決策揭露 — 確保評審可完整追溯決策依據
+ *
+ * 根據主辦單位回覆，評分重點在於 AI 推理過程是否嚴謹、
+ * 是否正確引用 SOP 條款，而非唯一的運算結果。
+ *
+ * 因此我們在每次決策中明確揭露：
+ * - 使用的資料時間
+ * - 使用的路段集合
+ * - 計算公式與輸入值
+ * - 團隊採用的實作假設
+ */
+export interface Disclosure {
+  /** 使用的資料時間（事件時間以前含最近一筆） */
+  readonly data_timestamp: TimestampTriplet;
+  /** 使用的路段集合定義 */
+  readonly road_set_definition: string;
+  /** ETE 計算公式 */
+  readonly ete_formula: string;
+  /** ETE 計算輸入值 */
+  readonly ete_inputs: {
+    /** base_clearance 分鐘 */
+    readonly base_clearance: number;
+    /** congestion_penalty 分鐘 */
+    readonly congestion_penalty: number;
+    /** 受影響路段 ID 列表 */
+    readonly affected_segment_ids: readonly string[];
+    /** 受影響路段平均飽和度 */
+    readonly avg_saturation: number;
+  };
+  /** 時間對齊策略說明 */
+  readonly time_alignment_note: string;
+  /** 團隊採用的實作假設 */
+  readonly assumptions: readonly string[];
+  /** 是否精確匹配 */
+  readonly exact_match: boolean;
+}
+
 // ─── 決策核心 ──────────────────────────────────────────────
 
 /**
@@ -165,6 +205,10 @@ export interface DecisionCore {
   readonly snapshot_timestamp: TimestampTriplet;
   /** 是否精確匹配 */
   readonly exact_match: boolean;
+
+  // ── 決策揭露 ──
+  /** 決策揭露（確保評審可完整追溯決策依據） */
+  readonly disclosure: Disclosure;
 }
 
 // ─── 決策筆記 (AI 生成) ────────────────────────────────────
@@ -183,4 +227,45 @@ export interface DecisionNarrative {
   readonly generated_at: string;
   /** 使用的 Bedrock 模型 ID */
   readonly model_id: string;
+  /** 決策揭露（確保評審可完整追溯決策依據） */
+  readonly disclosure?: Disclosure;
+}
+
+// ─── 建議書模板 ────────────────────────────────────────────
+
+/**
+ * 建議書模板 — 交控中心建議書的標準格式
+ *
+ * 根據主辦單位回覆，評分重點在於 AI 推理過程是否嚴謹、
+ * 是否正確引用 SOP 條款，而非唯一的運算結果。
+ *
+ * 因此建議書必須包含揭露區塊，確保評審可完整追溯決策依據。
+ */
+export interface RecommendationTemplate {
+  /** 決策 ID */
+  readonly decision_id: string;
+  /** 事件摘要 */
+  readonly event_summary: {
+    readonly event_id: string;
+    readonly event_type: string;
+    readonly location: string;
+    readonly timestamp: string;
+    readonly severity: string;
+  };
+  /** 觸發的 SOP 條款 */
+  readonly triggered_sops: readonly {
+    readonly article: SOPArticle;
+    readonly condition: string;
+    readonly data_values: Record<string, unknown>;
+  }[];
+  /** 處置建議 */
+  readonly recommendations: readonly string[];
+  /** 決策揭露區塊（確保評審可完整追溯決策依據） */
+  readonly disclosure_section: {
+    readonly data_timestamp: string;
+    readonly road_set: readonly string[];
+    readonly ete_formula: string;
+    readonly ete_inputs: Record<string, unknown>;
+    readonly assumptions: readonly string[];
+  };
 }
