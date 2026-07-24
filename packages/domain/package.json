@@ -1,0 +1,18 @@
+{
+  "name": "@city-commander/domain",
+  "version": "0.1.0",
+  "private": true,
+  "description": "決定性規則引擎 (SOP 判斷邏輯)",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@city-commander/shared-schemas": "*"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0"
+  }
+}

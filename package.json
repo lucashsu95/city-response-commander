@@ -1,0 +1,19 @@
+{
+  "name": "city-response-commander",
+  "version": "0.1.0",
+  "private": true,
+  "description": "城市交通應變 AI 指揮台 — 2026 雲湧智生黑客松競賽",
+  "workspaces": [
+    "packages/*",
+    "infra"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces",
+    "test": "npm run test --workspaces",
+    "lint": "eslint 'packages/*/src/**/*.ts'",
+    "typecheck": "tsc --build"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

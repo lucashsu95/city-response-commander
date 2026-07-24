@@ -1,0 +1,67 @@
+# 城市交通應變 AI 指揮台 — 本地開發設定
+# 此設定僅供 LOCAL_MOCK 環境使用，不包含任何敏感資訊
+
+env: LOCAL_MOCK
+
+bedrock:
+  region: ap-northeast-1
+  model_id: anthropic.claude-3-sonnet-20240229-v1:0
+  model_id_fallbacks:
+    - anthropic.claude-3-haiku-20240307-v1:0
+    - amazon.titan-text-express-v1
+  embedding_model_id: amazon.titan-embed-text-v1
+
+kb:
+  knowledge_base_id: ""
+  data_source_bucket: ""
+
+s3:
+  raw_bucket: ""
+  sop_source_bucket: ""
+  artifact_bucket: ""
+
+api:
+  endpoint: http://localhost:3000
+
+ws:
+  endpoint: ws://localhost:3001
+
+auth:
+  user_pool_id: ""
+  app_client_id: ""
+
+observability:
+  xray_enabled: false
+
+orchestration:
+  mode: lambda_direct
+
+enrichment:
+  fanout: stepfunctions
+
+frontend:
+  hosting: amplify
+
+config:
+  provider: local_file
+
+# ── Policy knobs (PROVISIONAL — OQ-001~011) ──
+policy:
+  time_alignment:
+    mode: exact_or_latest_prior
+    max_staleness_minutes: 30
+
+  affected_road:
+    role: ignore
+
+  ete:
+    affected_set: incident_plus_alternatives
+
+  incident_anchor:
+    mode: llm_parse
+
+  affected_intersection_scope:
+    mode: all_intersections
+
+  multilingual_scope:
+    mode: all_stations

@@ -1,0 +1,18 @@
+{
+  "name": "@city-commander/config",
+  "version": "0.1.0",
+  "private": true,
+  "description": "設定管理 (ConfigProvider)",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@city-commander/shared-schemas": "*"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0"
+  }
+}
