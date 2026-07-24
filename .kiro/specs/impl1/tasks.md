@@ -18,7 +18,7 @@ Implementation language (from design, not pseudocode): **TypeScript** is the pri
 
 Hard invariants enforced by every applicable task:
 - Deterministic code owns ALL numeric/boolean truth; Bedrock writes text-only fields and is rejected by `SchemaValidator` if it attempts to overwrite core fields (§9).
-- No task closes an Open Question. OQ-001..OQ-011 stay OPEN / AWAITING_HOST_REPLY. Provisional Strategies A–F and PARTIALLY_DEFINED items (OQ-006/007/008/009/011) MUST remain configurable via `ConfigProvider`; a task touching them records this in `provisional_policy_notes` and never bakes a provisional policy in as an official rule.
+- No task closes an Open Question without organizer guidance. OQ-001/002/003 resolved by HG-001 (remain configurable); OQ-004..OQ-011 stay OPEN / AWAITING_HOST_REPLY. Provisional Strategies A–F and PARTIALLY_DEFINED items (OQ-006/007/008/009/011) MUST remain configurable via `ConfigProvider`; a task touching them records this in `provisional_policy_notes` and never bakes a provisional policy in as an official rule.
 - No task requires an LLM to compute a numeric/boolean truth, and no task guesses an undefined official rule (such cases route to Strategy/config + `manual_confirmation_required`).
 
 Task ID scheme: flat, unique, sequential `TASK-001..TASK-180` (TASK-177 `WhatIfFnRole`, TASK-178 deployment-time KB ingestion, TASK-179 Lambda/IAM/Step-Functions final binding, and TASK-180 shared-stack final integration were added during competition-quality remediation; IDs remain unique and contiguous, physically placed in Phase 3). Test work is embedded per task via `tests_required`, and dedicated deterministic test tasks live in Phase 2 (plus cross-cutting tests in later phases). Every task carries a `delivery_class` (see "Competition Quality Principles"); `optional_marker` is retained ONLY on genuine `BONUS_OPTIONAL` tasks and is NOT a general-purpose skip flag — no core/test/security/latency/source-integrity/smoke work is ever waived. Test / security / latency / source-integrity / smoke tasks are `MANDATORY_ACCEPTANCE_GATE` (release-blocking), not optional. `CHECKPOINT` lines are not tasks and are excluded from the dependency graph and matrices.
@@ -226,7 +226,7 @@ Ten differentiators that make this entry competitive. Each is concrete and prova
   - competition_quality_floor: 7 official sources with exact UPPERCASE SHA-256; any mismatch/missing/unreadable → STOP decisioning (never silently use an unknown version); 5-file runtime vs 7-source provenance distinguished; 命題解說 = DOCX only, PDF = 命題文件 only.
   - demo_or_evidence_output: Unit tests (verified/mismatch/missing/unreadable) + STOP-gate abort test (TASK-056); `source_manifest_hash` exposed to DecisionCore.
 
-- [-] TASK-008 Implement DerivedArtifactManifest (mirrors are NOT source of truth)
+- [x] TASK-008 Implement DerivedArtifactManifest (mirrors are NOT source of truth)
   - objective: Register `.md`/`docx_extracted.txt` mirrors as `derived_searchable_mirror` in a separate manifest so they can never substitute for the official PDF/DOCX/SOP/CSV/JSON (§10.0c).
   - requirements_covered: REQ-032, R1
   - design_sections: §10.0c
@@ -249,7 +249,7 @@ Ten differentiators that make this entry competitive. Each is concrete and prova
   - competition_quality_floor: Mirrors registered only as `derived_searchable_mirror`; `derived_searchable_mirror` is never a valid `OfficialSourceManifest.source_type`; the decision path cannot read a mirror as authority.
   - demo_or_evidence_output: Unit test asserting mirror rejection from the official manifest + a compile/lint guard test blocking mirror imports into the decision path.
 
-- [~] TASK-009 Set up lint and format tooling
+- [x] TASK-009 Set up lint and format tooling
   - objective: Establish consistent linting/formatting across all packages to keep the deterministic/Bedrock boundary and naming conventions enforceable.
   - requirements_covered: REQ-025 (DELIVERABLE quality)
   - design_sections: §22 (test architecture support)
@@ -272,7 +272,7 @@ Ten differentiators that make this entry competitive. Each is concrete and prova
   - competition_quality_floor: Repo-wide lint/format; a custom rule mechanically flags any renderer write to an `LLM-prohibited` core field (§9 boundary guard); not skippable.
   - demo_or_evidence_output: Lint runs repo-wide; custom-rule unit test triggers on a renderer-writing-a-core-field fixture (positive/negative).
 
-- [~] TASK-010 Set up test frameworks (fast-check for TS, Hypothesis for Python)
+- [x] TASK-010 Set up test frameworks (fast-check for TS, Hypothesis for Python)
   - objective: Install and configure the PBT and unit-test frameworks so §22.1 properties run with ≥100 iterations and the required labels.
   - requirements_covered: R-supporting (all), REQ-032
   - design_sections: §22.1, §22.2
@@ -295,7 +295,7 @@ Ten differentiators that make this entry competitive. Each is concrete and prova
   - competition_quality_floor: PBT + unit frameworks operational; default `numRuns >= 100`; a label helper stamps `Feature: city-response-commander, Property {n}: {text}` on every property test; no framework built from scratch.
   - demo_or_evidence_output: A sample property test runs ≥100 iterations and emits the required label; root test command works.
 
-- [~] TASK-011 Establish CI skeleton (LOCAL_MOCK full deterministic run, no credentials)
+- [x] TASK-011 Establish CI skeleton (LOCAL_MOCK full deterministic run, no credentials)
   - objective: Create CI that runs all deterministic unit/property/golden tests in LOCAL_MOCK with no AWS calls and no credentials in the repo (§22.3, §23).
   - requirements_covered: REQ-025, REQ-032 (DELIVERABLE)
   - design_sections: §22.3, §23, §23.1
@@ -318,7 +318,7 @@ Ten differentiators that make this entry competitive. Each is concrete and prova
   - competition_quality_floor: CI runs the full deterministic unit/property/golden suite in LOCAL_MOCK with zero AWS calls and no credentials; a secret-scan step fails on committed credentials; any AWS call in the deterministic job fails CI.
   - demo_or_evidence_output: Green CI on the scaffold; deterministic test job requires no AWS credentials; secret-scan on a seeded fixture.
 
-- [~] TASK-012 Enforce no-credentials-in-repo guard and .gitignore hygiene
+- [x] TASK-012 Enforce no-credentials-in-repo guard and .gitignore hygiene
   - objective: Prevent secrets/artifacts from entering the repository and codify the "no hard-coded account/region/keys" rule (§17, §23).
   - requirements_covered: REQ-025 (DELIVERABLE), R-supporting (security)
   - design_sections: §17, §23, §4.12
@@ -347,7 +347,7 @@ CHECKPOINT A (not a task): Ensure all Phase 0 tests pass, ask the user if questi
 
 ## Phase 1 — Deterministic Domain Core (no Bedrock)
 
-- [~] TASK-013 Parse city_traffic_flow.csv into RawTrafficRecord
+- [x] TASK-013 Parse city_traffic_flow.csv into RawTrafficRecord
   - objective: Read the traffic CSV read-only into typed `RawTrafficRecord`, preserving official fields exactly (§10.1).
   - requirements_covered: REQ-001, REQ-011, R1
   - design_sections: §10.1, §15.1, §3.1
@@ -370,7 +370,7 @@ CHECKPOINT A (not a task): Ensure all Phase 0 tests pass, ask the user if questi
   - competition_quality_floor: Read-only parse of all 15 segments; `Saturation_Score` a number in 0..1; `timestamp_raw` byte-identical to source; schema mismatch aborts (`insufficient_data`) — no fabrication, no dropped rows.
   - demo_or_evidence_output: Unit tests (well-formed + malformed rows); typed `RawTrafficRecord[]` for 15 segments; feeds P2/P34.
 
-- [~] TASK-014 Parse signaling_crowd_density.csv and implement PercentParser
+- [x] TASK-014 Parse signaling_crowd_density.csv and implement PercentParser
   - objective: Read the crowd CSV into `RawCrowdRecord` and parse `Roaming_User_Pct` strings to `roaming_pct_value` (e.g., "30%"→0.30) (§10.2, R1.3).
   - requirements_covered: REQ-001, REQ-010, REQ-019, R1
   - design_sections: §10.2, §8 (PercentParser), §3.1
@@ -393,7 +393,7 @@ CHECKPOINT A (not a task): Ensure all Phase 0 tests pass, ask the user if questi
   - competition_quality_floor: `roaming_pct_value` exact for "5%"/"30%"/"45%"; original `Roaming_User_Pct` immutable; `User_Count` int / `Growth_Rate` number validated; unparseable percent → typed error, no fabrication.
   - demo_or_evidence_output: Unit tests + feeds P1 (percent round-trip).
 
-- [~] TASK-015 Parse road_network_geometry.json into RoadSegment and load RoadNetworkModel
+- [x] TASK-015 Parse road_network_geometry.json into RoadSegment and load RoadNetworkModel
   - objective: Read the road network JSON into `RoadSegment` records and load them into `RoadNetworkModel` (§10.3, R7).
   - requirements_covered: REQ-026, REQ-027, REQ-028, R7
   - design_sections: §10.3, §9.4 (geometry), §15.1
@@ -416,7 +416,7 @@ CHECKPOINT A (not a task): Ensure all Phase 0 tests pass, ask the user if questi
   - competition_quality_floor: `intersections` order (upstream→downstream) and `alternatives` order preserved verbatim; empty `nearby_stations` kept empty (never filled); malformed geometry → abort, no fabrication.
   - demo_or_evidence_output: Unit tests (order-preserving, empty nearby) + feeds P13/P14/P15.
 
-- [~] TASK-016 Parse live_incidents.json into Incident
+- [x] TASK-016 Parse live_incidents.json into Incident
   - objective: Read incidents JSON into typed `Incident` records including optional `affected_road` (only EVT_002) (§10.4).
   - requirements_covered: REQ-003, REQ-012, REQ-016, R5, R6
   - design_sections: §10.4, §3.1
@@ -439,7 +439,7 @@ CHECKPOINT A (not a task): Ensure all Phase 0 tests pass, ask the user if questi
   - competition_quality_floor: The three official events parse; `affected_road` present only where provided (EVT_002), semantics deferred to Strategy B (not interpreted here); `severity ∈ {Critical,High,Medium}`; unknown severity → typed error.
   - demo_or_evidence_output: Unit tests for ACC_001/EVT_002/EVT_003 shapes.
 
-- [~] TASK-017 Load emergency_traffic_sop.txt with article chunking metadata
+- [x] TASK-017 Load emergency_traffic_sop.txt with article chunking metadata
   - objective: Load the 7-article SOP text and split it per article (article_no metadata) to support precise citation and S3 fallback retrieval (§14.1).
   - requirements_covered: REQ-005, REQ-020, R5, R12
   - design_sections: §14.1, §3.1, §10.0b
@@ -462,7 +462,7 @@ CHECKPOINT A (not a task): Ensure all Phase 0 tests pass, ask the user if questi
   - competition_quality_floor: Exactly 7 article chunks with correct `article_no`; verbatim text preserved for citation source location; lookup by `article_no` for the KB S3 fallback; article count != 7 → abort/flag.
   - demo_or_evidence_output: Unit test (7 chunks, verbatim) + feeds RAG citation tests (Phase 6).
 
-- [~] TASK-018 Implement timestamp normalization (raw immutable, normalized, display)
+- [x] TASK-018 Implement timestamp normalization (raw immutable, normalized, display)
   - objective: Produce `timestamp_normalized` (for comparison) and `timestamp_display` (`YYYY-MM-DD HH:MM`) while `timestamp_raw` is never overwritten (§10.1/§10.2, R11.5).
   - requirements_covered: REQ-019, R1, R11
   - design_sections: §10.1, §10.2, §9.4 (art.6 format)
@@ -485,7 +485,7 @@ CHECKPOINT A (not a task): Ensure all Phase 0 tests pass, ask the user if questi
   - competition_quality_floor: `timestamp_display` always `YYYY-MM-DD HH:MM`; `timestamp_normalized` denotes the same instant as raw; `timestamp_raw` never overwritten; unparseable timestamp → typed error, no guessing.
   - demo_or_evidence_output: Unit tests + feeds P34/P21.
 
-- [~] TASK-019 Implement DataIngestionService orchestration (load + verify + read-only)
+- [x] TASK-019 Implement DataIngestionService orchestration (load + verify + read-only)
   - objective: Compose the five parsers with the manifest STOP gate into one read-only ingestion entry point (§8, §15.1, Figure 4).
   - requirements_covered: REQ-001, REQ-032, R1
   - design_sections: §8, §15.1, §10.0, Figure 4
@@ -508,7 +508,7 @@ CHECKPOINT A (not a task): Ensure all Phase 0 tests pass, ask the user if questi
   - competition_quality_floor: Five parsers composed behind the manifest STOP gate into one read-only ingestion entry point; load failure / hash mismatch → `insufficient_data`, no fabrication; official data never mutated.
   - demo_or_evidence_output: Orchestration unit tests + STOP-gate integration (feeds P2 read-only invariance).
 
-- [~] TASK-020 Implement SnapshotSelector (Strategy A / TimeAlignmentStrategy)
+- [x] TASK-020 Implement SnapshotSelector (Strategy A / TimeAlignmentStrategy)
   - objective: Select the per-entity data row aligned to an event timestamp using the pluggable time-alignment strategy, never using post-event rows as the primary basis (§11.1, R1.5).
   - requirements_covered: REQ-001, REQ-004, REQ-009, R1
   - design_sections: §11.1, §10.5, §8
@@ -524,7 +524,7 @@ CHECKPOINT A (not a task): Ensure all Phase 0 tests pass, ask the user if questi
   - tests_required: unit + P3 in Phase 2; policy-switch test (TASK-057).
   - failure_cases: no legal row → `insufficient_data`/`manual_confirmation_required` (§21), never fabricate.
   - done_definition: Strategy A selects aligned snapshots and is switchable via config.
-  - provisional_policy_notes: Strategy A = OQ-001, PROVISIONAL, `AWAITING_HOST_REPLY`; mode is a config knob (`policy.time_alignment.mode`), never presented as official.
+  - provisional_policy_notes: Strategy A = OQ-001, RESOLVED_FOR_IMPLEMENTATION_BY_ORGANIZER_GUIDANCE (HG-001); mode is a config knob (`policy.time_alignment.mode`), never presented as official; remains configurable.
   - aws_services_touched: none (pure domain)
   - security_or_iam_notes: none
   - delivery_class: MANDATORY_IMPLEMENTATION
@@ -532,7 +532,7 @@ CHECKPOINT A (not a task): Ensure all Phase 0 tests pass, ask the user if questi
   - competition_quality_floor: Selected row `Timestamp <= event_timestamp` and per-entity latest prior; a station's User_Count/Growth_Rate/Roaming taken from one row; no legal row → `insufficient_data` (never an event-after row); Strategy A configurable and provisional-marked.
   - demo_or_evidence_output: Feeds P3; policy-switch verification (TASK-057); provisional flag surfaced.
 
-- [~] TASK-021 Implement RoadNetworkModel semantics (one-way alternatives, empty nearby, upstream/downstream)
+- [x] TASK-021 Implement RoadNetworkModel semantics (one-way alternatives, empty nearby, upstream/downstream)
   - objective: Provide geometry query methods honoring one-way `alternatives`, empty `nearby_stations` as normal, and `intersections` upstream→downstream ordering with `flow_direction` (§9.4, R7).
   - requirements_covered: REQ-026, REQ-027, REQ-028, R7
   - design_sections: §10.3, §9.4, §11.5 (used by anchor)
@@ -555,7 +555,7 @@ CHECKPOINT A (not a task): Ensure all Phase 0 tests pass, ask the user if questi
   - competition_quality_floor: `alternatives` one-way (never assume B→A, no symmetric graph search); empty `nearby_stations` kept as empty set; upstream/downstream from `intersections` order + `flow_direction`.
   - demo_or_evidence_output: Feeds P13/P14/P15.
 
-- [~] TASK-022 Implement ClassificationEngine (A/B grading)
+- [x] TASK-022 Implement ClassificationEngine (A/B grading)
   - objective: Grade every segment A iff `>=0.95`, B iff `0.85<=score<0.95`, else neither, applied identically to all 15 segments (§9.4 art.1, R2).
   - requirements_covered: REQ-011, R2
   - design_sections: §9.4 (art.1 grading), §10.11a (classifications)
@@ -577,7 +577,7 @@ CHECKPOINT A (not a task): Ensure all Phase 0 tests pass, ask the user if questi
   - competition_quality_floor: A iff `Saturation>=0.95`; B iff `0.85<=score<0.95`; else non-A/B; consistent across all 15 segments; exact official boundaries (no drift, no rounding shortcuts).
   - demo_or_evidence_output: Feeds P4; boundary tests (TASK-052) at 0.8499/0.85/0.9499/0.95.
 
-- [~] TASK-023 Implement RuleEngine article1 (trigger segments, measures, invoked_procedures)
+- [x] TASK-023 Implement RuleEngine article1 (trigger segments, measures, invoked_procedures)
   - objective: Encode SOP-1 measures for RD_TPE_001/002 (B-level actions; A-level additionally invokes `article2_alternative_route_guidance` recorded in `invoked_procedures`), keeping A-level alone from adding art.2 to `triggered_articles` (§9.4 art.1, R3).
   - requirements_covered: REQ-011, R3
   - design_sections: §9.4 (art.1), §10.11a (art1_measures/invoked_procedures)
@@ -600,7 +600,7 @@ CHECKPOINT A (not a task): Ensure all Phase 0 tests pass, ask the user if questi
   - competition_quality_floor: RD_TPE_001/002 — B → long-green timing + that segment's alternatives green +25% + clear intersections; A additionally INVOKES `article2_alternative_route_guidance` (recorded in `invoked_procedures`); A alone does NOT put 2 in `triggered_articles` (art.2 trigger requires its own 3 conditions).
   - demo_or_evidence_output: Feeds P5; ACC_001 golden (invoked_procedures + art.1 measures).
 
-- [~] TASK-024 Implement RuleEngine article2 trigger and candidate qualification (3-AND)
+- [x] TASK-024 Implement RuleEngine article2 trigger and candidate qualification (3-AND)
   - objective: Encode SOP-2 trigger (status∈{Closed,Blocked,Restricted} AND severity∈{High,Critical} AND affected_segment starts with RD_) and candidate qualification as exactly three ANDs (capacity>=1000, direct intersection, upstream), with Saturation NOT a filter (§9.4 art.2, R6).
   - requirements_covered: REQ-012, REQ-013, R6
   - design_sections: §9.4 (art.2), §10.8 (RouteCandidate)
@@ -623,7 +623,7 @@ CHECKPOINT A (not a task): Ensure all Phase 0 tests pass, ask the user if questi
   - competition_quality_floor: art.2 triggers iff `status∈{Closed,Blocked,Restricted}` AND `severity∈{High,Critical}` AND `affected_segment` starts `RD_`; candidate qualification is EXACTLY 3 AND (`capacity_vph>=1000`, direct intersection, upstream); Saturation is NEVER a 4th hard filter; `BS_` routes to art.3.
   - demo_or_evidence_output: Feeds P8/P9; ACC_001 golden; TC-SOP2 capacity boundary (999/1000).
 
-- [~] TASK-025 Implement EvacuationSelector (lowest-saturation primary, downstream secondary, congested-maintain, no-candidate)
+- [x] TASK-025 Implement EvacuationSelector (lowest-saturation primary, downstream secondary, congested-maintain, no-candidate)
   - objective: Among qualified candidates pick the lowest `Saturation_Score` as primary, list downstream intersecting arterials as secondary, maintain a congested primary (>=0.85) with long-green + public-transit note, and record "查無合規替代路段" when none qualify (§9.4 art.2, §11.7, R6).
   - requirements_covered: REQ-013, REQ-014, REQ-005, R5, R6
   - design_sections: §9.4 (art.2), §11.7 (OQ-008), §10.8
@@ -647,7 +647,7 @@ CHECKPOINT A (not a task): Ensure all Phase 0 tests pass, ask the user if questi
   - competition_quality_floor: Primary = lowest Saturation among qualified candidates; downstream direct intersections → secondary only; congested primary (`>=0.85`) is MAINTAINED + long-green + report note + public-transit recommendation; no qualifying candidate → "no compliant alternative" (never fabricate a road). OQ-008 disclosure stays configurable.
   - demo_or_evidence_output: Feeds P9/P10/P11/P12; ACC_001 golden (primary RD_TPE_004 / secondary RD_TPE_005, PROVISIONAL).
 
-- [~] TASK-026 Implement IncidentAnchorResolutionStrategy (Strategy D) and conservative fallback
+- [x] TASK-026 Implement IncidentAnchorResolutionStrategy (Strategy D) and conservative fallback
   - objective: Map `Incident.location` text to a structured anchor (intersection, direction, upstream/downstream) for art.2, and when it cannot be uniquely resolved, return `manual_confirmation_required` with no primary and unranked direct intersections (§11.5, R6).
   - requirements_covered: REQ-013, REQ-028, R6, R7
   - design_sections: §11.5, §10.8a (IncidentAnchor)
@@ -671,7 +671,7 @@ CHECKPOINT A (not a task): Ensure all Phase 0 tests pass, ask the user if questi
   - competition_quality_floor: Anchor uniquely resolved from `location` text → upstream/downstream via RoadNetworkModel + Strategy D (NOT time-alignment Strategy A); if not uniquely resolvable → `manual_confirmation_required`, `primary_evacuation=null`, no auto-ranking (all `unranked_direct_intersection`), no fabricated up/down; provisional and configurable.
   - demo_or_evidence_output: Feeds P30; policy-switch verification (TASK-057).
 
-- [~] TASK-027 Implement RuleEngine article3 (SOP-3 MRT shuttle)
+- [x] TASK-027 Implement RuleEngine article3 (SOP-3 MRT shuttle)
   - objective: Encode SOP-3 OR-trigger for BS_MRT_BL17 (Growth_Rate>0.30 OR User_Count>25000) with exact boundaries and the shuttle actions (§9.4 art.3, R8).
   - requirements_covered: REQ-016, R8
   - design_sections: §9.4 (art.3), §10.7
@@ -693,7 +693,7 @@ CHECKPOINT A (not a task): Ensure all Phase 0 tests pass, ask the user if questi
   - competition_quality_floor: art.3 triggers iff `BL17 Growth_Rate>0.30` OR `User_Count>25000` (=25000 not, =25001 yes, =0.30 not); actions include skip-stop + bus shuttle + walk to BS_MRT_BL18; EVT_002 must be COMPUTED, never assumed triggered.
   - demo_or_evidence_output: Feeds P16; TC-SOP3 boundaries; EVT_002 golden (must-compute).
 
-- [~] TASK-028 Implement RuleEngine article4 (SOP-4 dome dispersal)
+- [-] TASK-028 Implement RuleEngine article4 (SOP-4 dome dispersal)
   - objective: Encode SOP-4: mark dispersal iff BS_TPE_DOME historical peak>=30000 AND current Growth_Rate<=-0.20, then proactively invoke art.3 (§9.4 art.4, R9).
   - requirements_covered: REQ-017, R9
   - design_sections: §9.4 (art.4), §10.7
@@ -774,17 +774,17 @@ CHECKPOINT A (not a task): Ensure all Phase 0 tests pass, ask the user if questi
     2. Compute `congestion_penalty=max(0,(avg-0.5)*60)` and `ete_minutes`.
     3. Set `formula_applicability` (applicable vs partially_defined) per §9.5; record `applicability_note` and `lower_bound_only`.
     4. Record `base_clearance` from severity.
-  - acceptance_criteria: ACC_001 → 90 (flagged PROVISIONAL_DERIVED_EXAMPLE); penalty never negative; art.7 goes to `applied_formula_articles` only.
+  - acceptance_criteria: ACC_001 → 78.6 (flagged ORGANIZER_GUIDED_TEAM_POLICY, HG-001); penalty never negative; art.7 goes to `applied_formula_articles` only.
   - tests_required: unit + P22/P23 in Phase 2; ACC_001 ETE golden (TASK-053).
   - failure_cases: saturation missing → `lower_bound` using base_clearance, penalty marked undefined (§21).
   - done_definition: ETE formula + Strategy C encoded.
-  - provisional_policy_notes: Strategy C = OQ-003 (with OQ-011 interplay); `policy.ete.affected_set` configurable; ACC_001=90 never presented as official.
+  - provisional_policy_notes: Strategy C = OQ-003 (with OQ-011 interplay); `policy.ete.affected_set` configurable; ACC_001=78.6 per HG-001 organizer guidance; RESOLVED_FOR_IMPLEMENTATION_BY_ORGANIZER_GUIDANCE (HG-001), remains configurable.
   - aws_services_touched: none (pure domain)
   - security_or_iam_notes: none
   - delivery_class: MANDATORY_IMPLEMENTATION
   - judging_criteria_contribution: technical_feasibility, theme_alignment, completeness
   - competition_quality_floor: `ETE = base_clearance + congestion_penalty`; base 60/40/20 for Critical/High/Medium; `congestion_penalty = max(0,(avg_saturation-0.5)*60)`; art.7 is ALWAYS `applied_formula_articles`, NEVER `triggered_articles`; affected_set via Strategy C; Bedrock never recomputes ETE.
-  - demo_or_evidence_output: Feeds P22/P23; ACC_001 ETE=90 (PROVISIONAL_DERIVED_EXAMPLE, official_golden_answer=false).
+  - demo_or_evidence_output: Feeds P22/P23; ACC_001 ETE=78.6 (ORGANIZER_GUIDED_TEAM_POLICY, HG-001, official_golden_answer=false).
 
 - [~] TASK-032 Implement AffectedRoadStrategy (Strategy B) for EVT_002 affected_road role
   - objective: Encode the pluggable role of `affected_road` (default `display_only`) so a BS_ event's `affected_road` never directly triggers art.2 and re-validates all art.2 conditions if ever escalated (§11.2, R8).
@@ -801,7 +801,7 @@ CHECKPOINT A (not a task): Ensure all Phase 0 tests pass, ask the user if questi
   - tests_required: unit + policy switch (TASK-057); EVT_002 golden (TASK-054).
   - failure_cases: never assert EVT_002 auto-triggers art.2/art.3 (must compute) (§11.2).
   - done_definition: Strategy B implemented and switchable.
-  - provisional_policy_notes: Strategy B = OQ-002, PROVISIONAL default `display_only`; never official.
+  - provisional_policy_notes: Strategy B = OQ-002, RESOLVED_FOR_IMPLEMENTATION_BY_ORGANIZER_GUIDANCE (HG-001) default `display_only`; remains configurable.
   - aws_services_touched: none (pure domain)
   - security_or_iam_notes: none
   - delivery_class: MANDATORY_IMPLEMENTATION
@@ -1274,7 +1274,7 @@ CHECKPOINT B (not a task): Ensure all Phase 1 unit tests pass and the determinis
   - demo_or_evidence_output: Green boundary suite; each boundary asserts the exact expected classification/trigger per the derived boundary matrix.
 
 - [~] TASK-053 Golden test ACC_001 (deterministic core)
-  - objective: End-to-end deterministic golden for ACC_001: triggered=[1,2], invoked=[article2_alternative_route_guidance], applied=[7], citation={1,2,7}, primary RD_TPE_004 / secondary RD_TPE_005 (provisional), ETE=90 (provisional), all provisional facts flagged.
+  - objective: End-to-end deterministic golden for ACC_001: triggered=[1,2], invoked=[article2_alternative_route_guidance], applied=[7], citation={1,2,7}, primary RD_TPE_004 / secondary RD_TPE_005 (provisional), ETE=78.6 (ORGANIZER_GUIDED_TEAM_POLICY, HG-001), all provisional facts flagged.
   - requirements_covered: REQ-012, REQ-013, REQ-014, REQ-015, REQ-009, REQ-020, R6, R12
   - design_sections: §9.5, §11.4, §22.3
   - components: RuleEngine, EvacuationSelector, ETECalculator, DecisionCore builder
@@ -1283,7 +1283,7 @@ CHECKPOINT B (not a task): Ensure all Phase 1 unit tests pass and the determinis
   - implementation_steps:
     1. Feed ACC_001 with default provisional strategies.
     2. Assert triggered/invoked/applied/citation sets and excluded reasons (RD_TPE_006 not-direct, RD_TPE_008 capacity 600<1000).
-    3. Assert primary/secondary and ETE=90 carry `PROVISIONAL_DERIVED_EXAMPLE`, `official_golden_answer=false`.
+    3. Assert primary/secondary and ETE=78.6 carry `ORGANIZER_GUIDED_TEAM_POLICY` (guidance_id=HG-001), `official_golden_answer=false`.
   - acceptance_criteria: Golden matches the §9.5/§11.4 walkthrough with provisional flags.
   - tests_required: golden ACC_001.
   - failure_cases: art.1 omitted or art.7 mislabeled as trigger → failure.
@@ -1293,8 +1293,8 @@ CHECKPOINT B (not a task): Ensure all Phase 1 unit tests pass and the determinis
   - security_or_iam_notes: none
   - delivery_class: MANDATORY_ACCEPTANCE_GATE
   - judging_criteria_contribution: technical_feasibility, theme_alignment, completeness
-  - competition_quality_floor: ACC_001 end-to-end golden: `triggered_articles=[1,2]`, `invoked_procedures=[article2_alternative_route_guidance]`, `applied_formula_articles=[7]`, citation {1,2,7}, primary RD_TPE_004 / secondary RD_TPE_005 / excluded RD_TPE_006,008, ETE=90 — all marked PROVISIONAL_DERIVED_EXAMPLE (`official_golden_answer=false`), never presented as the host's answer. Release-blocking.
-  - demo_or_evidence_output: Green ACC_001 golden asserting the exact core sets with provisional markers.
+  - competition_quality_floor: ACC_001 end-to-end golden: `triggered_articles=[1,2]`, `invoked_procedures=[article2_alternative_route_guidance]`, `applied_formula_articles=[7]`, citation {1,2,7}, primary RD_TPE_004 / secondary RD_TPE_005 / excluded RD_TPE_006,008, ETE=78.6 — all marked ORGANIZER_GUIDED_TEAM_POLICY (guidance_id=HG-001, `official_golden_answer=false`), never presented as the host's answer. Release-blocking.
+  - demo_or_evidence_output: Green ACC_001 golden asserting the exact core sets with ORGANIZER_GUIDED_TEAM_POLICY (HG-001) markers.
 
 - [~] TASK-054 Golden test EVT_002 (SOP-3 evaluation, must-compute)
   - objective: Golden for EVT_002 verifying BS_ routes to art.3 evaluation (computed, not assumed), and `affected_road` handled via Strategy B `display_only` without triggering art.2.
@@ -1328,7 +1328,8 @@ CHECKPOINT B (not a task): Ensure all Phase 1 unit tests pass and the determinis
   - implementation_steps:
     1. Feed EVT_003; assert art.5 triggered, CMS "松高路 號誌故障，請依現場指揮通行".
     2. Assert count/total police unresolved + manual_confirmation.
-  - acceptance_criteria: Golden matches §9.5 with unresolved police totals.
+    3. Assert EVT_003 ETE = 41.0 (Medium base=20, common timestamp 22:30, RD_TPE_007=0.85 + RD_TPE_011=0.85, avg=0.85, penalty=21.0, guidance_id=HG-001).
+  - acceptance_criteria: Golden matches §9.5 with unresolved police totals; EVT_003 ETE=41.0(HG-001).
   - tests_required: golden EVT_003.
   - failure_cases: fixed total police as official → failure.
   - done_definition: EVT_003 golden green.
@@ -1337,8 +1338,8 @@ CHECKPOINT B (not a task): Ensure all Phase 1 unit tests pass and the determinis
   - security_or_iam_notes: none
   - delivery_class: MANDATORY_ACCEPTANCE_GATE
   - judging_criteria_contribution: technical_feasibility, completeness
-  - competition_quality_floor: EVT_003 golden proves art.5 trigger (Power_Failure), `police_per_intersection=2` (official) with unresolved scope (`affected_intersection_count`/`total_police=unresolved`), and exact CMS "松高路 號誌故障，請依現場指揮通行". Release-blocking.
-  - demo_or_evidence_output: Green EVT_003 golden asserting CMS text + unresolved police scope (no fabricated total).
+  - competition_quality_floor: EVT_003 golden proves art.5 trigger (Power_Failure), `police_per_intersection=2` (official) with unresolved scope (`affected_intersection_count`/`total_police=unresolved`), exact CMS "松高路 號誌故障，請依現場指揮通行", and ETE=41.0(HG-001). Release-blocking.
+  - demo_or_evidence_output: Green EVT_003 golden asserting CMS text + unresolved police scope (no fabricated total) + ETE=41.0(HG-001).
 
 - [~] TASK-056 Failure-mode deterministic tests (source-hash STOP, no-candidate, unresolved anchor, unresolved police)
   - objective: Verify STOP on source hash mismatch, no-legal-alternative documentation, unresolved-anchor conservative behavior, and unresolved police scope.
@@ -3204,7 +3205,7 @@ CHECKPOINT G (not a task): Ensure enrichment path + §9 boundary hold, and Bedro
   - demo_or_evidence_output: Route panel showing primary RD_TPE_004 / secondary RD_TPE_005 / excluded reasons + provisional badge (ACC_001).
 
 - [~] TASK-131 Implement ETE display + provisional markers
-  - objective: Render the ETE value + calculation basis with `formula_applicability` and `PROVISIONAL_DERIVED_EXAMPLE`/`official_golden_answer=false` markers (§16, R12).
+  - objective: Render the ETE value + calculation basis with `formula_applicability` and `ORGANIZER_GUIDED_TEAM_POLICY`/`official_golden_answer=false` markers (§16, R12).
   - requirements_covered: REQ-009, REQ-020, R12
   - design_sections: §16, §10.9, §11.4
   - components: DashboardService (ETE display)
@@ -3212,19 +3213,19 @@ CHECKPOINT G (not a task): Ensure enrichment path + §9 boundary hold, and Bedro
   - dependencies: [TASK-129]
   - implementation_steps:
     1. Render `ete_minutes` + `basis_note` + `formula_applicability`.
-    2. Show provisional markers (e.g., "90 分為暫定政策推導範例，非官方指定答案").
+    2. Show provisional markers (e.g., "78.6 分為 HG-001 主辦方指導之團隊政策值，非官方指定答案").
     3. Show `lower_bound_only` when data insufficient.
   - acceptance_criteria: ETE + basis + provisional markers render; never presented as official.
   - tests_required: component test (TASK-135).
-  - failure_cases: presenting provisional ETE as official → review rejection.
+  - failure_cases: presenting HG-001 guided ETE as official → review rejection.
   - done_definition: ETE display implemented.
   - provisional_policy_notes: ETE provisional (Strategies A/C, OQ-003/011); markers mandatory.
   - aws_services_touched: HTTP API (client)
   - security_or_iam_notes: none
   - delivery_class: MANDATORY_IMPLEMENTATION
   - judging_criteria_contribution: theme_alignment, business_applicability, completeness
-  - competition_quality_floor: ETE value + calculation basis; `PROVISIONAL_DERIVED_EXAMPLE` badge where applicable; lower-bound display when data insufficient; provisional never presented as the official/host answer.
-  - demo_or_evidence_output: ETE panel showing 90 min for ACC_001 with the PROVISIONAL badge and basis note.
+  - competition_quality_floor: ETE value + calculation basis; `ORGANIZER_GUIDED_TEAM_POLICY` badge where applicable; lower-bound display when data insufficient; HG-001 guided ETE never presented as the official/host answer.
+  - demo_or_evidence_output: ETE panel showing 78.6 min for ACC_001 with the ORGANIZER_GUIDED_TEAM_POLICY (HG-001) badge and basis note.
 
 - [~] TASK-132 Implement report + public-alert panels
   - objective: Render the command-center report and multilingual public alert from the read model (Core+Narrative), with template-text indication when narratives are not yet ready (§16, R13/R14).
@@ -4302,7 +4303,7 @@ CHECKPOINT L (not a task): Ensure all deployment/evidence runbooks and helper sc
 ## Notes
 
 - Every task carries a `delivery_class` (see "Competition Quality Principles" and Section 8). `optional_marker` is retained ONLY on the two genuine `BONUS_OPTIONAL` tasks (TASK-134, TASK-162) and is never a general-purpose skip flag; no core, test, security, latency, source-integrity, or smoke work is ever waived. `MANDATORY_ACCEPTANCE_GATE` tasks (tests / IAM / security / latency / source-integrity / smoke) are release-blocking. Top-level phases are never optional. TASK-179 (final Lambda/IAM/Step-Functions binding) and TASK-180 (shared-stack final integration) are `MANDATORY_IMPLEMENTATION` and placed in Phase 3 immediately after TASK-178.
-- No task closes an Open Question. OQ-001..OQ-011 remain OPEN / AWAITING_HOST_REPLY. Provisional Strategies A–F and PARTIALLY_DEFINED items (OQ-006/007/008/009/011) stay configurable via `ConfigProvider`; the `provisional_policy_notes` field on each touching task records this. No default is presented as an official rule.
+- No task closes an Open Question without organizer guidance. OQ-001/002/003 resolved by HG-001 (remain configurable); OQ-004..OQ-011 remain OPEN / AWAITING_HOST_REPLY. Provisional Strategies A–F and PARTIALLY_DEFINED items (OQ-006/007/008/009/011) stay configurable via `ConfigProvider`; the `provisional_policy_notes` field on each touching task records this. No default is presented as an official rule.
 - No task lets an LLM compute a numeric/boolean truth or guess an undefined official rule; such cases route to a Strategy/config knob plus `manual_confirmation_required`.
 - Phase 11 tasks AUTHOR runbooks/scripts only; they never execute a deployment or `cdk destroy`. Actual deploy/teardown are operator actions gated by the runbooks (teardown additionally gated by organizer confirmation, §25/§26).
 - `CHECKPOINT A..L` lines are not tasks and are excluded from the matrices and the dependency waves.
@@ -4450,9 +4451,9 @@ Coverage result: **every property P1–P37 has ≥1 dedicated property/integrati
 
 | OQ | Issue | Strategy / mechanism | Implementing task(s) | Config knob | Switchability test | Status |
 | --- | --- | --- | --- | --- | --- | --- |
-| OQ-001 | 事件時間對齊 | Strategy A `TimeAlignmentStrategy` | TASK-020 | `policy.time_alignment.*` (TASK-006) | TASK-038, TASK-057 | OPEN |
-| OQ-002 | Event2 affected_road 用途 | Strategy B `AffectedRoadStrategy` | TASK-032 | `policy.affected_road.role` | TASK-054, TASK-057 | OPEN |
-| OQ-003 | ETE 受影響路段集合 | Strategy C `EteAffectedSetStrategy` | TASK-031 | `policy.ete.affected_set` | TASK-047, TASK-057 | OPEN |
+| OQ-001 | 事件時間對齊 | Strategy A `TimeAlignmentStrategy` | TASK-020 | `policy.time_alignment.*` (TASK-006) | TASK-038, TASK-057 | RESOLVED_BY_HG-001 |
+| OQ-002 | Event2 affected_road 用途 | Strategy B `AffectedRoadStrategy` | TASK-032 | `policy.affected_road.role` | TASK-054, TASK-057 | RESOLVED_BY_HG-001 |
+| OQ-003 | ETE 受影響路段集合 | Strategy C `EteAffectedSetStrategy` | TASK-031 | `policy.ete.affected_set` | TASK-047, TASK-057 | RESOLVED_BY_HG-001 |
 | OQ-004 | 事故錨點解析 | Strategy D `IncidentAnchorResolutionStrategy` | TASK-026 | `policy.incident_anchor.mode` | TASK-043, TASK-057 | OPEN |
 | OQ-005 | SOP6 站集/時間快照 | Strategy F `MultilingualScopeStrategy` | TASK-030 | `policy.multilingual_scope.mode` | TASK-046, TASK-057 | OPEN |
 | OQ-006 | 無 segment_id 路口標籤 | PARTIALLY_DEFINED (labels order/display only) | TASK-021 | (RoadNetworkModel behavior flag) | TASK-042, TASK-057 | OPEN |
@@ -4462,7 +4463,7 @@ Coverage result: **every property P1–P37 has ≥1 dedicated property/integrati
 | OQ-010 | SOP5 受影響路口範圍 | Strategy E `AffectedIntersectionScopeStrategy` | TASK-029 | `policy.affected_intersection_scope.mode` | TASK-045, TASK-057 | OPEN |
 | OQ-011 | SOP5 估計持續時間 vs SOP7 ETE | PARTIALLY_DEFINED (kept separate/non-overwriting) | TASK-029, TASK-031 | (duration/ETE separation flag) | TASK-047, TASK-055 | OPEN |
 
-Result: **all OQ-001..011 remain OPEN**; each has a configurable landing task and a switch-verification test. No task resolves an OQ.
+Result: **OQ-001/002/003 resolved by HG-001 organizer guidance** (remain configurable); OQ-004..011 remain OPEN; each has a configurable landing task and a switch-verification test.
 
 ---
 
