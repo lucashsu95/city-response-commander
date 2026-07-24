@@ -165,12 +165,26 @@ describe('shared-schemas type-level assertions', () => {
 
     it('ETEResult type exists with formula fields', () => {
       const ete: ETEResult = {
-        ete_minutes: 90,
+        ete_minutes: 78.6,
         base_clearance: 60,
-        congestion_penalty: 30,
+        congestion_penalty: 18.6,
         severity: 'Critical',
-        avg_saturation: 1.0,
+        avg_saturation: 0.81,
+        affected_set: ['RD_TPE_002', 'RD_TPE_004', 'RD_TPE_005'],
+        calculation_status: 'computed',
+        snapshot_provenance: {
+          selection_status: 'common_exact_snapshot',
+          event_timestamp: '2026-05-20 22:10',
+          common_snapshot_timestamp: '2026-05-20 22:00',
+          readings: [
+            { road_id: 'RD_TPE_002', observation_timestamp: '2026-05-20 22:00', saturation_score: 1 },
+            { road_id: 'RD_TPE_004', observation_timestamp: '2026-05-20 22:00', saturation_score: 0.78 },
+            { road_id: 'RD_TPE_005', observation_timestamp: '2026-05-20 22:00', saturation_score: 0.65 },
+          ],
+        },
+        manual_confirmation_required: false,
         formula_applicability: 'applicable',
+        lower_bound_only: false,
       };
       expect(ete.ete_minutes).toBe(ete.base_clearance + ete.congestion_penalty);
     });

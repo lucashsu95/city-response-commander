@@ -85,6 +85,10 @@ export type {
 // ─── ETE Result (§10.9) ────────────────────────────────────
 export type {
   ETEResult,
+  EteSnapshotRoadReading,
+  CommonExactEteSnapshot,
+  InsufficientCommonEteSnapshot,
+  EteSnapshotProvenance,
 } from './ete.js';
 
 // ─── Evidence Trace (§10.10) ───────────────────────────────

@@ -37,6 +37,7 @@ export type AffectedRoadRole = (typeof AffectedRoadRoles)[number];
  * Strategy C: ETE affected set (OQ-003)
  */
 export const EteAffectedSets = [
+  'incident_primary_and_selected_secondary',
   'directly_affected_roads_at_event_snapshot',
   'incident_plus_alternatives',
   'all_classified_roads',
@@ -330,8 +331,8 @@ export const CONFIG_SCHEMA: readonly ConfigKeyDefinition[] = [
     type: 'string',
     required: true,
     allowedValues: [...EteAffectedSets],
-    provisionalDefault: 'directly_affected_roads_at_event_snapshot',
-    description: 'Strategy C: which roads are included in ETE avg saturation (OQ-003, PROVISIONAL)',
+    provisionalDefault: 'incident_primary_and_selected_secondary',
+    description: 'Strategy C: incident plus selected primary and secondary roads for ETE (HG-001 organizer guidance)',
     isProvisionalPolicy: true,
   },
 

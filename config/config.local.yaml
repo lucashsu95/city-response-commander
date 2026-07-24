@@ -74,9 +74,9 @@ policy:
   affected_road:
     role: display_only
 
-  # Strategy C: ETE 受影響路段集合 (OQ-003)
+  # Strategy C: ETE 受影響路段集合 (HG-001 organizer guidance)
   ete:
-    affected_set: directly_affected_roads_at_event_snapshot
+    affected_set: incident_primary_and_selected_secondary
 
   # Strategy D: 事故錨點解析 (OQ-004)
   incident_anchor:
