@@ -49,6 +49,48 @@ npm run typecheck
 npm run build
 ```
 
+## 開發流程（PR 工作流）
+
+本專案使用 Branch 保護規則，`main` 分支禁止直接 push，必須透過 Pull Request 合併。
+
+```bash
+# 1. 建立新分支
+git checkout -b feat/my-feature
+
+# 2. 做修改、commit
+git add .
+git commit -m "feat: 新增某某功能"
+
+# 3. 推到 GitHub
+git push -u origin feat/my-feature
+
+# 4. 建立 PR（在 GitHub 網頁上）
+# 點 "Compare & pull request" 按鈕
+
+# 5. 等隊友 approve 後合併
+```
+
+### Commit 訊息規範
+
+使用 [Conventional Commits](https://www.conventionalcommits.org/) 格式：
+
+| 前綴 | 用途 |
+|------|------|
+| `feat:` | 新功能 |
+| `fix:` | 修 bug |
+| `docs:` | 文件變更 |
+| `refactor:` | 重構（不改功能） |
+| `test:` | 測試 |
+| `chore:` | 雜項（設定、依賴等） |
+
+### 範例
+
+```bash
+git commit -m "feat: 新增 SOP-2 車禍疏散路徑計算"
+git commit -m "fix: 修正 ETE 公式小數點精度問題"
+git commit -m "docs: 更新 demo-scenario.md 場景定義"
+```
+
 ## 專案結構
 
 ```
