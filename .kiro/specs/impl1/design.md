@@ -1316,6 +1316,9 @@ core_hash = SHA-256( UTF-8( canonical_serialize( canonical_decision_payload ) ) 
 
 ### 11.1 Strategy A — 事件時間對齊（對應 OQ-001，R1）
 
+**狀態**：`RESOLVED_FOR_IMPLEMENTATION_BY_ORGANIZER_GUIDANCE (HG-001)`
+**HG-001 選定模式**：`GLOBAL_AS_OF_EVENT_CUTOFF_LATEST_PRIOR_PER_ENTITY`——以事件時間為全域截止點，每 entity 取 ≤ event_timestamp 之最新一列。其餘模式仍保留為可配置選項（Strategy 介面不變）。
+
 **介面**：`TimeAlignmentStrategy.select(entity_id, event_timestamp) -> SelectedSnapshot`
 
 **預設實作 `exact_or_latest_prior_per_entity`**：
@@ -1333,6 +1336,9 @@ core_hash = SHA-256( UTF-8( canonical_serialize( canonical_decision_payload ) ) 
 
 ### 11.2 Strategy B — affected_road 用途（對應 OQ-002，R8）
 
+**狀態**：`RESOLVED_FOR_IMPLEMENTATION_BY_ORGANIZER_GUIDANCE (HG-001)`
+**HG-001 確認角色**：`DISPLAY_AND_CONTEXT_ONLY`——affected_road 於 UI 顯示與情境摘要中使用，但不進入 ETE 計算亦不觸發 art.2。其餘模式仍保留為可配置選項（Strategy 介面不變）。
+
 **介面**：`AffectedRoadStrategy.role() -> {display_only | context_and_ete | parallel_road_impact_explicit_host}`
 
 - **`display_only`（預設，最保守）**：affected_road 僅顯示於情境，不進入任何觸發或 ETE。
@@ -1346,9 +1352,19 @@ core_hash = SHA-256( UTF-8( canonical_serialize( canonical_decision_payload ) ) 
 
 ### 11.3 Strategy C — ETE 受影響路段集合（對應 OQ-003，R12）
 
+**狀態**：`RESOLVED_FOR_IMPLEMENTATION_BY_ORGANIZER_GUIDANCE (HG-001)`
+**HG-001 預設實作**：`INCIDENT_PRIMARY_AND_SELECTED_SECONDARY`——ETE 受影響路段集合 = 事故路段 + 主疏散 + 選定次要疏散。
+
+**共同精確時間戳要求 (Common Exact Timestamp Requirement)**：
+- 所有 ETE Saturation_Score 值必須來自**同一個共同精確時間戳**（common exact timestamp），該時間戳須滿足：ETE affected set 中的**每一條道路**在該時間戳都有資料紀錄。
+- 選取規則：取 ≤ event_timestamp 之**最新**時間戳，使得 affected set 內所有道路皆有該時間戳的紀錄。
+- **若不存在此共同時間戳** → `status = INSUFFICIENT_COMMON_SNAPSHOT`、`ete_minutes = null`、`ete_lower_bound_minutes = base_clearance`、`manual_confirmation_required = true`。
+
+其餘模式仍保留為可配置選項（Strategy 介面不變）。
+
 **介面**：`EteAffectedSetStrategy.resolve(incident, snapshot) -> string[]`
 
-**預設實作 `directly_affected_roads_at_event_snapshot`**：
+**預設實作 `directly_affected_roads_at_event_snapshot`**（舊預設，仍可配置）：
 - `RD_` 事件：`affected_roads = [affected_segment]`。
 - 若事件明確列出多條**直接受影響**道路：僅取這些。
 - `BS_` 事件且帶 `affected_road`：是否納入由 **Strategy B** 的 role 決定。
@@ -1358,19 +1374,22 @@ core_hash = SHA-256( UTF-8( canonical_serialize( canonical_decision_payload ) ) 
 
 **敏感度分析（保留但非官方）**：`accident_plus_evac` 僅作為 `sensitivity_analysis` / `network_recovery_indicator`，**永不**作為官方 ETE。
 
-### 11.4 ACC_001 ETE 範例（PROVISIONAL_DERIVED_EXAMPLE）
+### 11.4 ACC_001 ETE 範例（ORGANIZER_GUIDED_TEAM_POLICY, guidance_id = HG-001）
 
-- 事件時間 22:10；`RD_TPE_002` 於 22:10 有完全相符列，`Saturation_Score = 1.00`（exact_match）。
+- 事件時間 22:10。
+- ETE affected set = [RD_TPE_002, RD_TPE_004, RD_TPE_005]（事故路段 + 主疏散 + 選定次要疏散，依 HG-001 `INCIDENT_PRIMARY_AND_SELECTED_SECONDARY`）。
+- Common exact timestamp = 22:00（≤ 22:10 之最新時間戳，使 RD_TPE_002、RD_TPE_004、RD_TPE_005 三條道路皆有紀錄）。
+- Saturation：RD_TPE_002 = 1.00、RD_TPE_004 = 0.78、RD_TPE_005 = 0.65。
+- `avg_saturation = (1.00 + 0.78 + 0.65) / 3 = 0.81`。
+- `congestion_penalty = max(0, (0.81 - 0.5) * 60) = 18.6`。
 - `severity = Critical` → `base_clearance = 60`。
-- `affected_set = [RD_TPE_002]`（Strategy C 預設）→ `avg_saturation = 1.00`。
-- `congestion_penalty = max(0, (1.00 - 0.5) * 60) = 30`。
-- `ete_minutes = 60 + 30 = 90`。
+- `ete_minutes = 60 + 18.6 = **78.6 minutes**`。
 
 **SOP 判定**：ACC_001 為 `triggered_articles = [1, 2]`、`applied_formula_articles = [7]`；art.7 僅作為 ETE 公式被套用，非觸發條款。
 
-**標記**：`example_classification = PROVISIONAL_DERIVED_EXAMPLE`、`official_golden_answer = false`。此 ETE 數值本身依賴 Strategy A（時間對齊）與 Strategy C（ETE 集合）；而同案的**主/次疏散路徑範例**（RD_TPE_004 / RD_TPE_005）額外依賴 **Strategy D**（`incident_anchor_from_location_text`）。故 ACC_001 例之整體 `policy_dependencies = [incident_anchor_from_location_text, exact_or_latest_prior_per_entity, directly_affected_roads_at_event_snapshot]`（**不得只列後兩者**）。
+**標記**：`example_classification = ORGANIZER_GUIDED_TEAM_POLICY`、`guidance_id = HG-001`、`official_golden_answer = false`。此 ETE 數值依賴 Strategy A（時間對齊，HG-001 resolved）、Strategy C（ETE 集合，HG-001 resolved）與 Common Exact Timestamp 要求；而同案的**主/次疏散路徑範例**（RD_TPE_004 / RD_TPE_005）額外依賴 **Strategy D**（`incident_anchor_from_location_text`）。故 ACC_001 例之整體 `policy_dependencies = [incident_anchor_from_location_text, GLOBAL_AS_OF_EVENT_CUTOFF_LATEST_PRIOR_PER_ENTITY, INCIDENT_PRIMARY_AND_SELECTED_SECONDARY]`。
 
-於報告與 UI 明示：**「90 分是依目前暫定政策推導的範例，不是中華電信指定答案。」**
+於報告與 UI 明示：**「78.6 分鐘是依 HG-001 主辦指引之團隊政策推導的範例。」**
 
 關於 `accident_plus_evac`：**不印出任何比較用 ETE 數字**；僅說明採用不同受影響集合可能得到不同 ETE，實際數值待完整資料 lineage 於設計中補齊。
 
@@ -2623,17 +2642,17 @@ flowchart TB
 
 ## 29. Open Questions（開放問題）
 
-> 下列各項經官方來源檢視後仍**無法唯一決定**，統一編號為 **OQ-001..OQ-011**。全部以 Strategy 介面或 `PARTIALLY_DEFINED` 標記（§11）承接，**維持 OPEN、狀態 AWAITING_HOST_REPLY**，本階段**不予關閉**，亦不得於任何輸出宣稱為官方規則；各項團隊 fallback 一律標為 `PROVISIONAL_TEAM_POLICY / AWAITING_HOST_REPLY`。
+> 下列各項經官方來源檢視後仍**無法唯一決定**，統一編號為 **OQ-001..OQ-011**。以 Strategy 介面或 `PARTIALLY_DEFINED` 標記（§11）承接；其中 **OQ-001、OQ-002、OQ-003 已由 HG-001 主辦指引解決**（`RESOLVED_FOR_IMPLEMENTATION_BY_ORGANIZER_GUIDANCE`），其餘維持 OPEN / AWAITING_HOST_REPLY。各項團隊 fallback 一律標為 `PROVISIONAL_TEAM_POLICY / AWAITING_HOST_REPLY`（已解決者改標 `ORGANIZER_GUIDED_TEAM_POLICY / HG-001`）。
 
-**OQ-001 事件時間對齊（對應 R1，Strategy A，§11.1）**：事件 `timestamp` 與 CSV 時序資料列之對齊規則未由官方定義。目前以 Strategy A `exact_or_latest_prior_per_entity`（PROVISIONAL）承接。**狀態：OPEN / AWAITING_HOST_REPLY。**
+**OQ-001 事件時間對齊（對應 R1，Strategy A，§11.1）**：事件 `timestamp` 與 CSV 時序資料列之對齊規則未由官方定義。目前以 Strategy A `GLOBAL_AS_OF_EVENT_CUTOFF_LATEST_PRIOR_PER_ENTITY`（HG-001 指引）實作。**狀態：RESOLVED_FOR_IMPLEMENTATION_BY_ORGANIZER_GUIDANCE (HG-001)。** 仍可配置切換。
 
-**OQ-002 Event 2 affected_road 用途（對應 R8，Strategy B，§11.2）**：`TPE_2026_EVT_002` 之 `affected_road = RD_TPE_001` 於 SOP 與命題解說均無使用方式定義。目前以 Strategy B `display_only`（PROVISIONAL，最保守）承接。**狀態：OPEN / AWAITING_HOST_REPLY。**
+**OQ-002 Event 2 affected_road 用途（對應 R8，Strategy B，§11.2）**：`TPE_2026_EVT_002` 之 `affected_road = RD_TPE_001` 於 SOP 與命題解說均無使用方式定義。目前以 Strategy B `DISPLAY_AND_CONTEXT_ONLY`（HG-001 指引）實作。**狀態：RESOLVED_FOR_IMPLEMENTATION_BY_ORGANIZER_GUIDANCE (HG-001)。** 仍可配置切換。
 
-**OQ-003 ETE 受影響路段集合（對應 R12，Strategy C，§11.3）**：SOP 第 7 條「受影響路段平均 Saturation_Score」之集合未由官方界定。目前以 Strategy C `directly_affected_roads_at_event_snapshot`（PROVISIONAL）承接；ACC_001 之 ETE=90 為 `PROVISIONAL_DERIVED_EXAMPLE`（`official_golden_answer = false`）。**狀態：OPEN / AWAITING_HOST_REPLY。**
+**OQ-003 ETE 受影響路段集合（對應 R12，Strategy C，§11.3）**：SOP 第 7 條「受影響路段平均 Saturation_Score」之集合未由官方界定。目前以 Strategy C `INCIDENT_PRIMARY_AND_SELECTED_SECONDARY`（HG-001 指引）實作，含共同精確時間戳要求；ACC_001 之 ETE=78.6 為 `ORGANIZER_GUIDED_TEAM_POLICY`（`guidance_id = HG-001`）。**狀態：RESOLVED_FOR_IMPLEMENTATION_BY_ORGANIZER_GUIDANCE (HG-001)。** 仍可配置切換。
 
 **OQ-004 事故錨點解析（Incident location anchor，對應 R6，Strategy D，§11.5）**：`Incident.location` 之自然語言（如「光復南路與忠孝東路口南側」）如何**唯一對映**為事故錨點（錨定路口、方位、上/下游）未由官方定義。目前以 Strategy D `incident_anchor_from_location_text`（`PROVISIONAL_TEAM_POLICY`）承接；無法唯一解析時回 `manual_confirmation_required`、不選主疏散、不自動排名直接相交路口。**狀態：OPEN / AWAITING_HOST_REPLY。**
 
-**OQ-005 SOP6「任一基地台」站集與時間快照範圍（對應 R11，Strategy F，§11.8）**：「任一基地台 `Roaming_User_Pct >= 30%`」中之**站集**與**時間快照**範圍未由官方界定。目前以 Strategy F `current_snapshot_all_available_stations`（`PROVISIONAL_TEAM_POLICY`）承接；**不得**將歷史曾達 30% 之時點視為當前已觸發。**狀態：OPEN / AWAITING_HOST_REPLY。**
+**OQ-005 SOP6「任一基地台」站集與時間快照範圍（對應 R11，Strategy F，§11.8）**：「任一基地台 `Roaming_User_Pct >= 30%`」中之**站集**與**時間快照**範圍未由官方界定。目前以 Strategy F `current_snapshot_all_available_stations`（`PROVISIONAL_TEAM_POLICY`）承接；**不得**將歷史曾達 30% 之時點視為當前已觸發。**時間維度**已由 HG-001 解決（Strategy A `GLOBAL_AS_OF_EVENT_CUTOFF_LATEST_PRIOR_PER_ENTITY`），但**站集範圍（station-set scope）仍為 OPEN**。**狀態：OPEN / AWAITING_HOST_REPLY（站集範圍部分）。**
 
 **OQ-006 無 segment_id 之路口標籤運用（intersection label 無 segment_id，對應 R7）**：`intersections` 以路段全名（路口標籤）表示，部分名稱未必對應到具 `segment_id` 之路段；官方未定義此類**純標籤**如何用於容量/上下游判定。目前團隊暫定僅用於上下游排序與顯示、不臆造其容量或路段屬性（`PROVISIONAL_TEAM_POLICY`）。**狀態：OPEN / AWAITING_HOST_REPLY。**
 
