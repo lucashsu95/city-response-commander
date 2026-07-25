@@ -1,0 +1,39 @@
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "pre-commit-check",
+      "description": "Run typecheck, lint, and format check before commit",
+      "trigger": "PreToolUse",
+      "matcher": "shell.*git commit",
+      "action": {
+        "type": "command",
+        "command": "npm run typecheck && npm run lint && npm run format:check"
+      },
+      "timeout": 120,
+      "enabled": true
+    },
+    {
+      "name": "post-task-pr-reminder",
+      "description": "Remind to create PR after task completion",
+      "trigger": "PostTaskExec",
+      "action": {
+        "type": "agent",
+        "prompt": "Task completed. Remember to: 1) Commit with conventional format, 2) Push to GitHub, 3) Create PR with task reference (Closes TASK-XXX). Use the PR template from .github/pull_request_template.md"
+      },
+      "enabled": true
+    },
+    {
+      "name": "validate-pr-branch",
+      "description": "Ensure branch follows naming convention before push",
+      "trigger": "PreToolUse",
+      "matcher": "shell.*git push",
+      "action": {
+        "type": "command",
+        "command": "git branch --show-current | grep -E '^(feat|fix|docs|refactor|test|chore)/' || echo 'WARNING: Branch name does not follow convention. Use feat/<name>, fix/<name>, docs/<name>, etc.'"
+      },
+      "timeout": 10,
+      "enabled": true
+    }
+  ]
+}

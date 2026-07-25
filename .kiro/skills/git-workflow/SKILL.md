@@ -219,24 +219,7 @@ When using Kiro to implement tasks:
 
 1. **Before starting a task**: Create a feature branch
 2. **After completing a task**: Commit with conventional format
-3. **When task is done**: Push and create PR
-4. **Link PR to task**: Reference task ID in PR description
+3. **When task is done**: Push to GitHub
+4. **Create PR**: Use `pr-creation` skill for PR workflow
 
-Example PR description:
-
-```
-## Summary
-Implements TASK-027: RuleEngine article3 (SOP-3 MRT shuttle)
-
-## Changes
-- Added article3.ts with SOP-3 trigger logic
-- Added unit tests for OR condition evaluation
-- Updated index.ts exports
-
-## Testing
-- [x] Unit tests pass
-- [x] Property test P16 passes
-- [x] Type check passes
-
-Closes TASK-027
-```
+See `.kiro/skills/pr-creation/SKILL.md` for detailed PR creation workflow.
