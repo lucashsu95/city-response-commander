@@ -72,8 +72,7 @@ export interface IncidentAnchorResolutionStrategy {
  * 1. Get the affected road's intersections list from RoadNetworkModel
  * 2. For each intersection name, check if it appears in the location text
  * 3. If exactly ONE match -> high confidence, use it as the anchor
- * 4. If MULTIPLE matches -> medium confidence, pick the first match found
- *    in the intersections array order (most upstream first)
+ * 4. If MULTIPLE matches -> resolution is ambiguous and requires manual confirmation
  * 5. If NO match -> low confidence, return manual_confirmation_required=true
  *
  * When non-unique resolution:
@@ -107,10 +106,11 @@ export const incidentAnchorFromLocationText: IncidentAnchorResolutionStrategy = 
     const intersections = segment.intersections;
     const locationText = incident.location;
 
-    // Find intersection names that appear in the location text
+    // Find intersection names (or their unambiguous road-name alias without a
+    // section suffix, e.g. 忠孝東路四段 -> 忠孝東路) in the official location text.
     const matches: Array<{ name: string; index: number }> = [];
     for (let i = 0; i < intersections.length; i++) {
-      if (locationText.includes(intersections[i])) {
+      if (intersectionAppearsInLocation(locationText, intersections[i])) {
         matches.push({ name: intersections[i], index: i });
       }
     }
@@ -137,15 +137,13 @@ export const incidentAnchorFromLocationText: IncidentAnchorResolutionStrategy = 
       );
     }
 
-    // Case: MULTIPLE matches -> medium confidence, pick first in array order
-    // (first = most upstream since intersections is ordered upstream->downstream)
-    const firstMatch = matches[0];
-    return buildResolvedAnchor(
-      segment,
-      firstMatch.name,
-      firstMatch.index,
+    // Case: MULTIPLE matches -> non-unique. Never choose one or invent a
+    // direction; expose only the matched intersections for manual resolution.
+    return buildUnresolvableAnchor(
+      affectedSegmentId,
       locationText,
-      'medium',
+      matches.map((match) => match.name),
+      'multiple intersection names found in location text',
     );
   },
 };
@@ -237,16 +235,28 @@ export function resolveIncidentAnchorStrategy(
 
 // ─── Helpers ───────────────────────────────────────────────
 
+function intersectionAppearsInLocation(locationText: string, intersectionName: string): boolean {
+  if (locationText.includes(intersectionName)) return true;
+  const roadAlias = intersectionName.replace(/[一二三四五六七八九十]+段$/u, '');
+  return roadAlias !== intersectionName && locationText.includes(roadAlias);
+}
+
 /**
  * Extract a position hint from location text relative to an intersection.
  * Looks for directional keywords near the intersection name.
  */
 function extractPositionHint(locationText: string, intersectionName: string): string {
-  // Look for direction keywords following the intersection mention
-  const afterIdx = locationText.indexOf(intersectionName);
+  // Look for direction keywords following the intersection mention. Official
+  // location text may omit the road section suffix used by road geometry.
+  let afterIdx = locationText.indexOf(intersectionName);
+  let matchedName = intersectionName;
+  if (afterIdx === -1) {
+    matchedName = intersectionName.replace(/[一二三四五六七八九十]+段$/u, '');
+    afterIdx = locationText.indexOf(matchedName);
+  }
   if (afterIdx === -1) return 'unknown';
 
-  const afterText = locationText.slice(afterIdx + intersectionName.length);
+  const afterText = locationText.slice(afterIdx + matchedName.length);
   const beforeText = locationText.slice(0, afterIdx);
   const contextText = beforeText + afterText;
 

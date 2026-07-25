@@ -23,6 +23,10 @@ export interface PolicyMetadata {
   readonly status: 'AWAITING_HOST_REPLY';
   /** Never official */
   readonly is_official: false;
+  /** Organizer guidance used by the selected implementation policy, when applicable. */
+  readonly guidance_id?: 'HG-001';
+  /** Golden values derived from policy are examples, never host-provided answers. */
+  readonly official_golden_answer?: false;
 
   // ── Strategy A: Time Alignment (OQ-001) ──
   readonly time_alignment: {

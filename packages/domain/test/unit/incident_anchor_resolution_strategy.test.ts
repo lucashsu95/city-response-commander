@@ -155,9 +155,8 @@ describe('IncidentAnchorResolutionStrategy', () => {
       expect(result.provisional).toBe(true);
     });
 
-    it('returns medium confidence and picks first match when multiple intersections match', () => {
+    it('requires manual confirmation and does not rank when multiple intersections match', () => {
       const model = loadModel();
-      // Create a location that mentions multiple intersections of RD_TPE_002
       const incident = makeIncident({
         event_id: 'TEST_003',
         location: '位於市民大道四段與忠孝東路四段之間的光復南路',
@@ -166,11 +165,12 @@ describe('IncidentAnchorResolutionStrategy', () => {
 
       const result = incidentAnchorFromLocationText.resolve(incident, model, defaultConfig);
 
-      expect(result.manual_confirmation_required).toBe(false);
-      expect(result.resolution_confidence).toBe('medium');
-      // Should pick first match in intersections array order (upstream first)
-      expect(result.anchor_intersection).toBe('市民大道四段');
-      expect(result.anchor_index).toBe(0);
+      expect(result.manual_confirmation_required).toBe(true);
+      expect(result.resolution_confidence).toBe('low');
+      expect(result.anchor_intersection).toBe('');
+      expect(result.anchor_index).toBe(-1);
+      expect(result.position_relative_to_intersection).toBe('');
+      expect(result.unranked_direct_intersections).toEqual(['市民大道四段', '忠孝東路四段']);
       expect(result.provisional).toBe(true);
     });
 

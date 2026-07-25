@@ -693,7 +693,7 @@ CHECKPOINT A (not a task): Ensure all Phase 0 tests pass, ask the user if questi
   - competition_quality_floor: art.3 triggers iff `BL17 Growth_Rate>0.30` OR `User_Count>25000` (=25000 not, =25001 yes, =0.30 not); actions include skip-stop + bus shuttle + walk to BS_MRT_BL18; EVT_002 must be COMPUTED, never assumed triggered.
   - demo_or_evidence_output: Feeds P16; TC-SOP3 boundaries; EVT_002 golden (must-compute).
 
-- [-] TASK-028 Implement RuleEngine article4 (SOP-4 dome dispersal)
+- [x] TASK-028 Implement RuleEngine article4 (SOP-4 dome dispersal)
   - objective: Encode SOP-4: mark dispersal iff BS_TPE_DOME historical peak>=30000 AND current Growth_Rate<=-0.20, then proactively invoke art.3 (§9.4 art.4, R9).
   - requirements_covered: REQ-017, R9
   - design_sections: §9.4 (art.4), §10.7
@@ -715,7 +715,7 @@ CHECKPOINT A (not a task): Ensure all Phase 0 tests pass, ask the user if questi
   - competition_quality_floor: Dispersal iff DOME historical peak `>=30000` AND current `Growth_Rate<=-0.20`; once marked, proactively links the art.3 shuttle mechanism.
   - demo_or_evidence_output: Feeds P17; DOME golden (peak 40000, growth −0.31).
 
-- [~] TASK-029 Implement RuleEngine article5 (SOP-5) and AffectedIntersectionScopeStrategy (E)
+- [x] TASK-029 Implement RuleEngine article5 (SOP-5) and AffectedIntersectionScopeStrategy (E)
   - objective: Encode SOP-5 trigger (type=Power_Failure OR description contains 號誌失效/故障) and manual-command output with official `police_per_intersection=2`, leaving affected-intersection scope unresolved by default (§9.4 art.5, §11.6, R10).
   - requirements_covered: REQ-018, R10
   - design_sections: §9.4 (art.5), §11.6, §10.9a
@@ -739,7 +739,7 @@ CHECKPOINT A (not a task): Ensure all Phase 0 tests pass, ask the user if questi
   - competition_quality_floor: art.5 triggers iff `type=Power_Failure` OR description contains 號誌失效/故障; `police_per_intersection=2` (official); affected scope default `unresolved_manual_confirmation` → `affected_intersection_count`/`total_police=unresolved`, `manual_confirmation_required=true`; NEVER multiply all segment intersections × 2; Strategy E configurable.
   - demo_or_evidence_output: Feeds P18/P19/P31; EVT_003 golden (CMS "松高路 號誌故障，請依現場指揮通行").
 
-- [~] TASK-030 Implement RuleEngine article6 (SOP-6 trigger) and MultilingualScopeStrategy (F)
+- [x] TASK-030 Implement RuleEngine article6 (SOP-6 trigger) and MultilingualScopeStrategy (F)
   - objective: Encode SOP-6 multilingual trigger (any in-scope station roaming_pct_value>=0.30 at current snapshot) with the station-set/time-snapshot scope pluggable via Strategy F (§9.4 art.6, §11.8, R11).
   - requirements_covered: REQ-010, REQ-019, R11
   - design_sections: §9.4 (art.6), §11.8, §14.4
@@ -762,7 +762,7 @@ CHECKPOINT A (not a task): Ensure all Phase 0 tests pass, ask the user if questi
   - competition_quality_floor: art.6 triggers iff any IN-SCOPE station `roaming_pct_value>=0.30` at the CURRENT snapshot (=30% triggers); scope via Strategy F (default `current_snapshot_all_available_stations`); a historical peak is NEVER treated as a current trigger; Strategy F configurable.
   - demo_or_evidence_output: Feeds P20/P32; TC-SOP6 boundary (29.99% vs 30%).
 
-- [~] TASK-031 Implement ETECalculator (art.7) and EteAffectedSetStrategy (C)
+- [x] TASK-031 Implement ETECalculator (art.7) and EteAffectedSetStrategy (C)
   - objective: Encode the ETE formula `base_clearance + max(0,(avg_saturation-0.5)*60)` with `base_clearance` Critical/High/Medium=60/40/20, and the affected-set resolution as Strategy C, marking art.7 as applied-formula (never triggered) (§9.4 art.7, §11.3, R12).
   - requirements_covered: REQ-009, REQ-020, REQ-015, R12
   - design_sections: §9.4 (art.7), §11.3, §10.9 (ETEResult), §11.4
@@ -786,7 +786,7 @@ CHECKPOINT A (not a task): Ensure all Phase 0 tests pass, ask the user if questi
   - competition_quality_floor: `ETE = base_clearance + congestion_penalty`; base 60/40/20 for Critical/High/Medium; `congestion_penalty = max(0,(avg_saturation-0.5)*60)`; art.7 is ALWAYS `applied_formula_articles`, NEVER `triggered_articles`; affected_set via Strategy C; Bedrock never recomputes ETE.
   - demo_or_evidence_output: Feeds P22/P23; ACC_001 ETE=78.6 (ORGANIZER_GUIDED_TEAM_POLICY, HG-001, official_golden_answer=false).
 
-- [~] TASK-032 Implement AffectedRoadStrategy (Strategy B) for EVT_002 affected_road role
+- [x] TASK-032 Implement AffectedRoadStrategy (Strategy B) for EVT_002 affected_road role
   - objective: Encode the pluggable role of `affected_road` (default `display_only`) so a BS_ event's `affected_road` never directly triggers art.2 and re-validates all art.2 conditions if ever escalated (§11.2, R8).
   - requirements_covered: REQ-016, R8
   - design_sections: §11.2, §10.6 (affected_road.role)
@@ -809,7 +809,7 @@ CHECKPOINT A (not a task): Ensure all Phase 0 tests pass, ask the user if questi
   - competition_quality_floor: `affected_road` role via Strategy B (default `display_only`); `BS_` events route to art.3 evaluation (must-compute); `affected_road` NEVER directly triggers art.2; Strategy B configurable/provisional.
   - demo_or_evidence_output: Feeds EVT_002 golden; policy-switch verification (TASK-057).
 
-- [~] TASK-033 Implement triggered/applied_formula/invoked_procedures separation and citation_article_set
+- [x] TASK-033 Implement triggered/applied_formula/invoked_procedures separation and citation_article_set
   - objective: Assemble `triggered_articles` (art.1–6), `applied_formula_articles` (art.7), `invoked_procedures`, and derive `citation_article_set = triggered ∪ applied_formula` (§9.5, §14.2).
   - requirements_covered: REQ-021, REQ-008, R13, R15
   - design_sections: §9.4/§9.5, §14.2, §10.11a
@@ -832,7 +832,7 @@ CHECKPOINT A (not a task): Ensure all Phase 0 tests pass, ask the user if questi
   - competition_quality_floor: `triggered_articles` vs `applied_formula_articles` vs `invoked_procedures` strictly separated (art.7 never triggered); `citation_article_set = triggered ∪ applied_formula` (covers art.7 when applied); ACC_001 → {1,2,7}.
   - demo_or_evidence_output: Feeds P27; ACC_001 golden citation set {1,2,7}.
 
-- [~] TASK-034 Implement EvidenceTraceBuilder
+- [x] TASK-034 Implement EvidenceTraceBuilder
   - objective: Build the deterministic explanation-chain facts (classification reasoning, excluded routes with reasons, SOP citations, data points) for R15 (§10.10).
   - requirements_covered: REQ-008, R15
   - design_sections: §10.10, §9.2
@@ -855,7 +855,7 @@ CHECKPOINT A (not a task): Ensure all Phase 0 tests pass, ask the user if questi
   - competition_quality_floor: EvidenceTrace records grading reasoning (values+thresholds+conclusion), a non-empty exclusion reason for every excluded route, SOP citations, and data points; deterministic facts only (no LLM authorship of facts).
   - demo_or_evidence_output: Feeds P26; drives the explanation-chain UI (TASK-129).
 
-- [~] TASK-035 Implement canonical core_hash (§10.11a-1) and DecisionCore assembly
+- [x] TASK-035 Implement canonical core_hash (§10.11a-1) and DecisionCore assembly
   - objective: Assemble the immutable `DecisionCore` payload and compute `core_hash` via the canonical serialization algorithm (SHA-256 over canonical deterministic payload, excluding all execution-volatile metadata) (§10.11a, §10.11a-1, FIX 4).
   - requirements_covered: REQ-011..REQ-022 (core assembly), R2..R16
   - design_sections: §10.11a, §10.11a-1, §15.2, §22.1 P33(i)
@@ -887,7 +887,7 @@ CHECKPOINT B (not a task): Ensure all Phase 1 unit tests pass and the determinis
 
 > Every property test is implemented as its own `fast-check` (TS) / `Hypothesis` (Python) test with ≥100 iterations and the label `Feature: city-response-commander, Property {n}: {text}`. No test requires an LLM to compute truth. Every Phase 2 test task is a MANDATORY_ACCEPTANCE_GATE. No property, boundary, golden, policy-switch, source-integrity, failure-mode, idempotency, IAM, security, latency, or smoke test may be skipped for LOCAL_MOCK release validation, PERSONAL_AWS_DEV validation, or COMPETITION_AWS release.
 
-- [~] TASK-036 Property tests P1, P21, P34 (percent round-trip, time format, timestamp preservation)
+- [x] TASK-036 Property tests P1, P21, P34 (percent round-trip, time format, timestamp preservation)
   - objective: Verify percent parsing round-trip, `YYYY-MM-DD HH:MM` output format, and `timestamp_raw` immutability with correct normalization.
   - requirements_covered: REQ-001, REQ-019, R1, R11
   - design_sections: §22.1 (P1,P21,P34), §10.1, §10.2
@@ -910,7 +910,7 @@ CHECKPOINT B (not a task): Ensure all Phase 1 unit tests pass and the determinis
   - competition_quality_floor: P1/P21/P34 each a single `fast-check` property with ≥100 iterations and the label `Feature: city-response-commander, Property {n}: {text}`; universal (not example-only); fails with a shrunk counterexample on any violation. Release-blocking, not skippable.
   - demo_or_evidence_output: Green ≥100-iteration runs for P1/P21/P34 with the required labels; a seeded violation is caught with a shrunk counterexample.
 
-- [~] TASK-037 Property test P2 (official data read-only invariance)
+- [x] TASK-037 Property test P2 (official data read-only invariance)
   - objective: Verify that any sequence of read/query/decision operations leaves the five official sources deeply equal to load time.
   - requirements_covered: REQ-001, R1
   - design_sections: §22.1 (P2), §15.1
@@ -933,7 +933,7 @@ CHECKPOINT B (not a task): Ensure all Phase 1 unit tests pass and the determinis
   - competition_quality_floor: P2 a single `fast-check` property with ≥100 iterations and the required label; proves the five official sources are deep-equal before/after any read/query/decision sequence; fails with a shrunk counterexample. Release-blocking.
   - demo_or_evidence_output: Green ≥100-iteration P2 run with the label; a seeded mutation of official data is caught.
 
-- [~] TASK-038 Property test P3 (Strategy A snapshot selection)
+- [x] TASK-038 Property test P3 (Strategy A snapshot selection)
   - objective: Verify selected row Timestamp <= event and is the per-entity latest prior, single-row field cohesion, and `insufficient_data` instead of post-event rows.
   - requirements_covered: REQ-001, R1
   - design_sections: §22.1 (P3), §11.1
@@ -955,7 +955,7 @@ CHECKPOINT B (not a task): Ensure all Phase 1 unit tests pass and the determinis
   - competition_quality_floor: P3 a single `fast-check` property with ≥100 iterations and the required label; proves selected row `Timestamp <= event_timestamp` and per-entity latest-prior, same-row fields, and `insufficient_data` when no legal row (never event-after); provisional Strategy A. Release-blocking.
   - demo_or_evidence_output: Green ≥100-iteration P3 run with the label; counterexample on an event-after selection.
 
-- [~] TASK-039 Property tests P4, P5, P7 (classification, art.1 mapping, light mapping)
+- [x] TASK-039 Property tests P4, P5, P7 (classification, art.1 mapping, light mapping)
   - objective: Verify A/B grading correctness, RD_TPE_001/002 level→measure mapping (incl. A invokes guidance without art.2 trigger), and level→light color mapping.
   - requirements_covered: REQ-011, REQ-004, R2, R3, R4
   - design_sections: §22.1 (P4,P5,P7), §9.4 (art.1)
@@ -978,7 +978,7 @@ CHECKPOINT B (not a task): Ensure all Phase 1 unit tests pass and the determinis
   - competition_quality_floor: P4/P5/P7 each a single `fast-check` property with ≥100 iterations and the required label; exact A/B boundaries (0.85/0.95), art.1 measure mapping (A invokes article2 guidance, A alone ≠ triggered art.2), and A=red/B=yellow rendering. Release-blocking.
   - demo_or_evidence_output: Green ≥100-iteration runs for P4/P5/P7 with labels; boundary counterexamples caught.
 
-- [~] TASK-040 Property test P6 (threshold auto-popup)
+- [x] TASK-040 Property test P6 (threshold auto-popup)
   - objective: Verify `anomaly.detected` is produced iff any road/station meets an SOP (art.1/3/4/6) threshold, and not otherwise.
   - requirements_covered: REQ-002, R4
   - design_sections: §22.1 (P6), §16.2
@@ -1000,7 +1000,7 @@ CHECKPOINT B (not a task): Ensure all Phase 1 unit tests pass and the determinis
   - competition_quality_floor: P6 a single `fast-check` property with ≥100 iterations and the required label; proves `anomaly.detected` iff any SOP art.1/3/4/6 threshold met, no popup otherwise. Release-blocking.
   - demo_or_evidence_output: Green ≥100-iteration P6 run with the label; a below-threshold false-popup is caught.
 
-- [~] TASK-041 Property tests P8, P9, P10, P11, P12 (SOP-2 trigger/qualification/selection/congestion/no-candidate)
+- [x] TASK-041 Property tests P8, P9, P10, P11, P12 (SOP-2 trigger/qualification/selection/congestion/no-candidate)
   - objective: Verify art.2 3-AND trigger, 3-AND candidate qualification (Saturation excluded), lowest-saturation primary with downstream secondary, congested-maintain, and no-candidate documentation without fabrication.
   - requirements_covered: REQ-012, REQ-013, REQ-014, REQ-005, R5, R6
   - design_sections: §22.1 (P8–P12), §9.4 (art.2), §11.7
@@ -1025,7 +1025,7 @@ CHECKPOINT B (not a task): Ensure all Phase 1 unit tests pass and the determinis
   - competition_quality_floor: P8/P9/P10/P11/P12 each a single `fast-check` property with ≥100 iterations and the required label; proves art.2 3-AND trigger, 3-AND candidate qualification (Saturation not a 4th filter), lowest-Saturation primary / downstream secondary, congested-maintain + long-green, and no-candidate → "no compliant alternative" (no fabrication). Release-blocking.
   - demo_or_evidence_output: Green ≥100-iteration runs for P8–P12 with labels; counterexamples on a 4th-filter or fabricated-road violation.
 
-- [~] TASK-042 Property tests P13, P14, P15 (alternatives one-way, empty nearby, upstream/downstream)
+- [x] TASK-042 Property tests P13, P14, P15 (alternatives one-way, empty nearby, upstream/downstream)
   - objective: Verify geometry semantics: directional alternatives (no symmetry), empty nearby preserved, upstream/downstream by intersections order + flow_direction.
   - requirements_covered: REQ-026, REQ-027, REQ-028, R7
   - design_sections: §22.1 (P13–P15), §10.3, §9.4
@@ -1048,7 +1048,7 @@ CHECKPOINT B (not a task): Ensure all Phase 1 unit tests pass and the determinis
   - competition_quality_floor: P13/P14/P15 each a single `fast-check` property with ≥100 iterations and the required label; proves one-way alternatives (no symmetric search), empty `nearby_stations` kept empty, and upstream/downstream from order + `flow_direction`. Release-blocking.
   - demo_or_evidence_output: Green ≥100-iteration runs for P13/P14/P15 with labels; a symmetric-search or nearby-fill violation is caught.
 
-- [~] TASK-043 Property test P30 (anchor resolution + conservative fallback)
+- [x] TASK-043 Property test P30 (anchor resolution + conservative fallback)
   - objective: Verify unique anchor drives upstream/downstream via geometry+anchor (not Strategy A), and non-unique resolution yields manual_confirmation with null primary and unranked intersections, no invented direction.
   - requirements_covered: REQ-013, REQ-028, R6, R7
   - design_sections: §22.1 (P30), §11.5
@@ -1070,7 +1070,7 @@ CHECKPOINT B (not a task): Ensure all Phase 1 unit tests pass and the determinis
   - competition_quality_floor: P30 a single `fast-check` property with ≥100 iterations and the required label; proves upstream/downstream via RoadNetworkModel + Strategy D (not Strategy A), and non-unique anchor → `manual_confirmation_required` + `primary_evacuation=null` + no auto-ranking + no fabricated up/down. Release-blocking.
   - demo_or_evidence_output: Green ≥100-iteration P30 run with the label; a fabricated-anchor case is caught.
 
-- [~] TASK-044 Property tests P16, P17 (SOP-3 OR trigger + actions, SOP-4 dispersal)
+- [x] TASK-044 Property tests P16, P17 (SOP-3 OR trigger + actions, SOP-4 dispersal)
   - objective: Verify art.3 OR-trigger with exact boundaries and actions, and art.4 AND-trigger with art.3 chaining.
   - requirements_covered: REQ-016, REQ-017, R8, R9
   - design_sections: §22.1 (P16,P17), §9.4 (art.3/art.4)
@@ -1092,7 +1092,7 @@ CHECKPOINT B (not a task): Ensure all Phase 1 unit tests pass and the determinis
   - competition_quality_floor: P16/P17 each a single `fast-check` property with ≥100 iterations and the required label; proves art.3 OR trigger with exact boundaries (25000/25001, 0.30) + actions, and art.4 dispersal (peak>=30000 AND growth<=-0.20) linking art.3. Release-blocking.
   - demo_or_evidence_output: Green ≥100-iteration runs for P16/P17 with labels; boundary counterexamples caught.
 
-- [~] TASK-045 Property tests P18, P19, P31 (SOP-5 trigger, manual command, unresolved police scope)
+- [x] TASK-045 Property tests P18, P19, P31 (SOP-5 trigger, manual command, unresolved police scope)
   - objective: Verify art.5 trigger conditions, 2-per-confirmed-intersection police rule with unresolved totals until scope confirmed, and CMS annotation; Strategy E provisional behavior.
   - requirements_covered: REQ-018, R10
   - design_sections: §22.1 (P18,P19,P31), §9.4 (art.5), §11.6
@@ -1115,7 +1115,7 @@ CHECKPOINT B (not a task): Ensure all Phase 1 unit tests pass and the determinis
   - competition_quality_floor: P18/P19/P31 each a single `fast-check` property with ≥100 iterations and the required label; proves art.5 trigger (Power_Failure OR 號誌失效/故障), `police_per_confirmed_affected_intersection=2`, and unresolved scope → `affected_intersection_count`/`total_police=unresolved` (any shown number is PROVISIONAL_DERIVED_EXAMPLE). Release-blocking.
   - demo_or_evidence_output: Green ≥100-iteration runs for P18/P19/P31 with labels; an "all intersections × 2" derivation is caught.
 
-- [~] TASK-046 Property tests P20, P32 (SOP-6 trigger, current-snapshot scope)
+- [x] TASK-046 Property tests P20, P32 (SOP-6 trigger, current-snapshot scope)
   - objective: Verify multilingual trigger iff any in-scope roaming>=0.30 with same-response zh+en, zh-only when not triggered, and that only the current snapshot (not historical peak) drives the trigger.
   - requirements_covered: REQ-010, REQ-019, R11
   - design_sections: §22.1 (P20,P32), §9.4 (art.6), §11.8
@@ -1137,7 +1137,7 @@ CHECKPOINT B (not a task): Ensure all Phase 1 unit tests pass and the determinis
   - competition_quality_floor: P20/P32 each a single `fast-check` property with ≥100 iterations and the required label; proves art.6 trigger iff any in-scope station `roaming_pct_value>=0.30` (=30% triggers), multilingual zh+en on trigger, and current-snapshot scope (historical peak never a current trigger). Release-blocking.
   - demo_or_evidence_output: Green ≥100-iteration runs for P20/P32 with labels; a historical-peak false trigger is caught.
 
-- [~] TASK-047 Property tests P22, P23 (ETE formula, non-negative penalty)
+- [x] TASK-047 Property tests P22, P23 (ETE formula, non-negative penalty)
   - objective: Verify `ETE = base_clearance + penalty` with correct base_clearance and `penalty=max(0,(avg-0.5)*60)`, and penalty>=0.
   - requirements_covered: REQ-009, REQ-020, R12
   - design_sections: §22.1 (P22,P23), §9.4 (art.7)
@@ -1159,7 +1159,7 @@ CHECKPOINT B (not a task): Ensure all Phase 1 unit tests pass and the determinis
   - competition_quality_floor: P22/P23 each a single `fast-check` property with ≥100 iterations and the required label; proves `ETE=base_clearance+congestion_penalty` (60/40/20) and `congestion_penalty=max(0,(avg-0.5)*60)>=0`. Release-blocking.
   - demo_or_evidence_output: Green ≥100-iteration runs for P22/P23 with labels; a negative-penalty violation is caught.
 
-- [~] TASK-048 Property tests P24, P25, P37 (report completeness, alert/CMS completeness, CMS permission split)
+- [x] TASK-048 Property tests P24, P25, P37 (report completeness, alert/CMS completeness, CMS permission split)
   - objective: Verify report content completeness, public-alert + CMS content completeness, and that `cms_core_text` is deterministic/LLM-prohibited while `cms_explanation_text` is LLM-writable.
   - requirements_covered: REQ-021, REQ-022, REQ-015, REQ-014, R13, R14, R6, R10
   - design_sections: §22.1 (P24,P25,P37), §10.11b, §10.12, §14.3
@@ -1182,7 +1182,7 @@ CHECKPOINT B (not a task): Ensure all Phase 1 unit tests pass and the determinis
   - competition_quality_floor: P24/P25/P37 each a single `fast-check` property with ≥100 iterations and the required label; proves report completeness (event id + SOP clauses + grading + routes/exclusions + signal timing + cross-system + ETE), alert/CMS completeness, and `cms_core_text` LLM-prohibited vs `cms_explanation_text` LLM-writable split. Release-blocking.
   - demo_or_evidence_output: Green ≥100-iteration runs for P24/P25/P37 with labels; an LLM core-CMS overwrite is rejected.
 
-- [~] TASK-049 Property tests P26, P27 (evidence chain, citation coverage)
+- [x] TASK-049 Property tests P26, P27 (evidence chain, citation coverage)
   - objective: Verify evidence chain completeness (reasoning + data + non-empty exclusion reasons) and that `citation_article_set` covers `triggered ∪ applied_formula` (not only triggered).
   - requirements_covered: REQ-008, R15
   - design_sections: §22.1 (P26,P27), §14.2
@@ -1204,7 +1204,7 @@ CHECKPOINT B (not a task): Ensure all Phase 1 unit tests pass and the determinis
   - competition_quality_floor: P26/P27 each a single `fast-check` property with ≥100 iterations and the required label; proves evidence-chain completeness (reasoning + non-empty exclusion reasons) and `citation_article_set ⊇ triggered ∪ applied_formula` (covers art.7 when applied, not only triggered). Release-blocking.
   - demo_or_evidence_output: Green ≥100-iteration runs for P26/P27 with labels; a citation that omits an applied-formula article is caught.
 
-- [~] TASK-050 Property tests P29, P36 (bonus ja/ko languages, multilingual template no zh-only degradation)
+- [x] TASK-050 Property tests P29, P36 (bonus ja/ko languages, multilingual template no zh-only degradation)
   - objective: Verify that when the bonus is enabled and art.6 triggers, ja+ko are included, and that on Bedrock failure the language floor (zh+en, or zh+en+ja+ko) is met via deterministic approved templates, never degrading to zh-only.
   - requirements_covered: REQ-031, REQ-010, REQ-019, R11, R17
   - design_sections: §22.1 (P29,P36), §14.4, §21.3
@@ -1226,7 +1226,7 @@ CHECKPOINT B (not a task): Ensure all Phase 1 unit tests pass and the determinis
   - competition_quality_floor: P36 (core) and P29 (bonus scope) each a single `fast-check` property with ≥100 iterations and the required label; P36 proves SOP-6 multilingual never degrades to zh-only even when Bedrock fails (deterministic template, language floor zh+en, +ja/ko when bonus enabled); P29 proves ja/ko present when bonus enabled. Core P36 is release-blocking (the ja/ko-only assertion is the bonus portion).
   - demo_or_evidence_output: Green ≥100-iteration runs for P36/P29 with labels; a Bedrock-down zh-only degradation is caught.
 
-- [~] TASK-051 Canonical core_hash A/B/C tests (FIX 4)
+- [x] TASK-051 Canonical core_hash A/B/C tests (FIX 4)
   - objective: Verify the canonical `core_hash`: (A) volatile-metadata-only differences → same hash; (B) any decision-fact change → different hash; (C) semantically-equal reordering → same hash.
   - requirements_covered: REQ-011..REQ-022 (integrity), R-supporting
   - design_sections: §10.11a-1, §22.1 P33(i), §22.2 (Canonical core_hash)
@@ -1249,7 +1249,7 @@ CHECKPOINT B (not a task): Ensure all Phase 1 unit tests pass and the determinis
   - competition_quality_floor: Three canonical `core_hash` properties (FIX 4) with ≥100 iterations and labels: (A) volatile-metadata-only change → same hash; (B) any decision-fact change → different hash; (C) semantically-equal reorder → same hash (set-like stable sort, lexicographic keys, null-vs-absent fixed). Release-blocking.
   - demo_or_evidence_output: Green ≥100-iteration A/B/C runs with labels; ALREADY_COMMITTED_SAME_DECISION vs CORE_IDENTITY_CONFLICT decided correctly on fixtures.
 
-- [~] TASK-052 Boundary unit tests (all official numeric boundaries)
+- [x] TASK-052 Boundary unit tests (all official numeric boundaries)
   - objective: Encode EDGE_CASE unit tests for 0.85, 0.9499, 0.95, 25000, 25001, 0.30, 1000, 30% per the derived boundary matrix.
   - requirements_covered: REQ-011, REQ-016, REQ-019, REQ-013, R2, R8, R11, R6
   - design_sections: §22.3, cursor baseline §6 (TC-SAT/TC-SOP3/TC-SOP6/TC-SOP2)
@@ -1273,7 +1273,7 @@ CHECKPOINT B (not a task): Ensure all Phase 1 unit tests pass and the determinis
   - competition_quality_floor: Every official numeric boundary covered as an edge-case unit test with the exact official inequality (no drift): 0.8499/0.85 (B lower), 0.9499/0.95 (A lower), 25000/25001 (count), 0.30 (growth/roaming), 1000 (capacity), 30% (roaming). Release-blocking.
   - demo_or_evidence_output: Green boundary suite; each boundary asserts the exact expected classification/trigger per the derived boundary matrix.
 
-- [~] TASK-053 Golden test ACC_001 (deterministic core)
+- [x] TASK-053 Golden test ACC_001 (deterministic core)
   - objective: End-to-end deterministic golden for ACC_001: triggered=[1,2], invoked=[article2_alternative_route_guidance], applied=[7], citation={1,2,7}, primary RD_TPE_004 / secondary RD_TPE_005 (provisional), ETE=78.6 (ORGANIZER_GUIDED_TEAM_POLICY, HG-001), all provisional facts flagged.
   - requirements_covered: REQ-012, REQ-013, REQ-014, REQ-015, REQ-009, REQ-020, R6, R12
   - design_sections: §9.5, §11.4, §22.3
@@ -1296,7 +1296,7 @@ CHECKPOINT B (not a task): Ensure all Phase 1 unit tests pass and the determinis
   - competition_quality_floor: ACC_001 end-to-end golden: `triggered_articles=[1,2]`, `invoked_procedures=[article2_alternative_route_guidance]`, `applied_formula_articles=[7]`, citation {1,2,7}, primary RD_TPE_004 / secondary RD_TPE_005 / excluded RD_TPE_006,008, ETE=78.6 — all marked ORGANIZER_GUIDED_TEAM_POLICY (guidance_id=HG-001, `official_golden_answer=false`), never presented as the host's answer. Release-blocking.
   - demo_or_evidence_output: Green ACC_001 golden asserting the exact core sets with ORGANIZER_GUIDED_TEAM_POLICY (HG-001) markers.
 
-- [~] TASK-054 Golden test EVT_002 (SOP-3 evaluation, must-compute)
+- [x] TASK-054 Golden test EVT_002 (SOP-3 evaluation, must-compute)
   - objective: Golden for EVT_002 verifying BS_ routes to art.3 evaluation (computed, not assumed), and `affected_road` handled via Strategy B `display_only` without triggering art.2.
   - requirements_covered: REQ-016, R8
   - design_sections: §9.5, §11.2, §22.3
@@ -1318,7 +1318,7 @@ CHECKPOINT B (not a task): Ensure all Phase 1 unit tests pass and the determinis
   - competition_quality_floor: EVT_002 golden proves art.3 is EVALUATED (must-compute BL17 User_Count>25000 / Growth>0.30), never assumed; `affected_road=RD_TPE_001` handled via Strategy B (does not trigger art.2); provisional flags surfaced. Release-blocking.
   - demo_or_evidence_output: Green EVT_002 golden showing computed art.3 result + Strategy-B handling, not an assumed trigger.
 
-- [~] TASK-055 Golden test EVT_003 (SOP-5)
+- [x] TASK-055 Golden test EVT_003 (SOP-5)
   - objective: Golden for EVT_003 verifying art.5 trigger, CMS annotation, police_per_intersection=2, and unresolved affected-intersection scope by default.
   - requirements_covered: REQ-018, R10
   - design_sections: §9.5, §11.6, §22.3
@@ -1341,7 +1341,7 @@ CHECKPOINT B (not a task): Ensure all Phase 1 unit tests pass and the determinis
   - competition_quality_floor: EVT_003 golden proves art.5 trigger (Power_Failure), `police_per_intersection=2` (official) with unresolved scope (`affected_intersection_count`/`total_police=unresolved`), exact CMS "松高路 號誌故障，請依現場指揮通行", and ETE=41.0(HG-001). Release-blocking.
   - demo_or_evidence_output: Green EVT_003 golden asserting CMS text + unresolved police scope (no fabricated total) + ETE=41.0(HG-001).
 
-- [~] TASK-056 Failure-mode deterministic tests (source-hash STOP, no-candidate, unresolved anchor, unresolved police)
+- [x] TASK-056 Failure-mode deterministic tests (source-hash STOP, no-candidate, unresolved anchor, unresolved police)
   - objective: Verify STOP on source hash mismatch, no-legal-alternative documentation, unresolved-anchor conservative behavior, and unresolved police scope.
   - requirements_covered: REQ-032, REQ-005, REQ-013, REQ-018, R1, R6, R10
   - design_sections: §10.0, §21.2, §11.5, §11.6
@@ -1365,7 +1365,7 @@ CHECKPOINT B (not a task): Ensure all Phase 1 unit tests pass and the determinis
   - competition_quality_floor: Deterministic failure-mode tests: source-hash mismatch → STOP (no fabrication), no compliant alternative → documented (no invented road), unresolved anchor → `manual_confirmation_required`, unresolved police scope → `unresolved`. Release-blocking.
   - demo_or_evidence_output: Green failure-mode suite proving fail-closed/no-fabrication behaviors.
 
-- [~] TASK-057 Policy-switching contract tests (Strategies A–F, ≥2 impls each)
+- [x] TASK-057 Policy-switching contract tests (Strategies A–F, ≥2 impls each)
   - objective: Verify that switching each Strategy's mode via `ConfigProvider` changes outputs and `policy` metadata WITHOUT modifying the Rule Engine, per §30.
   - requirements_covered: REQ-005, REQ-009, REQ-013, REQ-016, REQ-018, REQ-019, R-supporting
   - design_sections: §11, §22.3, §30, §23.1
@@ -1388,7 +1388,7 @@ CHECKPOINT B (not a task): Ensure all Phase 1 unit tests pass and the determinis
   - competition_quality_floor: Contract tests prove each Strategy A–F switches behavior via `ConfigProvider` (≥2 implementations each) with the decision changing and `policy` metadata reflecting the new value, WITHOUT any Rule Engine code edit; no OQ is closed. Release-blocking.
   - demo_or_evidence_output: Green policy-switch suite: flipping each Strategy mode changes output + provisional metadata, engine unchanged.
 
-- [~] TASK-058 Golden tests for SOP-4 DOME and SOP-6 stations
+- [x] TASK-058 Golden tests for SOP-4 DOME and SOP-6 stations
   - objective: Golden for BS_TPE_DOME (peak 40000, growth -0.31 → dispersal + art.3) and art.6 stations (BS_TPE_101 40%/45%, BS_XY_ATT 30%/35% → multilingual triggered).
   - requirements_covered: REQ-017, REQ-010, REQ-019, R9, R11
   - design_sections: §22.3, §9.4 (art.4/art.6)
