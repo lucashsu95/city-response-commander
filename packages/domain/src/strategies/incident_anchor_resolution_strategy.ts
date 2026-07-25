@@ -26,9 +26,7 @@ import type { RoadNetworkModel } from '../road_network/road_network_model.js';
  * IncidentAnchorMode - strategy mode enum.
  * Matches the config schema's `policy.incident_anchor.mode` allowed values.
  */
-export type IncidentAnchorMode =
-  | 'incident_anchor_from_location_text'
-  | 'explicit_host_mapping';
+export type IncidentAnchorMode = 'incident_anchor_from_location_text' | 'explicit_host_mapping';
 
 /**
  * Configuration for explicit_host_mapping mode.
@@ -128,13 +126,7 @@ export const incidentAnchorFromLocationText: IncidentAnchorResolutionStrategy = 
     // Case: Exactly ONE match -> high confidence
     if (matches.length === 1) {
       const match = matches[0];
-      return buildResolvedAnchor(
-        segment,
-        match.name,
-        match.index,
-        locationText,
-        'high',
-      );
+      return buildResolvedAnchor(segment, match.name, match.index, locationText, 'high');
     }
 
     // Case: MULTIPLE matches -> non-unique. Never choose one or invent a

@@ -16,11 +16,7 @@ import type { RoadSegment } from '@city-commander/shared-schemas';
 export class RoadNetworkParseError extends Error {
   constructor(
     message: string,
-    public readonly code:
-      | 'INVALID_JSON'
-      | 'NOT_ARRAY'
-      | 'INVALID_SEGMENT'
-      | 'EMPTY_DATA',
+    public readonly code: 'INVALID_JSON' | 'NOT_ARRAY' | 'INVALID_SEGMENT' | 'EMPTY_DATA',
     public readonly details?: { index?: number; field?: string; value?: unknown },
   ) {
     super(message);
@@ -39,9 +35,7 @@ function isNonEmptyString(value: unknown): value is string {
  * Validate that a value is a string array.
  */
 function isStringArray(value: unknown): value is string[] {
-  return (
-    Array.isArray(value) && value.every((item) => typeof item === 'string')
-  );
+  return Array.isArray(value) && value.every((item) => typeof item === 'string');
 }
 
 /**
@@ -95,7 +89,11 @@ function validateSegment(raw: unknown, index: number): RoadSegment {
   }
 
   // capacity_vph: required positive integer
-  if (typeof obj.capacity_vph !== 'number' || !Number.isFinite(obj.capacity_vph) || obj.capacity_vph < 0) {
+  if (
+    typeof obj.capacity_vph !== 'number' ||
+    !Number.isFinite(obj.capacity_vph) ||
+    obj.capacity_vph < 0
+  ) {
     throw new RoadNetworkParseError(
       `Segment at index ${index}: "capacity_vph" must be a non-negative number`,
       'INVALID_SEGMENT',
@@ -139,9 +137,7 @@ function validateSegment(raw: unknown, index: number): RoadSegment {
  * @returns Readonly array of RoadSegment with array orders preserved
  * @throws RoadNetworkParseError on malformed data
  */
-export function parseRoadNetworkJson(
-  jsonContent: string,
-): readonly RoadSegment[] {
+export function parseRoadNetworkJson(jsonContent: string): readonly RoadSegment[] {
   let parsed: unknown;
   try {
     parsed = JSON.parse(jsonContent);
@@ -153,17 +149,11 @@ export function parseRoadNetworkJson(
   }
 
   if (!Array.isArray(parsed)) {
-    throw new RoadNetworkParseError(
-      'Road network JSON must be a top-level array',
-      'NOT_ARRAY',
-    );
+    throw new RoadNetworkParseError('Road network JSON must be a top-level array', 'NOT_ARRAY');
   }
 
   if (parsed.length === 0) {
-    throw new RoadNetworkParseError(
-      'Road network JSON array is empty',
-      'EMPTY_DATA',
-    );
+    throw new RoadNetworkParseError('Road network JSON array is empty', 'EMPTY_DATA');
   }
 
   const segments: RoadSegment[] = [];

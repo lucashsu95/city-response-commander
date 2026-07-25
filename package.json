@@ -11,16 +11,30 @@
     "build": "npm run build --workspaces",
     "test": "vitest run",
     "test:watch": "vitest",
-    "lint": "eslint 'packages/*/src/**/*.ts'",
+    "test:lint-rule": "vitest run eslint-local-rules/test/no-llm-prohibited-field-write.test.ts",
+    "test:credential-scan": "vitest run scripts/test/check-no-credentials.test.ts",
+    "test:source-gate": "vitest run scripts/test/verify_sources.test.ts",
+    "mock:bedrock-walkthrough": "tsx scripts/mock-bedrock-walkthrough.ts",
+    "rehearsal:dry-run": "bash scripts/local_mock_rehearsal.sh --dry-run",
+    "lint": "eslint 'packages/*/src/**/*.ts' 'scripts/**/*.ts' 'infra/{bin,lib}/**/*.ts'",
+    "format": "prettier --write 'packages/*/src/**/*.ts' 'scripts/**/*.ts' 'infra/{bin,lib}/**/*.ts'",
+    "format:check": "prettier --check 'packages/*/src/**/*.ts' 'scripts/**/*.ts' 'infra/{bin,lib}/**/*.ts'",
     "typecheck": "tsc --build",
-    "check:language-boundary": "tsx scripts/check-language-boundary.ts"
+    "check:language-boundary": "tsx scripts/check-language-boundary.ts",
+    "check:no-credentials": "bash scripts/check-no-credentials.sh"
   },
   "engines": {
     "node": ">=18.0.0"
   },
   "devDependencies": {
+    "@typescript-eslint/eslint-plugin": "8.65.0",
+    "@typescript-eslint/parser": "8.65.0",
+    "eslint": "8.57.1",
+    "eslint-config-prettier": "10.1.8",
+    "eslint-plugin-local-rules": "3.0.2",
+    "prettier": "3.9.6",
     "tsx": "^4.7.0",
-    "vitest": "^1.6.0",
-    "typescript": "^5.4.0"
+    "typescript": "^5.4.0",
+    "vitest": "^1.6.0"
   }
 }

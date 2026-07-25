@@ -11,5 +11,6 @@
  */
 
 export { BedrockClient } from './bedrock.js';
-export { RecommendationGenerator } from './recommendation-generator.js';
+export type { BedrockConfig, TextGenerator } from './bedrock.js';
+export { buildRecommendationPrompt, RecommendationGenerator } from './recommendation-generator.js';
 export { MultilingualGenerator } from './multilingual-generator.js';

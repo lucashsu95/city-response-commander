@@ -83,9 +83,7 @@ export interface EvacuationResult {
  * @param candidates - The RouteCandidate[] produced by qualifyCandidates (article2.ts)
  * @returns EvacuationResult with primary/secondary/excluded and congestion handling
  */
-export function selectEvacuation(
-  candidates: readonly RouteCandidate[],
-): EvacuationResult {
+export function selectEvacuation(candidates: readonly RouteCandidate[]): EvacuationResult {
   // Partition candidates by role
   const primaryCandidates: RouteCandidate[] = [];
   const secondaryCandidates: RouteCandidate[] = [];

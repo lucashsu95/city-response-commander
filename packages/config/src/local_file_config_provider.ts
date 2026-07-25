@@ -17,11 +17,7 @@
 
 import { readFileSync } from 'node:fs';
 import { load as loadYaml } from 'js-yaml';
-import {
-  ConfigProvider,
-  ConfigKeyMissingError,
-  ConfigLoadError,
-} from './config_provider.js';
+import { ConfigProvider, ConfigKeyMissingError, ConfigLoadError } from './config_provider.js';
 
 /**
  * Options for constructing a LocalFileConfigProvider.
@@ -130,26 +126,18 @@ export class LocalFileConfigProvider implements ConfigProvider {
     try {
       yamlContent = readFileSync(filePath, 'utf-8');
     } catch (err) {
-      throw new ConfigLoadError(
-        `Failed to read configuration file: ${filePath}`,
-        err,
-      );
+      throw new ConfigLoadError(`Failed to read configuration file: ${filePath}`, err);
     }
 
     let parsed: unknown;
     try {
       parsed = loadYaml(yamlContent);
     } catch (err) {
-      throw new ConfigLoadError(
-        `Failed to parse YAML configuration: ${filePath}`,
-        err,
-      );
+      throw new ConfigLoadError(`Failed to parse YAML configuration: ${filePath}`, err);
     }
 
     if (parsed === null || parsed === undefined || typeof parsed !== 'object') {
-      throw new ConfigLoadError(
-        `Configuration file must contain a YAML object: ${filePath}`,
-      );
+      throw new ConfigLoadError(`Configuration file must contain a YAML object: ${filePath}`);
     }
 
     // Flatten YAML into dot-notation keys
@@ -169,10 +157,7 @@ export class LocalFileConfigProvider implements ConfigProvider {
     // (allows adding config purely through env)
     for (const [envKey, envValue] of Object.entries(env)) {
       if (envKey.startsWith('CONFIG_') && envValue !== undefined) {
-        const configKey = envKey
-          .slice('CONFIG_'.length)
-          .toLowerCase()
-          .replace(/_/g, '.');
+        const configKey = envKey.slice('CONFIG_'.length).toLowerCase().replace(/_/g, '.');
         if (!(configKey in this.flatConfig)) {
           this.flatConfig[configKey] = envValue;
         }

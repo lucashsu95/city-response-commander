@@ -7,7 +7,7 @@
  */
 
 import { Language } from '@city-commander/shared-schemas';
-import { BedrockClient } from './bedrock.js';
+import type { TextGenerator } from './bedrock.js';
 
 export interface MultilingualAlertInput {
   readonly event_id: string;
@@ -21,10 +21,10 @@ export interface MultilingualAlertInput {
 }
 
 export class MultilingualGenerator {
-  private readonly bedrock: BedrockClient;
+  private readonly textGenerator: TextGenerator;
 
-  constructor(bedrock: BedrockClient) {
-    this.bedrock = bedrock;
+  constructor(textGenerator: TextGenerator) {
+    this.textGenerator = textGenerator;
   }
 
   async generate(input: MultilingualAlertInput): Promise<Record<Language, string>> {
@@ -32,7 +32,7 @@ export class MultilingualGenerator {
 
     for (const lang of [Language.ZH, Language.EN, Language.JA, Language.KO]) {
       const prompt = this.buildPrompt(input, lang);
-      results[lang] = await this.bedrock.generateText(prompt);
+      results[lang] = await this.textGenerator.generateText(prompt);
     }
 
     return results as Record<Language, string>;
@@ -46,10 +46,9 @@ export class MultilingualGenerator {
       [Language.KO]: '한국어',
     };
 
-    const routes = [
-      input.primary_route,
-      ...(input.secondary_routes || []),
-    ].filter(Boolean).join('、');
+    const routes = [input.primary_route, ...(input.secondary_routes || [])]
+      .filter(Boolean)
+      .join('、');
 
     return `你是一位交通指揮中心的 AI 助手，請用${langNames[lang]}產出一份交通警示通報。
 

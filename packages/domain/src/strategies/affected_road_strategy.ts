@@ -2,7 +2,8 @@
 
 import type { Incident } from '@city-commander/shared-schemas';
 
-export type AffectedRoadRole = 'display_only' | 'context_and_ete' | 'parallel_road_impact_explicit_host';
+export type AffectedRoadRole =
+  'display_only' | 'context_and_ete' | 'parallel_road_impact_explicit_host';
 
 export interface AffectedRoadStrategyResult {
   readonly role: AffectedRoadRole;
@@ -25,11 +26,14 @@ export function createAffectedRoadStrategy(role: AffectedRoadRole): AffectedRoad
       affected_road: incident.affected_road ?? null,
       include_in_ete_context: role === 'context_and_ete' && incident.affected_road !== undefined,
       directly_triggers_article2: false,
-      requires_article2_revalidation: role === 'parallel_road_impact_explicit_host' && incident.affected_road !== undefined,
+      requires_article2_revalidation:
+        role === 'parallel_road_impact_explicit_host' && incident.affected_road !== undefined,
     }),
   };
 }
 
 export const displayOnlyAffectedRoadStrategy = createAffectedRoadStrategy('display_only');
 export const contextAndEteAffectedRoadStrategy = createAffectedRoadStrategy('context_and_ete');
-export const parallelRoadImpactExplicitHostStrategy = createAffectedRoadStrategy('parallel_road_impact_explicit_host');
+export const parallelRoadImpactExplicitHostStrategy = createAffectedRoadStrategy(
+  'parallel_road_impact_explicit_host',
+);

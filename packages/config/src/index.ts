@@ -8,21 +8,14 @@
  * Use `createConfigProvider()` to get the correct provider for the active profile.
  */
 
-export {
-  ConfigProvider,
-  ConfigKeyMissingError,
-  ConfigLoadError,
-} from './config_provider.js';
+export { ConfigProvider, ConfigKeyMissingError, ConfigLoadError } from './config_provider.js';
 
 export {
   LocalFileConfigProvider,
   LocalFileConfigProviderOptions,
 } from './local_file_config_provider.js';
 
-export {
-  SsmConfigProvider,
-  SsmConfigProviderOptions,
-} from './ssm_config_provider.js';
+export { SsmConfigProvider, SsmConfigProviderOptions } from './ssm_config_provider.js';
 
 export {
   createConfigProvider,

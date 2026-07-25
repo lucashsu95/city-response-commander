@@ -22,7 +22,12 @@
  */
 
 import type { Incident, RouteCandidate, RoadSegment } from '@city-commander/shared-schemas';
-import { IncidentStatus, Severity, UpstreamDownstream, RouteCandidateRole } from '@city-commander/shared-schemas';
+import {
+  IncidentStatus,
+  Severity,
+  UpstreamDownstream,
+  RouteCandidateRole,
+} from '@city-commander/shared-schemas';
 import type { RoadNetworkModel } from '../road_network/road_network_model.js';
 
 // ─── Constants ─────────────────────────────────────────────
@@ -35,10 +40,7 @@ const TRIGGER_STATUSES: ReadonlySet<string> = new Set([
 ]);
 
 /** Severity values that satisfy the second trigger condition */
-const TRIGGER_SEVERITIES: ReadonlySet<string> = new Set([
-  Severity.Critical,
-  Severity.High,
-]);
+const TRIGGER_SEVERITIES: ReadonlySet<string> = new Set([Severity.Critical, Severity.High]);
 
 /** Prefix for road segment events (art.2 applies) */
 const ROAD_SEGMENT_PREFIX = 'RD_';
@@ -155,10 +157,7 @@ function evaluateSingleCandidate(
   // Condition 2: Candidate's name appears in incident road's intersections
   // We check if the candidate segment's name is in the incident road's intersections
   const candidateName = candidateSegment?.name ?? '';
-  const is_direct_intersection = roadNetwork.isDirectIntersection(
-    incidentSegmentId,
-    candidateName,
-  );
+  const is_direct_intersection = roadNetwork.isDirectIntersection(incidentSegmentId, candidateName);
 
   // Condition 3: Upstream determination (requires anchor)
   let upstream_or_downstream: UpstreamDownstream;

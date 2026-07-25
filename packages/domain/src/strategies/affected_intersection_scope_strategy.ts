@@ -1,11 +1,13 @@
 /** Strategy E — resolve the provisional SOP-5 affected-intersection scope. */
 
-import type { AffectedIntersectionScope, Incident, RoadSegment } from '@city-commander/shared-schemas';
+import type {
+  AffectedIntersectionScope,
+  Incident,
+  RoadSegment,
+} from '@city-commander/shared-schemas';
 
 export type AffectedIntersectionScopeMode =
-  | 'unresolved_manual_confirmation'
-  | 'all_segment_intersections'
-  | 'explicit_host_set';
+  'unresolved_manual_confirmation' | 'all_segment_intersections' | 'explicit_host_set';
 
 export interface AffectedIntersectionScopeConfig {
   readonly mode: AffectedIntersectionScopeMode;
@@ -51,9 +53,12 @@ export function resolveAffectedIntersectionScopeStrategy(
   mode: AffectedIntersectionScopeMode,
 ): AffectedIntersectionScopeStrategy {
   switch (mode) {
-    case 'unresolved_manual_confirmation': return unresolvedManualConfirmation;
-    case 'all_segment_intersections': return allSegmentIntersections;
-    case 'explicit_host_set': return explicitHostSet;
+    case 'unresolved_manual_confirmation':
+      return unresolvedManualConfirmation;
+    case 'all_segment_intersections':
+      return allSegmentIntersections;
+    case 'explicit_host_set':
+      return explicitHostSet;
   }
 }
 

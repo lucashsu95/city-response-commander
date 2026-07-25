@@ -22,8 +22,11 @@ export function calculateEte(input: EteCalculationInput): EteCalculationResult {
     return lowerBoundResult(input, base_clearance);
   }
 
-  const saturationValues = input.snapshot_provenance.readings.map((reading) => reading.saturation_score);
-  const avg_saturation = saturationValues.reduce((total, value) => total + value, 0) / saturationValues.length;
+  const saturationValues = input.snapshot_provenance.readings.map(
+    (reading) => reading.saturation_score,
+  );
+  const avg_saturation =
+    saturationValues.reduce((total, value) => total + value, 0) / saturationValues.length;
   const congestion_penalty = Math.max(0, (avg_saturation - 0.5) * 60);
   return {
     severity: input.severity,
@@ -53,12 +56,19 @@ function hasCompleteCommonSnapshot(
   if (provenance.readings.length !== uniqueAffectedSet.size) return false;
 
   const observedRoads = new Set(provenance.readings.map((reading) => reading.road_id));
-  return observedRoads.size === uniqueAffectedSet.size
-    && [...uniqueAffectedSet].every((roadId) => observedRoads.has(roadId))
-    && provenance.readings.every((reading) => reading.observation_timestamp === provenance.common_snapshot_timestamp);
+  return (
+    observedRoads.size === uniqueAffectedSet.size &&
+    [...uniqueAffectedSet].every((roadId) => observedRoads.has(roadId)) &&
+    provenance.readings.every(
+      (reading) => reading.observation_timestamp === provenance.common_snapshot_timestamp,
+    )
+  );
 }
 
-function lowerBoundResult(input: EteCalculationInput, base_clearance: 60 | 40 | 20): EteCalculationResult {
+function lowerBoundResult(
+  input: EteCalculationInput,
+  base_clearance: 60 | 40 | 20,
+): EteCalculationResult {
   return {
     severity: input.severity,
     base_clearance,
@@ -76,7 +86,9 @@ function lowerBoundResult(input: EteCalculationInput, base_clearance: 60 | 40 | 
     },
     manual_confirmation_required: true,
     formula_applicability: input.affected_set.formula_applicability,
-    applicability_note: input.affected_set.applicability_note ?? 'No common exact snapshot exists across the full ETE affected-road set.',
+    applicability_note:
+      input.affected_set.applicability_note ??
+      'No common exact snapshot exists across the full ETE affected-road set.',
     lower_bound_only: true,
     applied_formula_articles: [7],
   };
@@ -84,8 +96,11 @@ function lowerBoundResult(input: EteCalculationInput, base_clearance: 60 | 40 | 
 
 export function baseClearanceFor(severity: Severity): 60 | 40 | 20 {
   switch (severity) {
-    case Severity.Critical: return 60;
-    case Severity.High: return 40;
-    case Severity.Medium: return 20;
+    case Severity.Critical:
+      return 60;
+    case Severity.High:
+      return 40;
+    case Severity.Medium:
+      return 20;
   }
 }

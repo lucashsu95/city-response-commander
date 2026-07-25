@@ -8,14 +8,14 @@
  * Usage: npx tsx scripts/check-language-boundary.ts
  */
 
-import * as fs from "fs";
-import * as path from "path";
+import * as fs from 'fs';
+import * as path from 'path';
 
-const ROOT = path.resolve(__dirname, "..");
-const PACKAGES_DIR = path.join(ROOT, "packages");
-const INFRA_DIR = path.join(ROOT, "infra");
+const ROOT = path.resolve(__dirname, '..');
+const PACKAGES_DIR = path.join(ROOT, 'packages');
+const INFRA_DIR = path.join(ROOT, 'infra');
 
-const EXCLUDED_DIRS = new Set(["node_modules", "dist", ".git", "cdk.out"]);
+const EXCLUDED_DIRS = new Set(['node_modules', 'dist', '.git', 'cdk.out']);
 
 interface ScanResult {
   hasTypeScript: boolean;
@@ -49,10 +49,10 @@ function scanDirectory(dir: string): ScanResult {
         walk(fullPath);
       } else if (entry.isFile()) {
         const ext = path.extname(entry.name).toLowerCase();
-        if (ext === ".ts" || ext === ".tsx") {
+        if (ext === '.ts' || ext === '.tsx') {
           result.hasTypeScript = true;
           result.tsFiles.push(path.relative(ROOT, fullPath));
-        } else if (ext === ".py") {
+        } else if (ext === '.py') {
           result.hasython = true;
           result.pyFiles.push(path.relative(ROOT, fullPath));
         }
@@ -117,27 +117,23 @@ if (require.main === module) {
   const { passed, violations } = checkLanguageBoundary();
 
   if (passed) {
-    console.log(
-      "✓ Language boundary check passed: no package mixes TypeScript and Python."
-    );
+    console.log('✓ Language boundary check passed: no package mixes TypeScript and Python.');
     process.exit(0);
   } else {
     console.error(
-      "✗ Language boundary check FAILED: the following packages mix TypeScript and Python sources:"
+      '✗ Language boundary check FAILED: the following packages mix TypeScript and Python sources:',
     );
     for (const v of violations) {
       console.error(`\n  Package: ${v.packageName}`);
       console.error(
-        `    TypeScript files (${v.tsFiles.length}): ${v.tsFiles.slice(0, 3).join(", ")}${v.tsFiles.length > 3 ? "..." : ""}`
+        `    TypeScript files (${v.tsFiles.length}): ${v.tsFiles.slice(0, 3).join(', ')}${v.tsFiles.length > 3 ? '...' : ''}`,
       );
       console.error(
-        `    Python files (${v.pyFiles.length}): ${v.pyFiles.slice(0, 3).join(", ")}${v.pyFiles.length > 3 ? "..." : ""}`
+        `    Python files (${v.pyFiles.length}): ${v.pyFiles.slice(0, 3).join(', ')}${v.pyFiles.length > 3 ? '...' : ''}`,
       );
     }
-    console.error(
-      "\nA single package must not contain both .ts/.tsx and .py files."
-    );
-    console.error("See docs/language-boundary.md for the convention.");
+    console.error('\nA single package must not contain both .ts/.tsx and .py files.');
+    console.error('See docs/language-boundary.md for the convention.');
     process.exit(1);
   }
 }

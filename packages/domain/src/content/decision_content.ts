@@ -11,12 +11,19 @@ export interface ReportFacts {
   readonly signal_timing: { readonly alternatives_green_plus_pct: 25 } | null;
   readonly article3_triggered: boolean;
   readonly article5_triggered: boolean;
-  readonly ete: { readonly minutes: number | null; readonly lower_bound_minutes?: number; readonly basis: string };
+  readonly ete: {
+    readonly minutes: number | null;
+    readonly lower_bound_minutes?: number;
+    readonly basis: string;
+  };
   readonly cms_core_text: string;
 }
 
 export interface CommandCenterReport {
-  readonly event_identification: { readonly event_id: string; readonly sop_articles: readonly number[] };
+  readonly event_identification: {
+    readonly event_id: string;
+    readonly sop_articles: readonly number[];
+  };
   readonly classification_section: ReportFacts['classification'];
   readonly route_section: {
     readonly primary: string | null;
@@ -49,12 +56,17 @@ export interface Sop2CmsFacts {
 
 export function assembleCommandCenterReport(facts: ReportFacts): CommandCenterReport {
   const crossSystem = new Set<'mrt' | 'bus' | 'police'>();
-  if (facts.article3_triggered) { crossSystem.add('mrt'); crossSystem.add('bus'); }
+  if (facts.article3_triggered) {
+    crossSystem.add('mrt');
+    crossSystem.add('bus');
+  }
   if (facts.article5_triggered) crossSystem.add('police');
   return {
     event_identification: {
       event_id: facts.event_id,
-      sop_articles: [...new Set([...facts.triggered_articles, ...facts.applied_formula_articles])].sort((a, b) => a - b),
+      sop_articles: [
+        ...new Set([...facts.triggered_articles, ...facts.applied_formula_articles]),
+      ].sort((a, b) => a - b),
     },
     classification_section: facts.classification,
     route_section: {
@@ -84,10 +96,19 @@ export function buildSop2CmsCoreText(facts: Sop2CmsFacts): string {
   return `${facts.incident_road}封閉，請改道 ${facts.primary_evacuation}，預計延誤 ${facts.ete_minutes} 分鐘`;
 }
 
-const LLM_WRITABLE_FIELDS = new Set(['report_text', 'cms_explanation_text', 'citations_presentation', 'public_alert_text', 'explanation_text']);
+const LLM_WRITABLE_FIELDS = new Set([
+  'report_text',
+  'cms_explanation_text',
+  'citations_presentation',
+  'public_alert_text',
+  'explanation_text',
+]);
 
 /** Rejects any renderer attempt to write deterministic fields such as cms_core_text. */
-export function validateNarrativePatch(patch: Readonly<Record<string, unknown>>): { readonly ok: boolean; readonly rejected_fields: readonly string[] } {
+export function validateNarrativePatch(patch: Readonly<Record<string, unknown>>): {
+  readonly ok: boolean;
+  readonly rejected_fields: readonly string[];
+} {
   const rejected_fields = Object.keys(patch).filter((key) => !LLM_WRITABLE_FIELDS.has(key));
   return { ok: rejected_fields.length === 0, rejected_fields };
 }

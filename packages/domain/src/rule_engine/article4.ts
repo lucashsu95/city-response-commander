@@ -63,10 +63,11 @@ export function evaluateArticle4(input: Article4Input): Article4Result {
     return noResult('insufficient_data');
   }
 
-  const historical_peak = Math.max(...observationsAsOfCurrent.map((observation) => observation.user_count));
+  const historical_peak = Math.max(
+    ...observationsAsOfCurrent.map((observation) => observation.user_count),
+  );
   const triggered =
-    historical_peak >= DOME_PEAK_THRESHOLD &&
-    input.current_growth_rate <= DOME_GROWTH_THRESHOLD;
+    historical_peak >= DOME_PEAK_THRESHOLD && input.current_growth_rate <= DOME_GROWTH_THRESHOLD;
 
   if (!triggered) return { ...noResult('ready'), historical_peak };
 

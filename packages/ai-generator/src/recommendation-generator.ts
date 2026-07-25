@@ -1,92 +1,87 @@
 /**
  * 決策建議書生成器
  *
- * 根據 DecisionCore 產出交控中心建議書，
- * 確保每次產出都包含揭露區塊。
+ * 根據 DecisionCore 產出交控中心建議書，並保留可稽核的政策與資料揭露。
  *
  * @module ai-generator/recommendation-generator
  */
 
-import type {
-  DecisionCore,
-  Disclosure,
-  RecommendationTemplate,
-} from '@city-commander/shared-schemas';
-import { BedrockClient } from './bedrock.js';
+import type { DecisionCore } from '@city-commander/shared-schemas';
+import type { TextGenerator } from './bedrock.js';
 
-export class RecommendationGenerator {
-  private readonly bedrock: BedrockClient;
+function formatOptional(value: string | number | null | undefined): string {
+  return value === null || value === undefined || value === '' ? '無' : String(value);
+}
 
-  constructor(bedrock: BedrockClient) {
-    this.bedrock = bedrock;
-  }
+/** Build the text-only prompt without changing any deterministic core fact. */
+export function buildRecommendationPrompt(core: DecisionCore): string {
+  const facts = core.event_facts;
+  const ete = core.ete;
+  const eteValue =
+    ete?.calculation_status === 'computed'
+      ? `${ete.ete_minutes} 分鐘`
+      : '資料不足，僅可確認基準下限';
+  const eteSnapshot = ete?.snapshot_provenance.common_snapshot_timestamp ?? '無共同精確快照';
+  const evidenceTimestamps = core.evidence.data_points
+    .map((point) => `${point.source}.${point.field} @ ${point.timestamp}`)
+    .join('\n- ');
 
-  /**
-   * 生成建議書文案
-   *
-   * 根據主辦單位回覆，評分重點在於 AI 推理過程是否嚴謹、
-   * 是否正確引用 SOP 條款，而非唯一的運算結果。
-   *
-   * 因此建議書必須包含揭露區塊，確保評審可完整追溯決策依據。
-   */
-  async generate(core: DecisionCore): Promise<string> {
-    const disclosure = core.disclosure;
-
-    const prompt = this.buildPrompt(core, disclosure);
-    const result = await this.bedrock.generateText(prompt);
-
-    return result;
-  }
-
-  private buildPrompt(core: DecisionCore, disclosure: Disclosure): string {
-    const triggeredSops = core.triggered_articles.join(', ');
-    const roadSet = disclosure.road_set_definition;
-    const eteFormula = disclosure.ete_formula;
-    const assumptions = disclosure.assumptions.join('\n- ');
-
-    return `你是一位交通指揮中心的 AI 助手，請根據以下決策核心資料，產出一份交控中心建議書。
+  return `你是一位交通指揮中心的 AI 助手。只能依下列不可變的 DecisionCore 事實撰寫文字，不得重算或更改級別、SOP、道路、ETE、CMS 核心文字或任何數值。
 
 ## 事件資訊
 - 事件 ID: ${core.event_id}
-- 事件類型: ${core.incident_type}
-- 受影響路段: ${core.affected_segment}
-- 嚴重度: ${core.severity}
-- 觸發的 SOP 條款: ${triggeredSops}
+- 事件類型: ${formatOptional(facts?.type)}
+- 位置: ${formatOptional(facts?.location)}
+- 受影響路段: ${formatOptional(facts?.affected_segment)}
+- 嚴重度: ${formatOptional(facts?.severity)}
+- 事件時間/決策截止: ${facts?.timestamp ?? core.occurred_at}
+- 觸發 SOP 條款: ${core.triggered_articles.join(', ') || '無'}
+- 套用公式條款: ${core.applied_formula_articles.join(', ') || '無'}
+- 啟用程序: ${core.invoked_procedures.join(', ') || '無'}
 
-## 疏散路徑
-- 主疏散路徑: ${core.primary_evacuation?.road_name || '無'}
-- 次要疏散路徑: ${              core.secondary_evacuation?.map((r: { road_name: string }) => r.road_name).join(', ') || '無'}
+## 疏散與正式文字
+- 主疏散路徑 ID: ${formatOptional(core.primary_evacuation)}
+- 次要疏散路徑 ID: ${core.secondary_evacuation.join(', ') || '無'}
+- CMS 核心文字（逐字保留，不得改寫）: ${core.cms_core_text}
 
 ## ETE 計算
-- ETE: ${core.ete?.ete_minutes || '無'} 分鐘
-- 公式: ${eteFormula}
-- 輸入值: base_clearance=${disclosure.ete_inputs.base_clearance}, congestion_penalty=${disclosure.ete_inputs.congestion_penalty}
+- 狀態: ${ete?.calculation_status ?? '不適用'}
+- ETE: ${eteValue}
+- 公式: base_clearance + max(0, (avg_saturation - 0.5) * 60)
+- base_clearance: ${formatOptional(ete?.base_clearance)}
+- congestion_penalty: ${formatOptional(ete?.congestion_penalty)}
+- 受影響集合: ${ete?.affected_set.join(', ') || '無'}
+- 共同精確快照: ${eteSnapshot}
+- 需人工確認: ${ete?.manual_confirmation_required ?? false}
 
-## 決策揭露（確保評審可完整追溯決策依據）
-- 使用的資料時間: ${disclosure.data_timestamp.display}
-- 使用的路段集合: ${roadSet}
-- 時間對齊策略: ${disclosure.time_alignment_note}
-- 團隊採用的實作假設:
-- ${assumptions}
+## 決策揭露
+- guidance_id: ${core.policy.guidance_id ?? '無'}
+- 政策分類: ${core.policy.classification}
+- 時間對齊策略: ${core.policy.time_alignment.mode}
+- ETE 集合策略: ${core.policy.ete.affected_set}
+- 事故錨點策略: ${core.policy.incident_anchor.mode}
+- 多語範圍策略: ${core.policy.multilingual_scope.mode}
+- 資料證據時間:
+- ${evidenceTimestamps || '無'}
 
-請產出建議書文案，格式如下：
-【事件】...
-【級別】...
-【時間】...
-【預估恢復】...
-
+請產出下列章節，所有判定依據必須引用上述 SOP 條款與資料證據，不得補造缺失資訊：
+【事件】
+【級別】
+【時間】
+【預估恢復】
 【處置建議】
-1. ...
-2. ...
-
 【判定依據】
-- ...引用 SOP 條款...
+【決策揭露】`;
+}
 
-【決策揭露】
-- 使用的資料時間: ...
-- 使用的路段集合: ...
-- 計算公式: ...
-- 輸入值: ...
-- 實作假設: ...`;
+export class RecommendationGenerator {
+  private readonly textGenerator: TextGenerator;
+
+  constructor(textGenerator: TextGenerator) {
+    this.textGenerator = textGenerator;
+  }
+
+  async generate(core: DecisionCore): Promise<string> {
+    return this.textGenerator.generateText(buildRecommendationPrompt(core));
   }
 }

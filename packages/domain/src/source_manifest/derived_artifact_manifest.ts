@@ -82,10 +82,7 @@ export class DerivedMirrorAsOfficialError extends Error {
  *
  * @throws DerivedMirrorAsOfficialError if the filename is a registered derived mirror
  */
-export function rejectIfDerivedMirror(
-  filename: string,
-  manifest: DerivedArtifactManifest,
-): void {
+export function rejectIfDerivedMirror(filename: string, manifest: DerivedArtifactManifest): void {
   if (manifest.isDerivedMirror(filename)) {
     throw new DerivedMirrorAsOfficialError(filename);
   }

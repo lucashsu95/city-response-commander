@@ -23,8 +23,7 @@
  * Sourced from: packages/config/src/config_schema.ts (TimeAlignmentModes)
  */
 export type TimeAlignmentMode =
-  | 'exact_or_latest_prior_per_entity'
-  | 'last_known_value_with_visible_staleness';
+  'exact_or_latest_prior_per_entity' | 'last_known_value_with_visible_staleness';
 
 // ─── Types ─────────────────────────────────────────────────
 
@@ -122,9 +121,7 @@ export const exactOrLatestPriorPerEntity: TimeAlignmentStrategy = {
     }
 
     const exact_match = bestTimestampMs === eventMs;
-    const staleness_minutes = exact_match
-      ? 0
-      : Math.round((eventMs - bestTimestampMs) / 60_000);
+    const staleness_minutes = exact_match ? 0 : Math.round((eventMs - bestTimestampMs) / 60_000);
 
     // Check staleness against configured threshold
     if (staleness_minutes > config.max_staleness_minutes) {
@@ -184,9 +181,7 @@ export const lastKnownValueWithVisibleStaleness: TimeAlignmentStrategy = {
     }
 
     const exact_match = bestTimestampMs === eventMs;
-    const staleness_minutes = exact_match
-      ? 0
-      : Math.round((eventMs - bestTimestampMs) / 60_000);
+    const staleness_minutes = exact_match ? 0 : Math.round((eventMs - bestTimestampMs) / 60_000);
 
     // Always return the record with visible staleness — never cut off
     return {

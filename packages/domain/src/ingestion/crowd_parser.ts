@@ -55,19 +55,14 @@ function stripBom(content: string): string {
  * @returns Readonly array of RawCrowdRecord
  * @throws CrowdParseError on schema mismatch, invalid rows, or empty data
  */
-export function parseCrowdCsv(
-  csvContent: string,
-): readonly RawCrowdRecord[] {
+export function parseCrowdCsv(csvContent: string): readonly RawCrowdRecord[] {
   const cleaned = stripBom(csvContent);
 
   // Split by CRLF or LF, filter out empty trailing lines
   const lines = cleaned.split(/\r?\n/).filter((line) => line.trim().length > 0);
 
   if (lines.length === 0) {
-    throw new CrowdParseError(
-      'CSV content is empty',
-      'EMPTY_DATA',
-    );
+    throw new CrowdParseError('CSV content is empty', 'EMPTY_DATA');
   }
 
   // Validate header row
@@ -93,10 +88,7 @@ export function parseCrowdCsv(
   }
 
   if (lines.length < 2) {
-    throw new CrowdParseError(
-      'CSV has no data rows',
-      'EMPTY_DATA',
-    );
+    throw new CrowdParseError('CSV has no data rows', 'EMPTY_DATA');
   }
 
   // Parse data rows
@@ -126,27 +118,24 @@ export function parseCrowdCsv(
 
     // Validate required string fields are non-empty
     if (!timestamp_raw || timestamp_raw.trim().length === 0) {
-      throw new CrowdParseError(
-        `Row ${i + 1}: Timestamp is empty`,
-        'INVALID_ROW',
-        { row: i + 1, field: 'Timestamp' },
-      );
+      throw new CrowdParseError(`Row ${i + 1}: Timestamp is empty`, 'INVALID_ROW', {
+        row: i + 1,
+        field: 'Timestamp',
+      });
     }
 
     if (!BS_ID || BS_ID.trim().length === 0) {
-      throw new CrowdParseError(
-        `Row ${i + 1}: BS_ID is empty`,
-        'INVALID_ROW',
-        { row: i + 1, field: 'BS_ID' },
-      );
+      throw new CrowdParseError(`Row ${i + 1}: BS_ID is empty`, 'INVALID_ROW', {
+        row: i + 1,
+        field: 'BS_ID',
+      });
     }
 
     if (!Location_Name || Location_Name.trim().length === 0) {
-      throw new CrowdParseError(
-        `Row ${i + 1}: Location_Name is empty`,
-        'INVALID_ROW',
-        { row: i + 1, field: 'Location_Name' },
-      );
+      throw new CrowdParseError(`Row ${i + 1}: Location_Name is empty`, 'INVALID_ROW', {
+        row: i + 1,
+        field: 'Location_Name',
+      });
     }
 
     // Parse and validate User_Count (integer)
@@ -181,11 +170,10 @@ export function parseCrowdCsv(
 
     // Parse Roaming_User_Pct via PercentParser
     if (!Roaming_User_Pct || Roaming_User_Pct.trim().length === 0) {
-      throw new CrowdParseError(
-        `Row ${i + 1}: Roaming_User_Pct is empty`,
-        'INVALID_ROW',
-        { row: i + 1, field: 'Roaming_User_Pct' },
-      );
+      throw new CrowdParseError(`Row ${i + 1}: Roaming_User_Pct is empty`, 'INVALID_ROW', {
+        row: i + 1,
+        field: 'Roaming_User_Pct',
+      });
     }
 
     let roaming_pct_value: number;

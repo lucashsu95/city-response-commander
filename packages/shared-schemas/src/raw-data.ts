@@ -11,12 +11,7 @@
  * @module shared-schemas/raw-data
  */
 
-import type {
-  LaneStatus,
-  IncidentType,
-  IncidentStatus,
-  IncidentSeverity,
-} from './enums.js';
+import type { LaneStatus, IncidentType, IncidentStatus, IncidentSeverity } from './enums.js';
 
 // ─── city_traffic_flow.csv ──────────────────────────────────
 

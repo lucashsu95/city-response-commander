@@ -7,7 +7,7 @@ dist/
 build/
 *.tsbuildinfo
 
-# Environment
+# Environment files (may contain secrets)
 .env
 .env.*
 !.env.example
@@ -22,9 +22,24 @@ build/
 .DS_Store
 Thumbs.db
 
-# AWS
+# AWS CDK
 cdk.out/
 .cdk.staging/
+
+# AWS credentials and config (NEVER commit)
+.aws/
+credentials*
+**/credentials
+**/credentials.*
+
+# Secrets and keys (NEVER commit)
+**/secrets/
+**/*.pem
+**/*.key
+**/*.p12
+**/*.pfx
+**/*.jks
+**/*.keystore
 
 # Logs
 *.log
@@ -34,7 +49,17 @@ npm-debug.log*
 coverage/
 .nyc_output/
 
-# Secrets (NEVER commit)
-**/secrets/
-**/*.pem
-**/*.key
+# Temporary files
+*.tmp
+*.bak
+*.orig
+
+# Python (if boundary exists)
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.egg-info/
+
+# One-time recovery/scratch artifacts
+fix_utf8/

@@ -57,19 +57,14 @@ function stripBom(content: string): string {
  * @returns Readonly array of RawTrafficRecord
  * @throws TrafficParseError on schema mismatch, invalid rows, or empty data
  */
-export function parseTrafficCsv(
-  csvContent: string,
-): readonly RawTrafficRecord[] {
+export function parseTrafficCsv(csvContent: string): readonly RawTrafficRecord[] {
   const cleaned = stripBom(csvContent);
 
   // Split by CRLF or LF, filter out empty trailing lines
   const lines = cleaned.split(/\r?\n/).filter((line) => line.trim().length > 0);
 
   if (lines.length === 0) {
-    throw new TrafficParseError(
-      'CSV content is empty',
-      'EMPTY_DATA',
-    );
+    throw new TrafficParseError('CSV content is empty', 'EMPTY_DATA');
   }
 
   // Validate header row
@@ -95,10 +90,7 @@ export function parseTrafficCsv(
   }
 
   if (lines.length < 2) {
-    throw new TrafficParseError(
-      'CSV has no data rows',
-      'EMPTY_DATA',
-    );
+    throw new TrafficParseError('CSV has no data rows', 'EMPTY_DATA');
   }
 
   // Parse data rows
@@ -128,27 +120,24 @@ export function parseTrafficCsv(
 
     // Validate required string fields are non-empty
     if (!timestamp_raw || timestamp_raw.trim().length === 0) {
-      throw new TrafficParseError(
-        `Row ${i + 1}: Timestamp is empty`,
-        'INVALID_ROW',
-        { row: i + 1, field: 'Timestamp' },
-      );
+      throw new TrafficParseError(`Row ${i + 1}: Timestamp is empty`, 'INVALID_ROW', {
+        row: i + 1,
+        field: 'Timestamp',
+      });
     }
 
     if (!Segment_ID || Segment_ID.trim().length === 0) {
-      throw new TrafficParseError(
-        `Row ${i + 1}: Segment_ID is empty`,
-        'INVALID_ROW',
-        { row: i + 1, field: 'Segment_ID' },
-      );
+      throw new TrafficParseError(`Row ${i + 1}: Segment_ID is empty`, 'INVALID_ROW', {
+        row: i + 1,
+        field: 'Segment_ID',
+      });
     }
 
     if (!Road_Name || Road_Name.trim().length === 0) {
-      throw new TrafficParseError(
-        `Row ${i + 1}: Road_Name is empty`,
-        'INVALID_ROW',
-        { row: i + 1, field: 'Road_Name' },
-      );
+      throw new TrafficParseError(`Row ${i + 1}: Road_Name is empty`, 'INVALID_ROW', {
+        row: i + 1,
+        field: 'Road_Name',
+      });
     }
 
     // Parse and validate numeric fields
@@ -192,7 +181,7 @@ export function parseTrafficCsv(
     if (!VALID_LANE_STATUSES.has(trimmedLaneStatus)) {
       throw new TrafficParseError(
         `Row ${i + 1}: Lane_Status "${trimmedLaneStatus}" is not a valid value. ` +
-        `Expected one of: ${[...VALID_LANE_STATUSES].join(', ')}`,
+          `Expected one of: ${[...VALID_LANE_STATUSES].join(', ')}`,
         'INVALID_ROW',
         { row: i + 1, field: 'Lane_Status', value: trimmedLaneStatus },
       );

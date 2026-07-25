@@ -9,12 +9,7 @@
  * @module shared-schemas/idempotency
  */
 
-import type {
-  IdempotencyStatus,
-  RecoveryStage,
-  RecoveryMode,
-  EvidenceSource,
-} from './enums.js';
+import type { IdempotencyStatus, RecoveryStage, RecoveryMode, EvidenceSource } from './enums.js';
 
 /**
  * IdempotencyTable record — the lease/status state machine

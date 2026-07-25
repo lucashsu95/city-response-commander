@@ -9,8 +9,7 @@ import { normalizeTimestamp } from '../ingestion/timestamp_normalizer.js';
 import type { AffectedRoadStrategyResult } from './affected_road_strategy.js';
 
 export type EteAffectedSetMode =
-  | 'directly_affected_roads_at_event_snapshot'
-  | 'incident_primary_and_selected_secondary';
+  'directly_affected_roads_at_event_snapshot' | 'incident_primary_and_selected_secondary';
 
 export interface EteAffectedSetResult {
   readonly mode: EteAffectedSetMode;
@@ -45,7 +44,9 @@ export interface CommonEteSnapshotSelectionInput {
 }
 
 /** Preserve first appearance while removing duplicate or empty road IDs. */
-export function stableUniqueRoadIds(roadIds: readonly (string | null | undefined)[]): readonly string[] {
+export function stableUniqueRoadIds(
+  roadIds: readonly (string | null | undefined)[],
+): readonly string[] {
   const unique = new Set<string>();
   for (const roadId of roadIds) {
     if (roadId) unique.add(roadId);
@@ -64,7 +65,8 @@ export const incidentPrimaryAndSelectedSecondary: EteAffectedSetStrategy = {
         mode: 'incident_primary_and_selected_secondary',
         affected_set: [],
         formula_applicability: 'partially_defined',
-        applicability_note: 'HG-001 excludes contextual affected_road values from BS-event ETE sets.',
+        applicability_note:
+          'HG-001 excludes contextual affected_road values from BS-event ETE sets.',
       };
     }
 
@@ -76,7 +78,8 @@ export const incidentPrimaryAndSelectedSecondary: EteAffectedSetStrategy = {
         ...selected_secondary_evacuation,
       ]),
       formula_applicability: 'applicable',
-      applicability_note: 'HG-001 organizer-guided set: incident road, selected primary, and selected secondary evacuation roads.',
+      applicability_note:
+        'HG-001 organizer-guided set: incident road, selected primary, and selected secondary evacuation roads.',
     };
   },
 };
@@ -127,7 +130,8 @@ export function selectLatestCommonExactSnapshot(
     const normalized = normalizeTimestamp(reading.observation_timestamp);
     if (normalized.timestamp_normalized > eventTimestamp.timestamp_normalized) continue;
 
-    const byTimestamp = readingsByRoad.get(reading.road_id) ?? new Map<string, EteSnapshotRoadReading>();
+    const byTimestamp =
+      readingsByRoad.get(reading.road_id) ?? new Map<string, EteSnapshotRoadReading>();
     if (!byTimestamp.has(normalized.timestamp_display)) {
       byTimestamp.set(normalized.timestamp_display, {
         road_id: reading.road_id,

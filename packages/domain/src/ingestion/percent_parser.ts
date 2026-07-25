@@ -63,6 +63,7 @@ export function parsePercent(percentStr: string): number {
 
 /** Format a normalized decimal using a caller-selected decimal precision. */
 export function formatPercent(value: number, fractionDigits = 0): string {
-  if (!Number.isFinite(value)) throw new PercentParseError('Percent value must be finite.', 'NON_NUMERIC', String(value));
+  if (!Number.isFinite(value))
+    throw new PercentParseError('Percent value must be finite.', 'NON_NUMERIC', String(value));
   return `${(value * 100).toFixed(fractionDigits)}%`;
 }

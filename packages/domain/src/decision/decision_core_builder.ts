@@ -1,7 +1,10 @@
 /** Immutable DecisionCore assembly and canonical hashing. */
 
 import type { DecisionCore } from '@city-commander/shared-schemas';
-import { calculateCoreHash, type CanonicalDecisionInput } from '../core_hash/canonical_core_hash.js';
+import {
+  calculateCoreHash,
+  type CanonicalDecisionInput,
+} from '../core_hash/canonical_core_hash.js';
 
 type ImmutableIncidentFacts = NonNullable<DecisionCore['event_facts']>;
 

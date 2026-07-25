@@ -56,7 +56,4 @@ export {
   createDerivedArtifactEntry,
 } from './derived_artifact_manifest.js';
 
-export type {
-  DerivedArtifactType,
-  DerivedArtifactEntry,
-} from './derived_artifact_manifest.js';
+export type { DerivedArtifactType, DerivedArtifactEntry } from './derived_artifact_manifest.js';

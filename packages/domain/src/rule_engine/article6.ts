@@ -1,7 +1,10 @@
 /** RuleEngine Article 6 — SOP-6 multilingual-alert trigger. */
 
 import type { MultilingualScopeResult } from '../strategies/multilingual_scope_strategy.js';
-import { evaluateMultilingualTrigger, type MultilingualTriggerResult } from './multilingual_trigger.js';
+import {
+  evaluateMultilingualTrigger,
+  type MultilingualTriggerResult,
+} from './multilingual_trigger.js';
 
 export interface Article6Result extends MultilingualTriggerResult {
   readonly adds_to_triggered_articles: readonly number[];

@@ -10,11 +10,7 @@
  */
 
 import type { Incident } from '@city-commander/shared-schemas';
-import {
-  IncidentType,
-  IncidentStatus,
-  IncidentSeverity,
-} from '@city-commander/shared-schemas';
+import { IncidentType, IncidentStatus, IncidentSeverity } from '@city-commander/shared-schemas';
 
 /** Error types for incident parsing failures */
 export class IncidentParseError extends Error {
@@ -51,31 +47,20 @@ const VALID_SEVERITIES = new Set<string>(Object.values(IncidentSeverity));
  * @returns Readonly array of Incident
  * @throws IncidentParseError on invalid JSON, schema mismatch, or unknown severity
  */
-export function parseIncidentsJson(
-  jsonContent: string,
-): readonly Incident[] {
+export function parseIncidentsJson(jsonContent: string): readonly Incident[] {
   let parsed: unknown;
   try {
     parsed = JSON.parse(jsonContent);
   } catch {
-    throw new IncidentParseError(
-      'Failed to parse JSON content',
-      'INVALID_JSON',
-    );
+    throw new IncidentParseError('Failed to parse JSON content', 'INVALID_JSON');
   }
 
   if (!Array.isArray(parsed)) {
-    throw new IncidentParseError(
-      'Expected JSON content to be an array',
-      'NOT_ARRAY',
-    );
+    throw new IncidentParseError('Expected JSON content to be an array', 'NOT_ARRAY');
   }
 
   if (parsed.length === 0) {
-    throw new IncidentParseError(
-      'Incidents array is empty',
-      'EMPTY_DATA',
-    );
+    throw new IncidentParseError('Incidents array is empty', 'EMPTY_DATA');
   }
 
   const records: Incident[] = [];
@@ -123,7 +108,7 @@ export function parseIncidentsJson(
     if (!VALID_TYPES.has(typeValue)) {
       throw new IncidentParseError(
         `Index ${i}: unknown incident type "${typeValue}". ` +
-        `Expected one of: ${[...VALID_TYPES].join(', ')}`,
+          `Expected one of: ${[...VALID_TYPES].join(', ')}`,
         'UNKNOWN_TYPE',
         { index: i, field: 'type', value: typeValue },
       );
@@ -133,7 +118,7 @@ export function parseIncidentsJson(
     if (!VALID_STATUSES.has(statusValue)) {
       throw new IncidentParseError(
         `Index ${i}: unknown incident status "${statusValue}". ` +
-        `Expected one of: ${[...VALID_STATUSES].join(', ')}`,
+          `Expected one of: ${[...VALID_STATUSES].join(', ')}`,
         'UNKNOWN_STATUS',
         { index: i, field: 'status', value: statusValue },
       );
@@ -143,7 +128,7 @@ export function parseIncidentsJson(
     if (!VALID_SEVERITIES.has(severityValue)) {
       throw new IncidentParseError(
         `Index ${i}: unknown severity "${severityValue}". ` +
-        `Expected one of: ${[...VALID_SEVERITIES].join(', ')}`,
+          `Expected one of: ${[...VALID_SEVERITIES].join(', ')}`,
         'UNKNOWN_SEVERITY',
         { index: i, field: 'severity', value: severityValue },
       );

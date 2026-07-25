@@ -89,31 +89,19 @@ export function normalizeTimestamp(raw: string): NormalizedTimestamp {
 
   // Validate ranges
   if (month < 1 || month > 12) {
-    throw new TimestampParseError(
-      `Invalid month ${month} in timestamp: "${raw}".`,
-      raw,
-    );
+    throw new TimestampParseError(`Invalid month ${month} in timestamp: "${raw}".`, raw);
   }
 
   if (day < 1 || day > 31) {
-    throw new TimestampParseError(
-      `Invalid day ${day} in timestamp: "${raw}".`,
-      raw,
-    );
+    throw new TimestampParseError(`Invalid day ${day} in timestamp: "${raw}".`, raw);
   }
 
   if (hour < 0 || hour > 23) {
-    throw new TimestampParseError(
-      `Invalid hour ${hour} in timestamp: "${raw}".`,
-      raw,
-    );
+    throw new TimestampParseError(`Invalid hour ${hour} in timestamp: "${raw}".`, raw);
   }
 
   if (minute < 0 || minute > 59) {
-    throw new TimestampParseError(
-      `Invalid minute ${minute} in timestamp: "${raw}".`,
-      raw,
-    );
+    throw new TimestampParseError(`Invalid minute ${minute} in timestamp: "${raw}".`, raw);
   }
 
   // Construct a Date object (local time, as no timezone is specified in the data)

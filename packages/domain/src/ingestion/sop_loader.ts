@@ -62,10 +62,7 @@ export interface SOPLoadResult {
  */
 export function parseSOPText(sopContent: string): SOPLoadResult {
   if (!sopContent || sopContent.trim().length === 0) {
-    throw new SOPLoadError(
-      'SOP content is empty',
-      'EMPTY_CONTENT',
-    );
+    throw new SOPLoadError('SOP content is empty', 'EMPTY_CONTENT');
   }
 
   const lines = sopContent.split(/\r?\n/);
@@ -104,12 +101,8 @@ export function parseSOPText(sopContent: string): SOPLoadResult {
         const contentStart = secondSep + 1;
 
         // Content ends at the next separator line or end of file
-        const nextSepIndex = separatorIndices.findIndex(
-          (idx) => idx > secondSep,
-        );
-        const contentEnd = nextSepIndex >= 0
-          ? separatorIndices[nextSepIndex]
-          : lines.length;
+        const nextSepIndex = separatorIndices.findIndex((idx) => idx > secondSep);
+        const contentEnd = nextSepIndex >= 0 ? separatorIndices[nextSepIndex] : lines.length;
 
         // Extract content lines and preserve verbatim (including whitespace)
         const contentLines = lines.slice(contentStart, contentEnd);
@@ -123,7 +116,10 @@ export function parseSOPText(sopContent: string): SOPLoadResult {
 
         // Also trim leading empty lines
         let firstNonEmpty = 0;
-        while (firstNonEmpty < trimmedContent.length && trimmedContent[firstNonEmpty].trim() === '') {
+        while (
+          firstNonEmpty < trimmedContent.length &&
+          trimmedContent[firstNonEmpty].trim() === ''
+        ) {
           firstNonEmpty++;
         }
         const finalContent = trimmedContent.slice(firstNonEmpty);

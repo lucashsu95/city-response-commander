@@ -19,10 +19,17 @@ export interface AlertMonitorResult {
 export function monitorAlerts(snapshot: AlertMonitorSnapshot): AlertMonitorResult {
   const reasons: AlertReason[] = [];
   if (snapshot.road_saturations.some((value) => value >= 0.85)) reasons.push('article1');
-  if (snapshot.bl17 !== undefined &&
-      (snapshot.bl17.growth_rate > 0.3 || snapshot.bl17.user_count > 25_000)) reasons.push('article3');
-  if (snapshot.dome !== undefined && snapshot.dome.historical_peak >= 30_000 &&
-      snapshot.dome.current_growth_rate <= -0.2) reasons.push('article4');
+  if (
+    snapshot.bl17 !== undefined &&
+    (snapshot.bl17.growth_rate > 0.3 || snapshot.bl17.user_count > 25_000)
+  )
+    reasons.push('article3');
+  if (
+    snapshot.dome !== undefined &&
+    snapshot.dome.historical_peak >= 30_000 &&
+    snapshot.dome.current_growth_rate <= -0.2
+  )
+    reasons.push('article4');
   if (snapshot.station_roaming_rates.some((value) => value >= 0.3)) reasons.push('article6');
   return {
     anomaly_detected: reasons.length > 0,

@@ -30,7 +30,7 @@ export const ARTICLE3_STATION_ID = 'BS_MRT_BL17' as const;
 export const ARTICLE3_WALK_TARGET = 'BS_MRT_BL18' as const;
 
 /** Growth rate threshold (strictly greater than) */
-export const GROWTH_RATE_THRESHOLD = 0.30;
+export const GROWTH_RATE_THRESHOLD = 0.3;
 
 /** User count threshold (strictly greater than) */
 export const USER_COUNT_THRESHOLD = 25000;

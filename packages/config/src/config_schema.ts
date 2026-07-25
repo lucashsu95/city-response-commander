@@ -152,10 +152,7 @@ export const CONFIG_SCHEMA: readonly ConfigKeyDefinition[] = [
     key: 'bedrock.model_id_fallbacks',
     type: 'string[]',
     required: true,
-    provisionalDefault: [
-      'anthropic.claude-3-haiku-20240307-v1:0',
-      'amazon.titan-text-express-v1',
-    ],
+    provisionalDefault: ['anthropic.claude-3-haiku-20240307-v1:0', 'amazon.titan-text-express-v1'],
     description: 'Fallback model IDs when primary is unavailable',
     isProvisionalPolicy: false,
   },
@@ -332,7 +329,8 @@ export const CONFIG_SCHEMA: readonly ConfigKeyDefinition[] = [
     required: true,
     allowedValues: [...EteAffectedSets],
     provisionalDefault: 'incident_primary_and_selected_secondary',
-    description: 'Strategy C: incident plus selected primary and secondary roads for ETE (HG-001 organizer guidance)',
+    description:
+      'Strategy C: incident plus selected primary and secondary roads for ETE (HG-001 organizer guidance)',
     isProvisionalPolicy: true,
   },
 
@@ -354,7 +352,8 @@ export const CONFIG_SCHEMA: readonly ConfigKeyDefinition[] = [
     required: true,
     allowedValues: [...AffectedIntersectionScopeModes],
     provisionalDefault: 'unresolved_manual_confirmation',
-    description: 'Strategy E: which intersections count as affected for SOP5 police (OQ-010, PROVISIONAL)',
+    description:
+      'Strategy E: which intersections count as affected for SOP5 police (OQ-010, PROVISIONAL)',
     isProvisionalPolicy: true,
   },
 
@@ -365,7 +364,8 @@ export const CONFIG_SCHEMA: readonly ConfigKeyDefinition[] = [
     required: true,
     allowedValues: [...MultilingualScopeModes],
     provisionalDefault: 'current_snapshot_all_available_stations',
-    description: 'Strategy F: station set and time snapshot for SOP6 roaming check (OQ-005, PROVISIONAL)',
+    description:
+      'Strategy F: station set and time snapshot for SOP6 roaming check (OQ-005, PROVISIONAL)',
     isProvisionalPolicy: true,
   },
 ] as const;
@@ -376,19 +376,19 @@ export const CONFIG_SCHEMA: readonly ConfigKeyDefinition[] = [
 export const ALL_CONFIG_KEYS: readonly string[] = CONFIG_SCHEMA.map((def) => def.key);
 
 /** All required config keys */
-export const REQUIRED_CONFIG_KEYS: readonly string[] = CONFIG_SCHEMA
-  .filter((def) => def.required)
-  .map((def) => def.key);
+export const REQUIRED_CONFIG_KEYS: readonly string[] = CONFIG_SCHEMA.filter(
+  (def) => def.required,
+).map((def) => def.key);
 
 /** All policy knob keys (provisional) */
-export const POLICY_KNOB_KEYS: readonly string[] = CONFIG_SCHEMA
-  .filter((def) => def.isProvisionalPolicy)
-  .map((def) => def.key);
+export const POLICY_KNOB_KEYS: readonly string[] = CONFIG_SCHEMA.filter(
+  (def) => def.isProvisionalPolicy,
+).map((def) => def.key);
 
 /** Strategy mode keys (must each have >=2 allowed values) */
-export const STRATEGY_MODE_KEYS: readonly string[] = CONFIG_SCHEMA
-  .filter((def) => def.isProvisionalPolicy && def.allowedValues && def.allowedValues.length >= 2)
-  .map((def) => def.key);
+export const STRATEGY_MODE_KEYS: readonly string[] = CONFIG_SCHEMA.filter(
+  (def) => def.isProvisionalPolicy && def.allowedValues && def.allowedValues.length >= 2,
+).map((def) => def.key);
 
 // ─── Validation ──────────────────────────────────────────────────────────────
 
@@ -413,9 +413,7 @@ export interface ConfigValidationResult {
  * @param config - Flat key-value map (as returned by ConfigProvider.getAll or loaded from YAML)
  * @returns Validation result with any errors found
  */
-export function validateConfig(
-  config: Record<string, unknown>,
-): ConfigValidationResult {
+export function validateConfig(config: Record<string, unknown>): ConfigValidationResult {
   const errors: ConfigValidationError[] = [];
 
   for (const def of CONFIG_SCHEMA) {
@@ -497,7 +495,10 @@ export function getKeyDefinition(key: string): ConfigKeyDefinition | undefined {
  * Get all provisional default values as a flat config map.
  * Useful for populating a local config file with all required keys.
  */
-export function getProvisionalDefaults(): Record<string, string | number | boolean | readonly string[]> {
+export function getProvisionalDefaults(): Record<
+  string,
+  string | number | boolean | readonly string[]
+> {
   const defaults: Record<string, string | number | boolean | readonly string[]> = {};
   for (const def of CONFIG_SCHEMA) {
     if (def.provisionalDefault !== undefined) {

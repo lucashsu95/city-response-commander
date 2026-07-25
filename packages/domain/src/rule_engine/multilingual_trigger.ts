@@ -12,9 +12,14 @@ export interface MultilingualTriggerResult {
 }
 
 /** Evaluates only current, Strategy-A-aligned station snapshots. */
-export function evaluateMultilingualTrigger(scope: Pick<MultilingualScopeResult, 'stations_in_scope'>): MultilingualTriggerResult {
+export function evaluateMultilingualTrigger(
+  scope: Pick<MultilingualScopeResult, 'stations_in_scope'>,
+): MultilingualTriggerResult {
   const triggering_station_ids = scope.stations_in_scope
-    .filter((station) => station.roaming_pct_value !== null && station.roaming_pct_value >= ROAMING_THRESHOLD)
+    .filter(
+      (station) =>
+        station.roaming_pct_value !== null && station.roaming_pct_value >= ROAMING_THRESHOLD,
+    )
     .map((station) => station.bs_id);
 
   // A known qualifying station is sufficient regardless of incomplete readings
@@ -30,11 +35,14 @@ export function evaluateMultilingualTrigger(scope: Pick<MultilingualScopeResult,
 
   // Without a known qualifier, a missing in-scope reading could meet the
   // inclusive threshold, so the false result is not conclusive.
-  const hasUnknownReading = scope.stations_in_scope.some((station) => station.roaming_pct_value === null);
+  const hasUnknownReading = scope.stations_in_scope.some(
+    (station) => station.roaming_pct_value === null,
+  );
   return {
     triggered: false,
     multilingual_required: false,
     triggering_station_ids: [],
-    data_status: hasUnknownReading || scope.stations_in_scope.length === 0 ? 'insufficient_data' : 'ready',
+    data_status:
+      hasUnknownReading || scope.stations_in_scope.length === 0 ? 'insufficient_data' : 'ready',
   };
 }

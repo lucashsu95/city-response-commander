@@ -24,9 +24,7 @@ export class RoadNetworkModel {
     const map = new Map<string, RoadSegment>();
     for (const segment of segments) {
       if (map.has(segment.segment_id)) {
-        throw new Error(
-          `Duplicate segment_id "${segment.segment_id}" in road network data`,
-        );
+        throw new Error(`Duplicate segment_id "${segment.segment_id}" in road network data`);
       }
       map.set(segment.segment_id, segment);
     }

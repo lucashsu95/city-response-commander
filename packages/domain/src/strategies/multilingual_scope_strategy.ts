@@ -23,28 +23,48 @@ export interface MultilingualScopeResult {
 }
 
 export interface MultilingualScopeStrategy {
-  stationsInScope(currentStations: readonly CurrentStationSnapshot[], config: MultilingualScopeConfig): MultilingualScopeResult;
+  stationsInScope(
+    currentStations: readonly CurrentStationSnapshot[],
+    config: MultilingualScopeConfig,
+  ): MultilingualScopeResult;
 }
 
 export const currentSnapshotAllAvailableStations: MultilingualScopeStrategy = {
-  stationsInScope: (currentStations) => ({ mode: 'current_snapshot_all_available_stations', stations_in_scope: currentStations }),
+  stationsInScope: (currentStations) => ({
+    mode: 'current_snapshot_all_available_stations',
+    stations_in_scope: currentStations,
+  }),
 };
 export const incidentAreaNearbyStations: MultilingualScopeStrategy = {
-  stationsInScope: (currentStations, config) => ({ mode: 'incident_area_nearby_stations', stations_in_scope: filterStations(currentStations, config.incident_area_station_ids) }),
+  stationsInScope: (currentStations, config) => ({
+    mode: 'incident_area_nearby_stations',
+    stations_in_scope: filterStations(currentStations, config.incident_area_station_ids),
+  }),
 };
 export const explicitHostPolicyStations: MultilingualScopeStrategy = {
-  stationsInScope: (currentStations, config) => ({ mode: 'explicit_host_policy', stations_in_scope: filterStations(currentStations, config.explicit_station_ids) }),
+  stationsInScope: (currentStations, config) => ({
+    mode: 'explicit_host_policy',
+    stations_in_scope: filterStations(currentStations, config.explicit_station_ids),
+  }),
 };
 
-export function resolveMultilingualScopeStrategy(mode: MultilingualScopeMode): MultilingualScopeStrategy {
+export function resolveMultilingualScopeStrategy(
+  mode: MultilingualScopeMode,
+): MultilingualScopeStrategy {
   switch (mode) {
-    case 'current_snapshot_all_available_stations': return currentSnapshotAllAvailableStations;
-    case 'incident_area_nearby_stations': return incidentAreaNearbyStations;
-    case 'explicit_host_policy': return explicitHostPolicyStations;
+    case 'current_snapshot_all_available_stations':
+      return currentSnapshotAllAvailableStations;
+    case 'incident_area_nearby_stations':
+      return incidentAreaNearbyStations;
+    case 'explicit_host_policy':
+      return explicitHostPolicyStations;
   }
 }
 
-function filterStations(stations: readonly CurrentStationSnapshot[], ids: readonly string[] | undefined): readonly CurrentStationSnapshot[] {
+function filterStations(
+  stations: readonly CurrentStationSnapshot[],
+  ids: readonly string[] | undefined,
+): readonly CurrentStationSnapshot[] {
   if (ids === undefined) return [];
   const allowed = new Set(ids);
   return stations.filter((station) => allowed.has(station.bs_id));

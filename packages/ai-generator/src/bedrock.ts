@@ -4,14 +4,17 @@
  * @module ai-generator/bedrock
  */
 
-import type { DecisionCore, Disclosure, RecommendationTemplate } from '@city-commander/shared-schemas';
-
 export interface BedrockConfig {
   readonly region: string;
   readonly modelId: string;
 }
 
-export class BedrockClient {
+/** Text-only generation boundary shared by the real and LOCAL_MOCK adapters. */
+export interface TextGenerator {
+  generateText(prompt: string): Promise<string>;
+}
+
+export class BedrockClient implements TextGenerator {
   private readonly config: BedrockConfig;
 
   constructor(config: BedrockConfig) {
@@ -19,11 +22,14 @@ export class BedrockClient {
   }
 
   async generateText(prompt: string): Promise<string> {
-    if (process.env.NODE_ENV === 'local') {
+    if (process.env.CITY_COMMANDER_ENV === 'LOCAL_MOCK' || process.env.NODE_ENV === 'local') {
       return `[MOCK] ${prompt.substring(0, 100)}...`;
     }
 
-    // TODO: 實作真實 Bedrock API 調用
-    throw new Error('Bedrock API not implemented yet');
+    // Keep the selected model configuration attached to this adapter until the
+    // real Bedrock implementation lands; no network fallback is permitted.
+    throw new Error(
+      `Bedrock API not implemented for model ${this.config.modelId}; use CITY_COMMANDER_ENV=LOCAL_MOCK`,
+    );
   }
 }

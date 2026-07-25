@@ -67,20 +67,13 @@ export type {
 } from './decision_narrative.js';
 
 // ─── Publish Record (§10.11d) ──────────────────────────────
-export type {
-  PublishRecord,
-  AuditTrailEntry,
-} from './publish_record.js';
+export type { PublishRecord, AuditTrailEntry } from './publish_record.js';
 
 // ─── Idempotency Table (§10.11e) ───────────────────────────
-export type {
-  IdempotencyRecord,
-} from './idempotency.js';
+export type { IdempotencyRecord } from './idempotency.js';
 
 // ─── Route Candidate (§10.8) ───────────────────────────────
-export type {
-  RouteCandidate,
-} from './route_candidate.js';
+export type { RouteCandidate } from './route_candidate.js';
 
 // ─── ETE Result (§10.9) ────────────────────────────────────
 export type {
@@ -101,9 +94,7 @@ export type {
 } from './evidence.js';
 
 // ─── Policy Metadata (§10.6) ───────────────────────────────
-export type {
-  PolicyMetadata,
-} from './policy_metadata.js';
+export type { PolicyMetadata } from './policy_metadata.js';
 
 // ─── API Contracts (§12) ───────────────────────────────────
 export type {
@@ -118,11 +109,7 @@ export type {
 } from './api-contracts.js';
 
 // ─── Config ────────────────────────────────────────────────
-export type {
-  EnvironmentProfile,
-  ConfigSchema,
-  StrategyConfig,
-} from './config.js';
+export type { EnvironmentProfile, ConfigSchema, StrategyConfig } from './config.js';
 
 // ─── Discriminated union for API/event payloads (§12/§13) ──
 export type {

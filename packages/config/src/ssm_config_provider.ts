@@ -15,16 +15,8 @@
  * @module config/ssm_config_provider
  */
 
-import {
-  SSMClient,
-  GetParametersByPathCommand,
-  type Parameter,
-} from '@aws-sdk/client-ssm';
-import {
-  ConfigProvider,
-  ConfigKeyMissingError,
-  ConfigLoadError,
-} from './config_provider.js';
+import { SSMClient, GetParametersByPathCommand } from '@aws-sdk/client-ssm';
+import { ConfigProvider, ConfigKeyMissingError, ConfigLoadError } from './config_provider.js';
 
 /**
  * Options for constructing an SsmConfigProvider.
@@ -56,22 +48,10 @@ function ssmPathToConfigKey(path: string, prefix: string): string {
 }
 
 /**
- * Convert a dot-notation config key to an SSM parameter path suffix.
- *
- * "bedrock.region" -> "bedrock/region"
- * "policy.time_alignment.mode" -> "policy/time_alignment/mode"
- */
-function configKeyToSsmPathSuffix(key: string): string {
-  return key.replace(/\./g, '/');
-}
-
-/**
  * Parse an SSM parameter value to the appropriate type.
  * SSM stores everything as strings, so we apply heuristic type coercion.
  */
-function parseParameterValue(
-  value: string,
-): string | number | boolean | readonly string[] {
+function parseParameterValue(value: string): string | number | boolean | readonly string[] {
   // Boolean
   if (value === 'true') return true;
   if (value === 'false') return false;
@@ -106,9 +86,7 @@ export class SsmConfigProvider implements ConfigProvider {
   /**
    * Private constructor — use the static `create()` method for async initialization.
    */
-  private constructor(
-    flatConfig: Record<string, string | number | boolean | readonly string[]>,
-  ) {
+  private constructor(flatConfig: Record<string, string | number | boolean | readonly string[]>) {
     this.flatConfig = flatConfig;
   }
 
@@ -120,12 +98,7 @@ export class SsmConfigProvider implements ConfigProvider {
    * @throws ConfigLoadError if SSM is unreachable or returns an error
    */
   static async create(options: SsmConfigProviderOptions): Promise<SsmConfigProvider> {
-    const {
-      environment,
-      prefixBase = '/city-commander',
-      ssmClient,
-      region,
-    } = options;
+    const { environment, prefixBase = '/city-commander', ssmClient, region } = options;
 
     const client = ssmClient ?? new SSMClient(region ? { region } : {});
     const pathPrefix = `${prefixBase}/${environment}/`;

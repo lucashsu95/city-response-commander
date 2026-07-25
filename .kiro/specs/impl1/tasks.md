@@ -4020,7 +4020,7 @@ CHECKPOINT K (not a task): Ensure observability, resilience, and security contro
 
 > Every Phase 11 task AUTHORS a runbook and/or automated helper script (a file-creation coding task); NONE executes a deployment, runs the app end-to-end manually, or performs `cdk destroy`. Actual deploy/teardown are operator actions gated by the runbooks and (for teardown) organizer confirmation (§25, §26). Smoke/latency helpers are automated scripts, not manual runs.
 
-- [~] TASK-165 Author LOCAL_MOCK rehearsal runbook + script
+- [x] TASK-165 Author LOCAL_MOCK rehearsal runbook + script
   - objective: Author the runbook/script to rehearse the full deterministic suite offline (LOCAL_MOCK, Mock Bedrock, no AWS) so the team validates correctness before any AWS use (§23, §22.3).
   - requirements_covered: REQ-025, REQ-032, R-supporting
   - design_sections: §23, §22.3
@@ -4089,7 +4089,7 @@ CHECKPOINT K (not a task): Ensure observability, resilience, and security contro
   - competition_quality_floor: Complete COMPETITION_AWS deploy runbook: P0a–P0d (identity, Bedrock model access, KB support, SSM seeding) + step-1 `cdk deploy` + upload of the 5 runtime files + SOP + deployment-time KB ingestion (TASK-178) with completion VERIFIED before RAG smoke; operator-executed (no deploy run here); no simplified/placeholder deploy path.
   - demo_or_evidence_output: `runbooks/02_competition_deploy.md` covering pre-deploy + deploy step 1 + KB-ingestion completion gate (used to produce the live deployment URL deliverable).
 
-- [~] TASK-168 Author source-manifest gate runbook (step 2, 7 SHA-256 STOP)
+- [x] TASK-168 Author source-manifest gate runbook (step 2, 7 SHA-256 STOP)
   - objective: Author the runbook/script for step-2 source hash verification (7 official sources, §10.0b) that STOPs deployment on any mismatch (§25 step 2).
   - requirements_covered: REQ-032, R1
   - design_sections: §25 (step 2), §10.0b, §21

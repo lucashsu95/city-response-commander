@@ -29,7 +29,8 @@ export function aggregateArticles(input: ArticleAggregationInput): ArticleAggreg
   const invoked = new Set<string>();
   for (const evaluation of input.evaluations) {
     if (!evaluation.triggered) continue;
-    if (evaluation.article === 7) throw new Error('Article 7 must be recorded as an applied formula, not a trigger.');
+    if (evaluation.article === 7)
+      throw new Error('Article 7 must be recorded as an applied formula, not a trigger.');
     triggered.add(evaluation.article);
     for (const procedure of evaluation.invoked_procedures ?? []) invoked.add(procedure);
   }
@@ -41,6 +42,8 @@ export function aggregateArticles(input: ArticleAggregationInput): ArticleAggreg
     triggered_articles,
     applied_formula_articles,
     invoked_procedures: [...invoked].sort(),
-    citation_article_set: [...new Set([...triggered_articles, ...applied_formula_articles])].sort((a, b) => a - b),
+    citation_article_set: [...new Set([...triggered_articles, ...applied_formula_articles])].sort(
+      (a, b) => a - b,
+    ),
   };
 }

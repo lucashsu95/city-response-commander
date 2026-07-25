@@ -4,7 +4,8 @@ import { createHash } from 'node:crypto';
 import type { DecisionCore } from '@city-commander/shared-schemas';
 
 /** Additional execution metadata is accepted but cannot enter the allowlisted payload. */
-export type CanonicalDecisionInput = Omit<DecisionCore, 'core_hash'> & Readonly<Record<string, unknown>>;
+export type CanonicalDecisionInput = Omit<DecisionCore, 'core_hash'> &
+  Readonly<Record<string, unknown>>;
 
 const SET_LIKE_ARRAY_KEYS = new Set([
   'triggered_articles',
@@ -52,13 +53,16 @@ export function canonicalSerialize(value: unknown, fieldName?: string): string {
 }
 
 export function calculateCoreHash(input: CanonicalDecisionInput): string {
-  return createHash('sha256').update(canonicalSerialize(canonicalDecisionPayload(input)), 'utf8').digest('hex');
+  return createHash('sha256')
+    .update(canonicalSerialize(canonicalDecisionPayload(input)), 'utf8')
+    .digest('hex');
 }
 
 function normalize(value: unknown, fieldName?: string): unknown {
   if (value === null || typeof value === 'string' || typeof value === 'boolean') return value;
   if (typeof value === 'number') {
-    if (!Number.isFinite(value)) throw new Error('Canonical payload cannot contain a non-finite number.');
+    if (!Number.isFinite(value))
+      throw new Error('Canonical payload cannot contain a non-finite number.');
     return Object.is(value, -0) ? 0 : value;
   }
   if (Array.isArray(value)) {

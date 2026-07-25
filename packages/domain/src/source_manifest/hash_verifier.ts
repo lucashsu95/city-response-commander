@@ -137,10 +137,7 @@ export async function verifySourceFile(
  * @param data - File content as a Buffer
  * @returns VerificationResult
  */
-export function verifySourceBuffer(
-  entry: OfficialSourceEntry,
-  data: Buffer,
-): VerificationResult {
+export function verifySourceBuffer(entry: OfficialSourceEntry, data: Buffer): VerificationResult {
   const loadedAt = formatLoadedAt();
   const computedHash = computeSHA256(data);
   const matches = hashesMatch(computedHash, entry.expected_sha256);

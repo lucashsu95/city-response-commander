@@ -52,12 +52,16 @@ export interface PolicyMetadata {
 
   // ── Strategy E: Affected Intersection Scope (OQ-010) ──
   readonly affected_intersection_scope: {
-    readonly mode: 'unresolved_manual_confirmation' | 'all_segment_intersections' | 'explicit_host_set';
+    readonly mode:
+      'unresolved_manual_confirmation' | 'all_segment_intersections' | 'explicit_host_set';
   };
 
   // ── Strategy F: Multilingual Scope (OQ-005) ──
   readonly multilingual_scope: {
-    readonly mode: 'current_snapshot_all_available_stations' | 'incident_area_nearby_stations' | 'explicit_host_policy';
+    readonly mode:
+      | 'current_snapshot_all_available_stations'
+      | 'incident_area_nearby_stations'
+      | 'explicit_host_policy';
   };
 
   // ── OQ-008: Saturated vs Congested ──

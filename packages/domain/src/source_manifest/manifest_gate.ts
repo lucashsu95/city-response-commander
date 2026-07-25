@@ -15,13 +15,12 @@ import { createHash } from 'node:crypto';
 
 import { ValidationStatus } from '@city-commander/shared-schemas';
 
-import type { OfficialSourceEntry, ValidatedSourceEntry } from './official_source_manifest.js';
+import type { ValidatedSourceEntry } from './official_source_manifest.js';
 import {
   buildOfficialSourceManifest,
   getRuntimeDecisionSources,
 } from './official_source_manifest.js';
 import { verifySourceFile, verifySourceBuffer, toValidatedEntry } from './hash_verifier.js';
-import type { VerificationResult } from './hash_verifier.js';
 
 // ─── Types ─────────────────────────────────────────────────
 
@@ -53,9 +52,7 @@ export interface ManifestGateResult {
  * Algorithm: SHA-256 of all individual hashes concatenated in manifest order.
  */
 export function computeSourceManifestHash(entries: ValidatedSourceEntry[]): string {
-  const concatenated = entries
-    .map((e) => e.sha256)
-    .join('');
+  const concatenated = entries.map((e) => e.sha256).join('');
   return createHash('sha256').update(concatenated).digest('hex').toUpperCase();
 }
 

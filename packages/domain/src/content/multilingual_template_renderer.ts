@@ -15,7 +15,10 @@ export interface MultilingualTemplateResult {
   readonly fallback_used: true;
 }
 
-export function requiredAlertLanguages(sop6Triggered: boolean, bonusLanguages: boolean): readonly SupportedLanguage[] {
+export function requiredAlertLanguages(
+  sop6Triggered: boolean,
+  bonusLanguages: boolean,
+): readonly SupportedLanguage[] {
   if (!sop6Triggered) return ['zh'];
   return bonusLanguages ? ['zh', 'en', 'ja', 'ko'] : ['zh', 'en'];
 }
@@ -34,7 +37,10 @@ export function renderApprovedMultilingualFallback(
   const languages = requiredAlertLanguages(sop6Triggered, bonusLanguages);
   return {
     languages,
-    text: Object.fromEntries(languages.map((language) => [language, all[language]])) as Record<SupportedLanguage, string>,
+    text: Object.fromEntries(languages.map((language) => [language, all[language]])) as Record<
+      SupportedLanguage,
+      string
+    >,
     fallback_used: true,
   };
 }
