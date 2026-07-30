@@ -1,0 +1,733 @@
+{
+  "QueryLanguage": "JSONPath",
+  "Comment": "Express Workflow — City Response Commander. §4.6, §6, §15.2, Figure 8. Express execution is at-least-once; every side-effect handler MUST use conditional writes, fencing via $$.Execution.Id + attempt_count, or apply-or-confirm (TASK-068 documents this contract; TASK-097 implements the exact result gates). Bedrock failures MUST NOT modify DecisionCore. WsPushFn notifications are NOT the authoritative state — DynamoDB + HTTP read model is the fallback. ENRICHMENT_ONLY does NOT re-run DecisionFn and does NOT push decision.fast_path_ready. There is no runtime lambda_direct fallback; orchestration.mode=lambda_direct is a deployment-time alternative only.",
+  "StartAt": "MARK_RUNNING",
+  "States": {
+    "MARK_RUNNING": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "${WorkflowStatusFnArn}",
+        "Payload": {
+          "action": "MARK_RUNNING",
+          "execution_id.$": "$$.Execution.Id",
+          "idempotency_key.$": "$.idempotency_key",
+          "decision_id.$": "$.decision_id",
+          "attempt_count.$": "$.attempt_count",
+          "lease_owner.$": "$.lease_owner",
+          "recovery_mode.$": "$.recovery_mode",
+          "trace_id.$": "$.trace_id"
+        }
+      },
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "Lambda.ServiceException",
+            "Lambda.AWSLambdaException",
+            "Lambda.SdkClientException",
+            "Lambda.TooManyRequestsException"
+          ],
+          "IntervalSeconds": 1,
+          "MaxAttempts": 2,
+          "BackoffRate": 2
+        }
+      ],
+      "ResultPath": "$.workflow_status.marker_running",
+      "ResultSelector": { "payload.$": "$.Payload" },
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "ResultPath": "$.workflow_error",
+          "Next": "FAIL_BEFORE_RUNNING_REGISTERED"
+        }
+      ],
+      "Next": "SELECT_RECOVERY_MODE"
+    },
+    "FAIL_BEFORE_RUNNING_REGISTERED": {
+      "Type": "Fail",
+      "Cause": "MARK_RUNNING failed before the execution was registered as running. Terminal status updates MUST NOT happen from this execution.",
+      "Error": "MARK_RUNNING_PRE_REGISTRATION_FAILURE"
+    },
+    "SELECT_RECOVERY_MODE": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Variable": "$.recovery_mode",
+          "StringEquals": "NORMAL",
+          "Next": "RUN_DECISION"
+        },
+        {
+          "Variable": "$.recovery_mode",
+          "StringEquals": "FULL_WORKFLOW",
+          "Next": "RUN_DECISION"
+        },
+        {
+          "Variable": "$.recovery_mode",
+          "StringEquals": "ENRICHMENT_ONLY",
+          "Next": "RECOVERY_GATE"
+        }
+      ],
+      "Default": "PREPARE_INVALID_RECOVERY_MODE"
+    },
+    "PREPARE_INVALID_RECOVERY_MODE": {
+      "Type": "Pass",
+      "Parameters": {
+        "last_error": "INVALID_RECOVERY_MODE",
+        "retryable": false,
+        "recovery_stage": "NONE",
+        "execution_id.$": "$$.Execution.Id",
+        "attempt_count.$": "$.attempt_count",
+        "idempotency_key.$": "$.idempotency_key",
+        "decision_id.$": "$.decision_id"
+      },
+      "Next": "MARK_PROCESSING_FAILED"
+    },
+    "RUN_DECISION": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "${DecisionFnArn}",
+        "Payload": {
+          "execution_id.$": "$$.Execution.Id",
+          "attempt_count.$": "$.attempt_count",
+          "idempotency_key.$": "$.idempotency_key",
+          "decision_id.$": "$.decision_id",
+          "trace_id.$": "$.trace_id",
+          "recovery_mode.$": "$.recovery_mode",
+          "lease_owner.$": "$.lease_owner"
+        }
+      },
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "Lambda.ServiceException",
+            "Lambda.AWSLambdaException",
+            "Lambda.SdkClientException",
+            "Lambda.TooManyRequestsException"
+          ],
+          "IntervalSeconds": 1,
+          "MaxAttempts": 2,
+          "BackoffRate": 2
+        }
+      ],
+      "ResultPath": "$.decision",
+      "ResultSelector": { "payload.$": "$.Payload" },
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "ResultPath": "$.workflow_error",
+          "Next": "RECOVERY_GATE_AFTER_FAILURE"
+        }
+      ],
+      "Next": "DECISION_CORE_WRITE_GATE"
+    },
+    "DECISION_CORE_WRITE_GATE": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Variable": "$.decision.payload.core_write_status",
+          "StringEquals": "COMMITTED",
+          "Next": "MARK_CORE_COMMITTED_DECISION"
+        },
+        {
+          "Variable": "$.decision.payload.core_write_status",
+          "StringEquals": "ALREADY_COMMITTED_SAME_DECISION",
+          "Next": "MARK_CORE_COMMITTED_DECISION"
+        },
+        {
+          "Variable": "$.decision.payload.core_write_status",
+          "StringEquals": "CORE_IDENTITY_CONFLICT",
+          "Next": "PREPARE_CORE_IDENTITY_CONFLICT"
+        }
+      ],
+      "Default": "PREPARE_UNKNOWN_CORE_WRITE_STATUS"
+    },
+    "PREPARE_CORE_IDENTITY_CONFLICT": {
+      "Type": "Pass",
+      "Parameters": {
+        "last_error": "CORE_IDENTITY_CONFLICT",
+        "retryable": false,
+        "recovery_stage": "NONE",
+        "execution_id.$": "$$.Execution.Id",
+        "attempt_count.$": "$.attempt_count",
+        "idempotency_key.$": "$.idempotency_key",
+        "decision_id.$": "$.decision_id"
+      },
+      "Next": "MARK_PROCESSING_FAILED_TERMINAL"
+    },
+    "MARK_PROCESSING_FAILED_TERMINAL": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "${WorkflowStatusFnArn}",
+        "Payload": {
+          "action": "MARK_PROCESSING_FAILED",
+          "terminal": true,
+          "last_error": "CORE_IDENTITY_CONFLICT",
+          "retryable": false,
+          "recovery_stage": "NONE",
+          "execution_id.$": "$$.Execution.Id",
+          "attempt_count.$": "$.attempt_count",
+          "idempotency_key.$": "$.idempotency_key",
+          "decision_id.$": "$.decision_id"
+        }
+      },
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "Lambda.ServiceException",
+            "Lambda.AWSLambdaException",
+            "Lambda.SdkClientException",
+            "Lambda.TooManyRequestsException"
+          ],
+          "IntervalSeconds": 1,
+          "MaxAttempts": 2,
+          "BackoffRate": 2
+        }
+      ],
+      "ResultPath": "$.workflow_status.terminal_failed",
+      "ResultSelector": { "payload.$": "$.Payload" },
+      "Next": "PUBLISH_PROCESSING_FAILED"
+    },
+    "PUBLISH_PROCESSING_FAILED": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "${WsPushFnArn}",
+        "Payload": {
+          "event_type": "decision.processing_failed",
+          "decision_id.$": "$.decision_id",
+          "trace_id.$": "$.trace_id",
+          "execution_id.$": "$$.Execution.Id",
+          "last_error": "CORE_IDENTITY_CONFLICT"
+        }
+      },
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "Lambda.ServiceException",
+            "Lambda.AWSLambdaException",
+            "Lambda.SdkClientException",
+            "Lambda.TooManyRequestsException"
+          ],
+          "IntervalSeconds": 1,
+          "MaxAttempts": 2,
+          "BackoffRate": 2
+        }
+      ],
+      "ResultPath": "$.ws_push.processing_failed",
+      "ResultSelector": { "payload.$": "$.Payload" },
+      "Next": "FAIL_CORE_IDENTITY_CONFLICT"
+    },
+    "FAIL_CORE_IDENTITY_CONFLICT": {
+      "Type": "Fail",
+      "Cause": "DecisionCore identity conflict — non-retryable. Cannot continue on Fast Path, Renderer, or Completed.",
+      "Error": "CORE_IDENTITY_CONFLICT"
+    },
+    "PREPARE_UNKNOWN_CORE_WRITE_STATUS": {
+      "Type": "Pass",
+      "Parameters": {
+        "last_error": "UNKNOWN_CORE_WRITE_STATUS",
+        "retryable": false,
+        "recovery_stage": "NONE",
+        "execution_id.$": "$$.Execution.Id",
+        "attempt_count.$": "$.attempt_count",
+        "idempotency_key.$": "$.idempotency_key",
+        "decision_id.$": "$.decision_id"
+      },
+      "Next": "MARK_PROCESSING_FAILED"
+    },
+    "MARK_CORE_COMMITTED_DECISION": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "${WorkflowStatusFnArn}",
+        "Payload": {
+          "action": "MARK_CORE_COMMITTED",
+          "evidence_source": "DECISIONFN_COMMITTED",
+          "execution_id.$": "$$.Execution.Id",
+          "attempt_count.$": "$.attempt_count",
+          "idempotency_key.$": "$.idempotency_key",
+          "decision_id.$": "$.decision_id"
+        }
+      },
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "Lambda.ServiceException",
+            "Lambda.AWSLambdaException",
+            "Lambda.SdkClientException",
+            "Lambda.TooManyRequestsException"
+          ],
+          "IntervalSeconds": 1,
+          "MaxAttempts": 2,
+          "BackoffRate": 2
+        }
+      ],
+      "ResultPath": "$.workflow_status.core_committed",
+      "ResultSelector": { "payload.$": "$.Payload" },
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "ResultPath": "$.workflow_error",
+          "Next": "RECOVERY_GATE_AFTER_FAILURE"
+        }
+      ],
+      "Next": "PUBLISH_FAST_PATH_READY"
+    },
+    "PUBLISH_FAST_PATH_READY": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "${WsPushFnArn}",
+        "Payload": {
+          "event_type": "decision.fast_path_ready",
+          "decision_id.$": "$.decision_id",
+          "trace_id.$": "$.trace_id",
+          "execution_id.$": "$$.Execution.Id"
+        }
+      },
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "Lambda.ServiceException",
+            "Lambda.AWSLambdaException",
+            "Lambda.SdkClientException",
+            "Lambda.TooManyRequestsException"
+          ],
+          "IntervalSeconds": 1,
+          "MaxAttempts": 2,
+          "BackoffRate": 2
+        }
+      ],
+      "ResultPath": "$.ws_push.fast_path_ready",
+      "ResultSelector": { "payload.$": "$.Payload" },
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "ResultPath": "$.workflow_error.ws_push_fast_path",
+          "Next": "ENRICHMENT_PARALLEL"
+        }
+      ],
+      "Next": "ENRICHMENT_PARALLEL"
+    },
+    "RECOVERY_GATE": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "${RecoveryGateFnArn}",
+        "Payload": {
+          "execution_id.$": "$$.Execution.Id",
+          "attempt_count.$": "$.attempt_count",
+          "idempotency_key.$": "$.idempotency_key",
+          "decision_id.$": "$.decision_id",
+          "trace_id.$": "$.trace_id",
+          "recovery_mode.$": "$.recovery_mode",
+          "missing_narrative_types.$": "$.missing_narrative_types"
+        }
+      },
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "Lambda.ServiceException",
+            "Lambda.AWSLambdaException",
+            "Lambda.SdkClientException",
+            "Lambda.TooManyRequestsException"
+          ],
+          "IntervalSeconds": 1,
+          "MaxAttempts": 2,
+          "BackoffRate": 2
+        }
+      ],
+      "ResultPath": "$.recovery",
+      "ResultSelector": { "payload.$": "$.Payload" },
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "ResultPath": "$.workflow_error",
+          "Next": "RECOVERY_GATE_AFTER_FAILURE"
+        }
+      ],
+      "Next": "RECOVERY_CORE_EXISTS_GATE"
+    },
+    "RECOVERY_CORE_EXISTS_GATE": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Variable": "$.recovery.payload.core_exists",
+          "BooleanEquals": true,
+          "Next": "MARK_CORE_COMMITTED_RECOVERY"
+        }
+      ],
+      "Default": "PREPARE_RECOVERY_CORE_MISSING"
+    },
+    "MARK_CORE_COMMITTED_RECOVERY": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "${WorkflowStatusFnArn}",
+        "Payload": {
+          "action": "MARK_CORE_COMMITTED",
+          "evidence_source": "RECOVERY_GATE_CORE_EXISTS",
+          "execution_id.$": "$$.Execution.Id",
+          "attempt_count.$": "$.attempt_count",
+          "idempotency_key.$": "$.idempotency_key",
+          "decision_id.$": "$.decision_id"
+        }
+      },
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "Lambda.ServiceException",
+            "Lambda.AWSLambdaException",
+            "Lambda.SdkClientException",
+            "Lambda.TooManyRequestsException"
+          ],
+          "IntervalSeconds": 1,
+          "MaxAttempts": 2,
+          "BackoffRate": 2
+        }
+      ],
+      "ResultPath": "$.workflow_status.core_committed_recovery",
+      "ResultSelector": { "payload.$": "$.Payload" },
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "ResultPath": "$.workflow_error",
+          "Next": "RECOVERY_GATE_AFTER_FAILURE"
+        }
+      ],
+      "Next": "ENRICHMENT_PARALLEL"
+    },
+    "PREPARE_RECOVERY_CORE_MISSING": {
+      "Type": "Pass",
+      "Parameters": {
+        "last_error": "RECOVERY_CORE_MISSING",
+        "retryable": true,
+        "recovery_stage": "FULL_WORKFLOW",
+        "execution_id.$": "$$.Execution.Id",
+        "attempt_count.$": "$.attempt_count",
+        "idempotency_key.$": "$.idempotency_key",
+        "decision_id.$": "$.decision_id"
+      },
+      "Next": "MARK_PROCESSING_FAILED"
+    },
+    "ENRICHMENT_PARALLEL": {
+      "Type": "Parallel",
+      "Branches": [
+        {
+          "StartAt": "RENDER_REPORT",
+          "States": {
+            "RENDER_REPORT": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::lambda:invoke",
+              "Parameters": {
+                "FunctionName": "${RendererFnArn}",
+                "Payload": {
+                  "mode": "REPORT",
+                  "decision_id.$": "$.decision_id",
+                  "trace_id.$": "$.trace_id",
+                  "recovery_mode.$": "$.recovery_mode",
+                  "execution_id.$": "$$.Execution.Id",
+                  "attempt_count.$": "$.attempt_count"
+                }
+              },
+              "Retry": [
+                {
+                  "ErrorEquals": [
+                    "Lambda.ServiceException",
+                    "Lambda.AWSLambdaException",
+                    "Lambda.SdkClientException",
+                    "Lambda.TooManyRequestsException"
+                  ],
+                  "IntervalSeconds": 1,
+                  "MaxAttempts": 2,
+                  "BackoffRate": 2
+                }
+              ],
+              "ResultPath": "$.narrative",
+              "ResultSelector": { "payload.$": "$.Payload" },
+              "End": true
+            }
+          }
+        },
+        {
+          "StartAt": "RENDER_PUBLIC_ALERT",
+          "States": {
+            "RENDER_PUBLIC_ALERT": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::lambda:invoke",
+              "Parameters": {
+                "FunctionName": "${RendererFnArn}",
+                "Payload": {
+                  "mode": "PUBLIC_ALERT",
+                  "decision_id.$": "$.decision_id",
+                  "trace_id.$": "$.trace_id",
+                  "recovery_mode.$": "$.recovery_mode",
+                  "execution_id.$": "$$.Execution.Id",
+                  "attempt_count.$": "$.attempt_count"
+                }
+              },
+              "Retry": [
+                {
+                  "ErrorEquals": [
+                    "Lambda.ServiceException",
+                    "Lambda.AWSLambdaException",
+                    "Lambda.SdkClientException",
+                    "Lambda.TooManyRequestsException"
+                  ],
+                  "IntervalSeconds": 1,
+                  "MaxAttempts": 2,
+                  "BackoffRate": 2
+                }
+              ],
+              "ResultPath": "$.narrative",
+              "ResultSelector": { "payload.$": "$.Payload" },
+              "End": true
+            }
+          }
+        },
+        {
+          "StartAt": "RENDER_EXPLANATION",
+          "States": {
+            "RENDER_EXPLANATION": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::lambda:invoke",
+              "Parameters": {
+                "FunctionName": "${RendererFnArn}",
+                "Payload": {
+                  "mode": "EXPLANATION",
+                  "decision_id.$": "$.decision_id",
+                  "trace_id.$": "$.trace_id",
+                  "recovery_mode.$": "$.recovery_mode",
+                  "execution_id.$": "$$.Execution.Id",
+                  "attempt_count.$": "$.attempt_count"
+                }
+              },
+              "Retry": [
+                {
+                  "ErrorEquals": [
+                    "Lambda.ServiceException",
+                    "Lambda.AWSLambdaException",
+                    "Lambda.SdkClientException",
+                    "Lambda.TooManyRequestsException"
+                  ],
+                  "IntervalSeconds": 1,
+                  "MaxAttempts": 2,
+                  "BackoffRate": 2
+                }
+              ],
+              "ResultPath": "$.narrative",
+              "ResultSelector": { "payload.$": "$.Payload" },
+              "End": true
+            }
+          }
+        }
+      ],
+      "ResultPath": "$.enrichment",
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "ResultPath": "$.workflow_error",
+          "Next": "RECOVERY_GATE_AFTER_FAILURE"
+        }
+      ],
+      "Next": "PUBLISH_ENRICHED"
+    },
+    "PUBLISH_ENRICHED": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "${WsPushFnArn}",
+        "Payload": {
+          "event_type": "decision.enriched",
+          "decision_id.$": "$.decision_id",
+          "trace_id.$": "$.trace_id",
+          "execution_id.$": "$$.Execution.Id"
+        }
+      },
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "Lambda.ServiceException",
+            "Lambda.AWSLambdaException",
+            "Lambda.SdkClientException",
+            "Lambda.TooManyRequestsException"
+          ],
+          "IntervalSeconds": 1,
+          "MaxAttempts": 2,
+          "BackoffRate": 2
+        }
+      ],
+      "ResultPath": "$.ws_push.enriched",
+      "ResultSelector": { "payload.$": "$.Payload" },
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "ResultPath": "$.workflow_error.ws_push_enriched",
+          "Next": "MARK_COMPLETED"
+        }
+      ],
+      "Next": "MARK_COMPLETED"
+    },
+    "MARK_COMPLETED": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "${WorkflowStatusFnArn}",
+        "Payload": {
+          "action": "MARK_COMPLETED",
+          "execution_id.$": "$$.Execution.Id",
+          "attempt_count.$": "$.attempt_count",
+          "idempotency_key.$": "$.idempotency_key",
+          "decision_id.$": "$.decision_id"
+        }
+      },
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "Lambda.ServiceException",
+            "Lambda.AWSLambdaException",
+            "Lambda.SdkClientException",
+            "Lambda.TooManyRequestsException"
+          ],
+          "IntervalSeconds": 1,
+          "MaxAttempts": 2,
+          "BackoffRate": 2
+        }
+      ],
+      "ResultPath": "$.workflow_status.completed",
+      "ResultSelector": { "payload.$": "$.Payload" },
+      "Next": "WORKFLOW_SUCCEEDED"
+    },
+    "WORKFLOW_SUCCEEDED": {
+      "Type": "Succeed"
+    },
+    "RECOVERY_GATE_AFTER_FAILURE": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "${RecoveryGateFnArn}",
+        "Payload": {
+          "execution_id.$": "$$.Execution.Id",
+          "attempt_count.$": "$.attempt_count",
+          "idempotency_key.$": "$.idempotency_key",
+          "decision_id.$": "$.decision_id",
+          "purpose": "AFTER_FAILURE"
+        }
+      },
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "Lambda.ServiceException",
+            "Lambda.AWSLambdaException",
+            "Lambda.SdkClientException",
+            "Lambda.TooManyRequestsException"
+          ],
+          "IntervalSeconds": 1,
+          "MaxAttempts": 2,
+          "BackoffRate": 2
+        }
+      ],
+      "ResultPath": "$.recovery_gate_after_failure",
+      "ResultSelector": { "payload.$": "$.Payload" },
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "ResultPath": "$.workflow_error.recovery_gate_failed",
+          "Next": "PREPARE_RECOVERY_GATE_FAILED"
+        }
+      ],
+      "Next": "RECOVERY_STAGE_FROM_GATE"
+    },
+    "RECOVERY_STAGE_FROM_GATE": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Variable": "$.recovery_gate_after_failure.payload.effective_core_committed",
+          "BooleanEquals": true,
+          "Next": "PREPARE_RECOVERY_STAGE_ENRICHMENT_ONLY"
+        }
+      ],
+      "Default": "PREPARE_RECOVERY_STAGE_FULL_WORKFLOW"
+    },
+    "PREPARE_RECOVERY_STAGE_ENRICHMENT_ONLY": {
+      "Type": "Pass",
+      "Parameters": {
+        "last_error": "TASK_FAILED",
+        "retryable": true,
+        "recovery_stage": "ENRICHMENT_ONLY",
+        "execution_id.$": "$$.Execution.Id",
+        "attempt_count.$": "$.attempt_count",
+        "idempotency_key.$": "$.idempotency_key",
+        "decision_id.$": "$.decision_id"
+      },
+      "Next": "MARK_PROCESSING_FAILED"
+    },
+    "PREPARE_RECOVERY_STAGE_FULL_WORKFLOW": {
+      "Type": "Pass",
+      "Parameters": {
+        "last_error": "TASK_FAILED",
+        "retryable": true,
+        "recovery_stage": "FULL_WORKFLOW",
+        "execution_id.$": "$$.Execution.Id",
+        "attempt_count.$": "$.attempt_count",
+        "idempotency_key.$": "$.idempotency_key",
+        "decision_id.$": "$.decision_id"
+      },
+      "Next": "MARK_PROCESSING_FAILED"
+    },
+    "PREPARE_RECOVERY_GATE_FAILED": {
+      "Type": "Pass",
+      "Parameters": {
+        "last_error": "RECOVERY_GATE_FAILED",
+        "retryable": true,
+        "recovery_stage": "FULL_WORKFLOW",
+        "execution_id.$": "$$.Execution.Id",
+        "attempt_count.$": "$.attempt_count",
+        "idempotency_key.$": "$.idempotency_key",
+        "decision_id.$": "$.decision_id"
+      },
+      "Next": "MARK_PROCESSING_FAILED"
+    },
+    "MARK_PROCESSING_FAILED": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "${WorkflowStatusFnArn}",
+        "Payload": {
+          "action": "MARK_PROCESSING_FAILED",
+          "terminal": true,
+          "last_error.$": "$.last_error",
+          "retryable.$": "$.retryable",
+          "recovery_stage.$": "$.recovery_stage",
+          "execution_id.$": "$$.Execution.Id",
+          "attempt_count.$": "$.attempt_count",
+          "idempotency_key.$": "$.idempotency_key",
+          "decision_id.$": "$.decision_id"
+        }
+      },
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "Lambda.ServiceException",
+            "Lambda.AWSLambdaException",
+            "Lambda.SdkClientException",
+            "Lambda.TooManyRequestsException"
+          ],
+          "IntervalSeconds": 1,
+          "MaxAttempts": 2,
+          "BackoffRate": 2
+        }
+      ],
+      "ResultPath": "$.workflow_status.processing_failed",
+      "ResultSelector": { "payload.$": "$.Payload" },
+      "Next": "FAIL_PROCESSING_FAILED"
+    },
+    "FAIL_PROCESSING_FAILED": {
+      "Type": "Fail",
+      "Cause": "Workflow has been marked as processing-failed. The execution is terminal.",
+      "Error": "PROCESSING_FAILED"
+    }
+  }
+}
