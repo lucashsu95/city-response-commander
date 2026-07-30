@@ -6,9 +6,19 @@
   "main": "dist/bin/app.js",
   "scripts": {
     "build": "tsc",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "synth:local": "cdk synth --context env=LOCAL_MOCK",
+    "synth:personal": "cdk synth --context env=PERSONAL_AWS_DEV",
+    "synth:competition": "cdk synth --context env=COMPETITION_AWS"
   },
   "devDependencies": {
-    "typescript": "^5.4.0"
+    "@types/node": "^20.0.0",
+    "aws-cdk": "^2.162.1",
+    "aws-cdk-lib": "^2.162.1",
+    "constructs": "^10.3.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.4.0",
+    "vitest": "^1.6.0"
   }
 }

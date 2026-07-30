@@ -6,6 +6,7 @@ export default defineConfig({
       "scripts/test/**/*.test.ts",
       "packages/*/test/**/*.test.ts",
       "eslint-local-rules/test/**/*.test.ts",
+      "infra/test/**/*.test.ts",
     ],
   },
 });

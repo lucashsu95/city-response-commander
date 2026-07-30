@@ -7,6 +7,20 @@ dist/
 build/
 *.tsbuildinfo
 
+# Infra generated outputs (JS/dTS from TypeScript compilation)
+infra/bin/*.js
+infra/bin/*.d.ts
+infra/bin/*.d.ts.map
+infra/bin/*.js.map
+infra/lib/*.js
+infra/lib/*.d.ts
+infra/lib/*.d.ts.map
+infra/lib/*.js.map
+infra/test/*.test.js
+infra/test/*.test.d.ts
+infra/test/*.test.d.ts.map
+infra/test/*.test.js.map
+
 # Environment files (may contain secrets)
 .env
 .env.*
@@ -24,6 +38,7 @@ Thumbs.db
 
 # AWS CDK
 cdk.out/
+cdk.out.competition/
 .cdk.staging/
 
 # AWS credentials and config (NEVER commit)
