@@ -1,10 +1,34 @@
 # 技術設計文件 (Technical Design Document)
 
+**Design Status**: `RECOVERED_AND_AMENDED_BY_HG-001_PENDING_READ_ONLY_REVIEW`  
+**Amendment**: `HG-001` (2026-07-24)  
+**Implementation Authorization**: `NOT_AUTHORIZED_PENDING_READ_ONLY_REVIEW`
+
 ## 智慧交通指揮系統 — City Response Commander
 
 > 本文件為 `city-response-commander` 之技術設計，對應同目錄 `requirements.md`。
 > 撰寫語言為繁體中文；AWS 服務名稱、API 名稱、欄位名稱與程式識別字保留英文。
 > 本文件僅描述「如何設計」，不建立 `tasks.md`、產品程式碼或任何 AWS 資源。
+
+### HG-001 Organizer Guidance Amendment Record
+
+| Field | Value |
+|---|---|
+| `guidance_id` | `HG-001` |
+| `guidance_date` | `2026-07-24` |
+| `authority_class` | `ORGANIZER_WRITTEN_GUIDANCE` |
+| `implementation_uniqueness` | `NON_UNIQUE` |
+| `selected_policy_class` | `ORGANIZER_GUIDED_TEAM_POLICY` |
+| `runtime_official_source` | `false` |
+| `official_sop_amendment` | `false` |
+| `seven_source_manifest_member` | `false` |
+
+HG-001 是主辦方書面實作指引，不是新的 SOP 條文，不是第八個 Runtime 官方來源，也不變更七份官方來源雜湊。團隊採用決定性、可重現、可配置的政策，並於 Dashboard、EvidenceTrace 與報告揭露 event time、cutoff、observation time、staleness、road set、inputs、formula、assumptions 與 `guidance_id`。
+
+**OQ 狀態**：
+- OQ-001、OQ-002、OQ-003：`RESOLVED_FOR_IMPLEMENTATION_BY_ORGANIZER_GUIDANCE`
+- OQ-005：`PARTIALLY_RESOLVED_BY_ORGANIZER_GUIDANCE`，僅時間維度；station-set 範圍仍 OPEN
+- OQ-004、OQ-006..OQ-011：`OPEN / AWAITING_HOST_REPLY`
 
 ### 權威順序與正式來源真相 (Authority Order & Formal Source of Truth)
 
@@ -53,15 +77,15 @@
 - **決定性程式碼（Deterministic Engine）擁有一切數值與布林真值**：資料解析、百分比解析、時間序列選取、A/B 分級、SOP 觸發（AND/OR）判定、替代路徑候選來源、容量檢查、直接相交檢查、上/下游判定、主/次疏散選擇、Saturation 排序、ETE 公式、多語觸發布林、Evidence Trace、延遲量測。
 - **Amazon Bedrock 只擁有自然語言**：以 RAG 為依據的解釋、建議書措辭、民眾警示措辭、zh/en/ja/ko 生成、What-if 的自然語言互動；Bedrock **只能填寫文字欄位**，永不重算 ETE、永不更動 A/B 級別、永不更改主疏散道路、永不虛構道路或 SOP。
 
-系統執行環境為 **AWS-only**，所有生成式 AI 一律經由 **Amazon Bedrock**。設計以三種環境設定檔（LOCAL_MOCK / PERSONAL_AWS_DEV / COMPETITION_AWS）保證可在本機示範、於團隊自有帳號開發、並於主辦 8/1–8/2 競賽帳號快速部署與拆除。官方未定義之議題（**OQ-001..OQ-011**，見 §29）以**可抽換的 Strategy 介面**或 `PARTIALLY_DEFINED` 標記封裝為暫定政策（PROVISIONAL_TEAM_POLICY，狀態 AWAITING_HOST_REPLY），主辦回覆後僅需改設定即可切換，不需改寫核心 Rule Engine。
+系統執行環境為 **AWS-only**，所有生成式 AI 一律經由 **Amazon Bedrock**。設計以三種環境設定檔（LOCAL_MOCK / PERSONAL_AWS_DEV / COMPETITION_AWS）保證可在本機示範、於團隊自有帳號開發、並於主辦 8/1–8/2 競賽帳號快速部署與拆除。HG-001 已將 OQ-001、OQ-002、OQ-003 解決供實作，並部分解決 OQ-005 的時間維度。這些 organizer-guided policies 仍維持可配置，因主辦方未指定唯一演算法。OQ-004、OQ-006..OQ-011 與 OQ-005 的 station-set 維度繼續由 Strategy 介面或 `PARTIALLY_DEFINED` 標記封裝，狀態為 `OPEN / AWAITING_HOST_REPLY`。
 
 延遲採**雙路徑**設計：Fast Path 先以決定性結果輸出初步警示與核心決策（TEAM_TARGET：偵測→初步民眾警示 ≤ 5 秒，非官方硬指標）；Enrichment Path 隨後補上 Bedrock 解釋、多語與完整報告。**Bedrock 失敗不得阻擋 Fast Path。**
 
 ### 交付範圍界線
 
-- 本設計文件僅產出 `design.md`。
-- 不修改 `requirements.md`；**不關閉任何 OPEN_QUESTION（OQ-001..OQ-011）**。
-- 不產生 `tasks.md`、程式碼或 AWS 資源。
+- 本文件為 HG-001 修復與設計同步版本。
+- 本修復不建立產品程式碼、不建立或部署 AWS 資源。
+- OQ-001、OQ-002、OQ-003 僅依主辦方書面指引解決供實作；OQ-005 僅部分解決；其餘 OQ 保持 OPEN。
 
 ---
 
@@ -89,7 +113,7 @@
 | R16 What-if 顧問 (模組3) | 對話視窗、假設條件即時檢索、引用 SOP | `WhatIfEngine` + Bedrock | 決定性重算 + Bedrock 措辭 | P28, P35 | §9, §12, §14, §22.1 |
 | R17 加分項目 (選配) | Dashboard 設計、ja/ko 多語 | `DashboardService`、`MultilingualTrigger` | Dashboard + Bedrock | P29 + UI visual/snapshot tests | §16, §14, §22.1 |
 
-OPEN_QUESTION（OQ-001..OQ-011）以 Strategy 介面或 `PARTIALLY_DEFINED` 標記承接（§11），並於 §29 保持 OPEN。
+Open Questions 於仍需維持可配置性的範圍內，以 Strategy 介面或 `PARTIALLY_DEFINED` 標記承接（§11）。HG-001 已解決 OQ-001、OQ-002、OQ-003 供實作，並僅部分解決 OQ-005 的時間維度。OQ-004、OQ-006..OQ-011，以及 OQ-005 的 station-set 維度，維持 `OPEN / AWAITING_HOST_REPLY`。權威狀態矩陣見 §29。
 
 ### 2.1 Cursor REQ ↔ Kiro R Crosswalk（完整 32 列對映）
 
@@ -110,7 +134,7 @@ OPEN_QUESTION（OQ-001..OQ-011）以 Strategy 介面或 `PARTIALLY_DEFINED` 標�
 >
 > **coverage_status enum（僅此五種）**：`FULLY_COVERED`｜`PARTIALLY_COVERED`｜`NOT_COVERED`｜`DELIVERABLE_ONLY`｜`BONUS_ONLY`。
 >
-> **判定規則**：僅當該 REQ 有**具體設計落地**（component + section + property/test）時方標 `FULLY_COVERED`；僅因存在對應 Kiro R 編號**不足以**宣稱涵蓋。**不得**將任何開放問題視為已解決——所有 `mapped_open_questions` 之 OQ 一律維持 **OPEN / AWAITING_HOST_REPLY**（見 §29）。`DELIVERABLE_ONLY`（交付物）與 `BONUS_ONLY`（加分項）皆已有設計落地（§6/§24/§25/§25.1 及 §8/§16/§14.4/§21.3），屬**合法涵蓋**，**不得**報告為核心系統設計缺漏。
+> **判定規則**：僅當該 REQ 有**具體設計落地**（component + section + property/test）時方標 `FULLY_COVERED`；僅因存在對應 Kiro R 編號**不足以**宣稱涵蓋。`mapped_open_questions` 遵循 HG-001 狀態矩陣：OQ-001、OQ-002、OQ-003 已解決供實作；OQ-005 僅部分解決其時間維度；OQ-004 與 OQ-006..OQ-011 維持完全開放。`DELIVERABLE_ONLY`（交付物）與 `BONUS_ONLY`（加分項）皆已有設計落地（§6/§24/§25/§25.1 及 §8/§16/§14.4/§21.3），屬**合法涵蓋**，**不得**報告為核心系統設計缺漏。
 >
 > **不改動 Cursor 需求原文**：本 crosswalk 僅新增對映，未修改 `references/cursor_requirements_baseline.md` 或 `requirements.md`；亦未重新設計已核定之 AWS 架構。針對原設計未明列落點之交付物（REQ-025 GitHub、REQ-029 影片），僅於 §25.1 新增最小必要之「Deliverables → design landing」對照（不新增任何 AWS 資源）。
 
@@ -124,7 +148,7 @@ OPEN_QUESTION（OQ-001..OQ-011）以 Strategy 介面或 `PARTIALLY_DEFINED` 標�
 | REQ-006 | What-if 對話式問答 | 對話視窗輸入模擬指令/假設性問題 | R16 | `ScenarioParser`, `WhatIfEngine` | §14.5, 圖10 | `WhatIfRequest`(§10.14), `WhatIfResult`(§10.15) | POST /what-if | P28, P35 | What-if 4 階段測試；含糊即 `clarification_required` | OQ-009 | FULLY_COVERED | — |
 | REQ-007 | SOP 邏輯驗證 | 依假設檢索 SOP、回答觸發條款與預期動作 | R16 | `WhatIfEngine`/`RuleEngine`, `SopRetriever` | §14.5, §14.2 | `WhatIfResult`(§10.15) | POST /what-if | P28, P35 | RAG citation 測試(§22.2) | OQ-009 | FULLY_COVERED | — |
 | REQ-008 | 判定依據展示 | 展示推理過程、引用資料、排除替代道路理由 | R15 | `EvidenceTraceBuilder`, `DashboardService` | §9, §9.2(界線圖), §16 | `EvidenceTrace`(§10.10) | GET /decisions/{id} | P26, P27 | RAG citation(§22.2)；解釋鏈完整性(P26) | OQ-004, OQ-009 | FULLY_COVERED | — |
-| REQ-009 | ETE 公式運算 | 依事故嚴重度即時計算並顯示 ETE | R12 | `ETECalculator` | §9.4(art.7), §11.3, §20 | `ETEResult`(§10.9) | GET /decisions/{id} 之 `ete` | P22, P23 | ACC_001 ETE=90(PROVISIONAL_DERIVED_EXAMPLE) | OQ-001, OQ-003 | FULLY_COVERED | — |
+| REQ-009 | ETE 公式運算 | 依事故嚴重度即時計算並顯示 ETE | R12 | `ETECalculator` | §9.4(art.7), §11.3, §20 | `ETEResult`(§10.9) | GET /decisions/{id} 之 `ete` | P22, P23 | ACC_001 ETE=78.6(HG-001 SELECTED POLICY) | OQ-001, OQ-003 | FULLY_COVERED | — |
 | REQ-010 | 多語化通報觸發 | 任一站漫遊率≥30% 自動產多語告警 | R11 | `MultilingualTrigger`, `MultilingualScopeStrategy`(F) | §14.4, §11.8, 圖11 | `PublicAlert`(§10.13) | `public_alert.ready` | P20, P32 | TC-SOP6-001..002 | OQ-005 | FULLY_COVERED | — |
 | REQ-011 | SOP-1 交通擁塞級別判定 | A/B 分級(全 15 路段) + 觸發路段處置 | R2, R3 | `ClassificationEngine`, `RuleEngine.article1` | §9.4(art.1) | `DecisionCore.classifications`/`art1_measures`(§10.11a) | GET /roads | P4, P5, P7 | TC-SAT-001..004 | — | FULLY_COVERED | — |
 | REQ-012 | SOP-2 車禍與路障應變觸發條件 | 三要件 AND(status/severity/RD_) 觸發 art.2 | R6 | `RuleEngine.article2` | §9.4(art.2) | `RuleEvaluation`(§10.7) | 內部評估（結果經 GET /decisions/{id}） | P8 | ACC_001 Golden(triggered_articles 含 2) | — | FULLY_COVERED | — |
@@ -135,7 +159,7 @@ OPEN_QUESTION（OQ-001..OQ-011）以 Strategy 介面或 `PARTIALLY_DEFINED` 標�
 | REQ-017 | SOP-4 大巨蛋散場啟動 | 歷史峰值≥30000 且 Growth≤-0.20 連動 art.3 | R9 | `RuleEngine.article4` | §9.4(art.4) | `RuleEvaluation`(§10.7) | GET /crowd | P17 | DOME Golden(峰值 40000、growth −0.31, §22.3) | OQ-001 | FULLY_COVERED | — |
 | REQ-018 | SOP-5 號誌故障應變 | 人工指揮建議(每路口 2 人)+CMS 加註 | R10 | `RuleEngine.article5`, `AffectedIntersectionScopeStrategy`(E) | §9.4(art.5), §11.6 | `AffectedIntersectionScope`(§10.9a) | GET /reports/{id} | P18, P19, P31 | EVT_003 Golden | OQ-010, OQ-011 | FULLY_COVERED | — |
 | REQ-019 | SOP-6 數位通報與多語化 | 任一 Roaming≥30% 同回應多語 + 時間格式 | R11 | `RuleEngine.article6`, `MultilingualTrigger` | §9.4(art.6), §11.8 | `PublicAlert`(§10.13) | `public_alert.ready` | P20, P21, P32 | TC-SOP6-001..002 | OQ-005 | FULLY_COVERED | — |
-| REQ-020 | SOP-7 ETE 公式完整定義 | 完整 ETE 公式 + 報告註明數值與依據 | R12 | `ETECalculator` | §9.4(art.7) | `ETEResult`(§10.9) | GET /decisions/{id} 之 `ete` | P22, P23 | ACC_001 ETE=90(PROVISIONAL) | OQ-003 | FULLY_COVERED | — |
+| REQ-020 | SOP-7 ETE 公式完整定義 | 完整 ETE 公式 + 報告註明數值與依據 | R12 | `ETECalculator` | §9.4(art.7) | `ETEResult`(§10.9) | GET /decisions/{id} 之 `ete` | P22, P23 | ACC_001 ETE=78.6(HG-001) | OQ-003 | FULLY_COVERED | — |
 | REQ-021 | 交控中心建議書內容 | 事件辨識/分級/路徑/號誌/聯動/ETE | R13 | `ReportComposer` | §10.12, §14.3 | `CommandCenterReport`(§10.12), `DecisionReadModel`(§10.11c) | GET /reports/{id}；`report.ready` | P24 | 建議書完整性(P24)；ACC_001/EVT_003 Golden | OQ-003, OQ-010, OQ-011 | FULLY_COVERED | — |
 | REQ-022 | 多語化民眾簡訊內容 | 觸發判定 + 要點(位置/改道/延誤/避險) + 可讀性 | R14 | `PublicAlertComposer` | §10.13, §14.4 | `PublicAlert`(§10.13), `DecisionNarrative`(§10.11b) | `public_alert.ready`；POST /decisions/{id}/publish | P25, P20 | 簡訊完整性(P25)；多語觸發(P20) | OQ-003, OQ-005 | FULLY_COVERED | — |
 | REQ-023 | 提案簡報 AWS 架構圖 | 交付物：簡報含解題/AI/資料/流程/AWS 架構圖 | none（deliverable） | 交付物（非執行時元件） | §6(AWS Architecture 圖2), §4, §25(步驟8 匯出架構圖), §25.1 | — | — | — | 部署後佐證匯出(§25 步驟2/8) | — | DELIVERABLE_ONLY | 非核心系統設計；AWS 架構圖已落地於 §6 圖2 與 §4 服務決策矩陣，並於 §25.1「Deliverables → design landing」明列，屬合法涵蓋（非缺漏）。 |
@@ -177,7 +201,7 @@ coverage_rate = (fully_covered_count + deliverable_only_count + bonus_only_count
 
 - `DELIVERABLE_ONLY`（5 項：提案簡報／部署 URL／GitHub／影片／交付完整性）與 `BONUS_ONLY`（2 項：Dashboard 外觀／日韓多語）**皆具明確設計落地**（§6/§24/§25/§25.1 與 §8/§16/§14.4/§21.3），依定義屬**合法涵蓋**，**非**核心系統設計缺漏，故計入 coverage_rate 分子。
 - `PARTIALLY_COVERED`（REQ-005）**不**計入分子：其暫定落地（§11.7 + P11 揭露壅塞）已就位，唯一未決者為 **OQ-008 precedence 待主辦確認**——屬「有落地但待主辦回覆」，**非**「無落地之真缺口」。
-- `not_covered_count = 0`：本 crosswalk 中無任何 REQ 為「無設計落地之真缺口」。所有 `mapped_open_questions`（OQ-001..OQ-011）一律維持 **OPEN / AWAITING_HOST_REPLY**（§29），未被視為已解決。
+- `not_covered_count = 0`：本 crosswalk 中無任何 REQ 為「無設計落地之真缺口」。`mapped_open_questions` 依 §29 顯示 HG-001 狀態：OQ-001/002/003 resolved for implementation、OQ-005 partially resolved、其餘 7 項 OPEN。
 
 ---
 
@@ -193,7 +217,7 @@ coverage_rate = (fully_covered_count + deliverable_only_count + bonus_only_count
 
 ### 3.2 團隊暫定假設（PROVISIONAL，可抽換，AWAITING_HOST_REPLY）
 
-下列議題官方來源不足以唯一決定（完整清單見 §29 之 **OQ-001..OQ-011**），於 §11 以 Strategy 介面或 `PARTIALLY_DEFINED` 標記封裝，於 §29 保持 OPEN，且**永不宣稱為官方規則**。其中以 Strategy 介面直接承接者為：
+完整 OQ 狀態見 §29。HG-001 已解決 OQ-001/002/003 供實作並部分解決 OQ-005；其餘未解決議題以 Strategy 介面或 `PARTIALLY_DEFINED` 標記封裝，且不得宣稱為唯一官方規則。Strategy 介面承接者包括：
 
 - **Strategy A — 事件時間對齊**（對應 **OQ-001**，R1）
 - **Strategy B — 人流事件 affected_road 用途**（對應 **OQ-002**，R8）
@@ -807,28 +831,60 @@ flowchart LR
 - **art.6 多語**：任一（於所選 station scope 與 time snapshot 內的）`Roaming_User_Pct>=30%`（`=30%` 觸發）→ 同一回應多語；時間格式 `YYYY-MM-DD HH:MM`。「任一基地台」之站集與時間快照範圍由 **Strategy F**（§11.8）界定。
 - **art.7 ETE（公式，非觸發條款）**：`ETE = base_clearance + congestion_penalty`；`base_clearance` = Critical 60 / High 40 / Medium 20；`congestion_penalty = max(0, (avg Saturation of affected set - 0.5) * 60)`；affected set 由 **Strategy C** 界定。art.7 由其他條款之處置**引用套用**，一律列為 `applied_formula_articles`，**永不**列入 `triggered_articles`。
 
-### 9.5 官方事件的決定性走查（供實作驗證，非官方標準答案）
+### 9.5 官方事件的決定性走查（HG-001 Golden Scenarios）
 
-> **`triggered_articles` vs `applied_formula_articles` 的區別**：`triggered_articles` 是「觸發條件成立而啟動」的 SOP 條款；`applied_formula_articles` 是「被套用作為計算公式（但本身沒有觸發條件）」的條款。SOP 第 7 條（ETE）是一條**公式**，由其他條款的處置引用，**不是**一個會被「觸發」的條款，故一律歸入 `applied_formula_articles`，絕不列入 `triggered_articles`。
+> `triggered_articles` 是條件成立而啟動的 SOP 條款；`applied_formula_articles` 是被套用的公式條款。SOP 第 7 條是公式，不列入 `triggered_articles`。
 
-- **ACC_001（RD_TPE_002, Closed, Critical, 22:10）**：
-  - **SOP 第 1 條（A 級）觸發**：RD_TPE_002（光復南路）於 `2026-05-20 22:10` 之 `Saturation_Score = 1.00`（≥ 0.95 → **A 級**），且 RD_TPE_002 屬城市應變觸發路段。**art.1 正式措施**：啟動長綠燈時制、將 **RD_TPE_002 之 alternatives 綠燈配時 +25%**、調度警力淨空路口；因達 **A 級**，另**啟用** art.2 替代路徑引導程序 `article2_alternative_route_guidance`（記入 `invoked_procedures`）。**注意**：A 級本身只使 art.1 觸發，啟用引導程序**不等於** art.2 事故觸發成立。
-  - **SOP 第 2 條（車禍/路障）觸發**：ACC_001 **另行**符合 art.2 三要件（`status=Closed` ∈ {Closed,Blocked,Restricted}、`severity=Critical` ∈ {High,Critical}、`affected_segment=RD_TPE_002` 以 `RD_` 開頭），故 art.2 亦成立觸發——此觸發來自三要件本身，**非**由 A 級推得。
-  - **SOP 第 7 條（ETE）為套用公式**（非觸發）：ACC_001 的 ETE 由 art.2 處置引用 art.7 公式計算（見 §11.4）。
-  - **結論**：`triggered_articles = [1, 2]`、`invoked_procedures = [article2_alternative_route_guidance]`、`applied_formula_articles = [7]`；故 `citation_article_set = triggered_articles UNION applied_formula_articles = {1, 2} ∪ {7} = {1, 2, 7}`（引用須同時涵蓋 art.1、art.2 與 art.7）。（art.1 A 級與 art.2 車禍**均為觸發**條款；A 級所啟用之替代路徑引導程序記於 `invoked_procedures`；art.7 僅為**套用公式**（透過 `applied_formula_articles`），**永不**列入 `triggered_articles`；**不得**漏列 art.1，亦**不得**把 art.7 誤標為觸發條款。）
-  - **主/次疏散推導**（依 art.2 三項篩選）：事故錨點須先由 `location = "光復南路與忠孝東路口南側"` 解析（**Strategy D**，§11.5）得到錨定路口「忠孝東路四段」與事故位於其**南側**；RD_TPE_002 `intersections = [市民大道四段, 忠孝東路四段, 仁愛路四段]`（上游→下游），`flow_direction` 南北向（南下受影響）。alternatives = `[RD_TPE_004, RD_TPE_005, RD_TPE_006, RD_TPE_008]`：
-    - `RD_TPE_008 延吉街` capacity 600 < 1000 → 排除（容量）。
-    - `RD_TPE_006 敦化南路一段` 不在 RD_TPE_002 的 intersections → 排除（非直接相交）。
-    - `RD_TPE_005 仁愛路四段` 在 intersections，但相對錨點位於事故點**下游**（南側）→ 僅列**次要疏散**。
-    - `RD_TPE_004 市民大道四段` 在 intersections、相對錨點位於**上游**、容量 2500 ≥ 1000 → 通過三項資格 → **主疏散**（合格候選中亦為最低 Saturation）。
-    - **主疏散 = RD_TPE_004（市民大道四段）；次要 = RD_TPE_005（仁愛路四段）**。此走查依賴 **Strategy D**（`incident_anchor_from_location_text`，決定上/下游）、**Strategy A**（時間對齊，決定各候選 snapshot Saturation）與 **Strategy C**（ETE 集合），故 `example_classification = PROVISIONAL_DERIVED_EXAMPLE`、`official_golden_answer = false`。若錨點無法唯一解析，**不選主疏散、不自動排名**，改回 `manual_confirmation_required`（見 §11.5）。
-- **EVT_002（BS_MRT_BL17, Restricted, High, 22:20, affected_road=RD_TPE_001）**：`affected_segment` 以 `BS_` 開頭 → 進入 **art.3 評估流程**。實際是否觸發仍**須計算** `User_Count>25000` 或 `Growth_Rate>0.30`。截至 22:15，BL17 `User_Count=31000` 可滿足門檻，但**必須計算而非假設**。`affected_road=RD_TPE_001` 之處理由 **Strategy B** 決定；**不得**因 affected_road 直接觸發 art.2。RD_TPE_001 可能因自身 Saturation 獨立觸發 art.1（22:20 前後為 1.00 → A 級），但這**不等於** EVT_002 自動觸發 art.2。若 art.3 之處置需引用 art.7 計算恢復時程，則 art.7 為 `applied_formula_articles`。惟 EVT_002 之 **ETE 公式適用性 `FORMULA_APPLICABILITY = PARTIALLY_DEFINED`**：`severity = High` → `base_clearance = 40` 已由官方界定，但 (a) `affected_road = RD_TPE_001` 是否納入受影響集合（**OQ-002**）、(b) 受影響 segment 集合與時間快照範圍（**OQ-003**），官方**均未界定**，故**不宣稱其 ETE 適用或不適用**（見 §10.9、OQ-002、OQ-003）。
-- **EVT_003（type=Power_Failure, RD_TPE_007, 22:30）**：`type="Power_Failure"` → 觸發 art.5。處置：受影響路段 RD_TPE_007（松高路）、**每受影響路口 2 人警力**、估計持續時間、CMS 加註「松高路 號誌故障，請依現場指揮通行」。
-  - **警力人數不得臆測**：SOP 只明訂「每路口 2 人」，**並未**規定 RD_TPE_007 的哪些（或全部）路口屬於「受影響路口」。因此 `police_per_intersection = 2`（官方），而 `affected_intersection_count = unresolved`、`total_police = unresolved`、`manual_confirmation_required = true`（**Strategy E**，§11.6）。**不得**逕自假設 RD_TPE_007 之所有相交路口皆屬「受影響路口」而推導出固定警力人數。若 UI 為示範而顯示 6，必須標示 `PROVISIONAL_DERIVED_EXAMPLE`、`official_golden_answer = false`。
-  - **ETE 公式適用性 `FORMULA_APPLICABILITY = PARTIALLY_DEFINED`**：`severity = Medium` → `base_clearance = 20` 已由官方界定，但 (a) SOP5 之「估計持續時間」是否等同 SOP7 之 ETE（**OQ-011**）、(b) 受影響路口/路段之聚合範圍（**OQ-010**），官方**均未界定**，故**不宣稱其 ETE 適用或不適用**（見 §10.9、OQ-010、OQ-011）。
+#### ACC_001
 
----
+- event timestamp: `22:10`
+- decision cutoff: `22:10`
+- triggered articles: `[1, 2]`
+- applied formula articles: `[7]`
+- primary route: `RD_TPE_004`
+- secondary route: `RD_TPE_005`
+- ETE affected set:
+  1. `RD_TPE_002` as `INCIDENT`
+  2. `RD_TPE_004` as `PRIMARY`
+  3. `RD_TPE_005` as `SECONDARY`
+- latest common exact ETE timestamp at or before event: `22:00`
+- Saturation values: `1.00`, `0.78`, `0.65`
+- sum: `2.43`
+- count: `3`
+- average: `0.81`
+- severity: `Critical`
+- base clearance: `60`
+- congestion penalty: `max(0, (0.81 - 0.5) * 60) = 18.6`
+- ETE: `60 + 18.6 = 78.6 minutes`
 
+#### EVT_002
+
+- event timestamp: `22:20`
+- affected segment: `BS_MRT_BL17`
+- latest prior BL17 observation: `22:15`
+- User_Count: `31,000`
+- Growth_Rate: `0.08`
+- SOP 第 3 條 triggered because `User_Count > 25,000`
+- `22:30` is after the event and must never be used
+- affected_road `RD_TPE_001` is `DISPLAY_AND_CONTEXT_ONLY`
+- ETE: not applicable
+
+#### EVT_003
+
+- event timestamp: `22:30`
+- triggered article: `[5]`
+- ETE affected set:
+  1. `RD_TPE_007` as `INCIDENT`
+  2. `RD_TPE_011` as `PRIMARY`
+- common exact timestamp: `22:30`
+- Saturation values: `0.85`, `0.85`
+- average: `0.85`
+- severity: `Medium`
+- base clearance: `20`
+- congestion penalty: `max(0, (0.85 - 0.5) * 60) = 21.0`
+- ETE: `41.0 minutes`
+
+The affected-intersection count and total police remain unresolved under OQ-010. `police_per_intersection = 2` is official; the total must not be guessed.
 ## 10. Data Models（資料模型）
 
 **欄位標記**：`immutable-official`（官方唯讀原值）、`normalized`（正規化後）、`derived`（決定性推導）、`provisional`（依暫定政策）、`LLM-writable`（Bedrock 可寫文字）、`LLM-prohibited`（Bedrock 禁止寫）。所有 `derived` / `provisional` 欄位皆為 `LLM-prohibited`。
@@ -938,33 +994,45 @@ flowchart LR
 | `timestamp` | string(`YYYY-MM-DD HH:MM`) | immutable-official |
 
 ### 10.5 SelectedSnapshot（Strategy A 產物）
+
 | 欄位 | 型別 | 標記 |
 | --- | --- | --- |
 | `entity_id` | string(RD/BS) | derived |
 | `event_timestamp` | string | derived |
-| `selected_timestamp` | string | provisional |
-| `exact_match` | bool | provisional |
-| `staleness_minutes` | int | provisional |
-| `carried_forward` | bool | provisional |
-| `source_record` | RawTraffic/RawCrowd ref | provisional |
-| `data_status` | enum(`fresh`/`stale`/`insufficient_data`) | provisional |
+| `decision_cutoff_timestamp` | string | derived |
+| `observation_timestamp` | string | organizer-guided derived |
+| `selected_timestamp` | string | alias of observation timestamp |
+| `exact_match` | bool | organizer-guided derived |
+| `staleness_minutes` | int | organizer-guided derived |
+| `selection_mode` | enum(`GLOBAL_AS_OF_EVENT_CUTOFF_LATEST_PRIOR_PER_ENTITY`) | organizer-guided configurable |
+| `source_record` | RawTraffic/RawCrowd ref | derived |
+| `data_status` | enum(`fresh`/`stale`/`INSUFFICIENT_DATA`) | derived |
+| `manual_confirmation_required` | bool | derived |
+| `guidance_id` | string(`HG-001`) | provenance |
 
-### 10.6 PolicyMetadata（暫定政策標記，必帶）
+**不變式**：
+- `observation_timestamp <= decision_cutoff_timestamp`
+- 同一 entity 的所有欄位來自同一資料列
+- 不使用未來資料、不插值、不向未來回退
+- 無 prior observation 時回 `INSUFFICIENT_DATA`
+### 10.6 PolicyMetadata（政策標記，必帶）
+
 | 欄位 | 型別 | 標記 |
 | --- | --- | --- |
-| `classification` | const `PROVISIONAL_TEAM_POLICY` | provisional |
-| `status` | const `AWAITING_HOST_REPLY` | provisional |
-| `time_alignment.mode` | string(`exact_or_latest_prior_per_entity`...) | provisional |
-| `time_alignment.max_staleness_minutes` | int | provisional |
-| `time_alignment.on_insufficient` | enum | provisional |
-| `incident_anchor.mode` | enum(`incident_anchor_from_location_text`/`explicit_host_mapping`)（Strategy D） | provisional |
-| `affected_road.role` | enum(`display_only`/`context_and_ete`/`parallel_road_impact_explicit_host`) | provisional |
-| `affected_intersection_scope.mode` | enum(`unresolved_manual_confirmation`/`all_segment_intersections`/`explicit_host_set`)（Strategy E） | provisional |
-| `multilingual_scope.mode` | enum(`current_snapshot_all_available_stations`/`incident_area_nearby_stations`/`explicit_host_policy`)（Strategy F） | provisional |
-| `ete.affected_set` | string(`directly_affected_roads_at_event_snapshot`) | provisional |
-| `saturated_vs_congested` | const `PARTIALLY_DEFINED`（§11.7，OQ-008） | provisional |
-| `is_official` | const `false` | provisional |
-
+| `classification` | enum(`ORGANIZER_GUIDED_TEAM_POLICY`/`PROVISIONAL_TEAM_POLICY`) | derived |
+| `status` | enum(`RESOLVED_FOR_IMPLEMENTATION_BY_ORGANIZER_GUIDANCE`/`PARTIALLY_RESOLVED_BY_ORGANIZER_GUIDANCE`/`AWAITING_HOST_REPLY`) | derived |
+| `guidance_id` | string or null | provenance |
+| `official_unique_rule` | bool | derived |
+| `configurable` | bool | derived |
+| `time_alignment.mode` | enum(`GLOBAL_AS_OF_EVENT_CUTOFF_LATEST_PRIOR_PER_ENTITY`, other non-selected modes) | configurable |
+| `incident_anchor.mode` | enum(`incident_anchor_from_location_text`/`explicit_host_mapping`) | provisional |
+| `affected_road.role` | enum(`DISPLAY_AND_CONTEXT_ONLY`, other non-selected modes) | configurable |
+| `affected_intersection_scope.mode` | enum(`unresolved_manual_confirmation`/`all_segment_intersections`/`explicit_host_set`) | provisional |
+| `multilingual_scope.mode` | enum(`current_snapshot_all_available_stations`/`incident_area_nearby_stations`/`explicit_host_policy`) | partially resolved |
+| `ete.affected_set` | enum(`INCIDENT_PRIMARY_AND_SELECTED_SECONDARY`, other non-selected modes) | configurable |
+| `ete.snapshot_mode` | enum(`COMMON_EXACT_TIMESTAMP`) | configurable |
+| `saturated_vs_congested` | const `PARTIALLY_DEFINED` | provisional |
+| `is_official_sop` | const `false` | derived |
 ### 10.7 RuleEvaluation（每條 SOP 的觸發評估）
 | 欄位 | 型別 | 標記 |
 | --- | --- | --- |
@@ -1004,18 +1072,46 @@ flowchart LR
 | `provisional` | const `true` | provisional |
 
 ### 10.9 ETEResult（SOP7）
+
 | 欄位 | 型別 | 標記 |
 | --- | --- | --- |
 | `severity` | string | immutable-official |
 | `base_clearance` | int(60/40/20) | derived |
-| `affected_set` | string[]（Strategy C） | provisional |
-| `avg_saturation` | number | provisional |
-| `congestion_penalty` | number(`max(0,(avg-0.5)*60)`) | derived |
-| `ete_minutes` | number | derived |
-| `basis_note` | string(計算依據，R12.5) | derived |
-| `lower_bound_only` | bool（資料不足時） | derived |
-| `formula_applicability` | enum(`applicable`/`partially_defined`)（見 §9.5；ACC_001=applicable，EVT_002/EVT_003=`PARTIALLY_DEFINED`） | provisional |
-| `applicability_note` | string（哪些輸入未由官方界定） | provisional |
+| `affected_set` | `{segment_id, role}[]` | organizer-guided derived |
+| `ete_snapshot_timestamp` | string or null | organizer-guided derived |
+| `saturation_inputs` | `{segment_id, role, saturation, timestamp}[]` | derived |
+| `saturation_sum` | number or null | derived |
+| `road_count` | int | derived |
+| `avg_saturation` | number or null | derived |
+| `congestion_penalty` | number or null | derived |
+| `ete_minutes` | number or null | derived |
+| `ete_lower_bound_minutes` | number | derived |
+| `calculation_status` | enum(`CALCULATED`/`INSUFFICIENT_COMMON_SNAPSHOT`/`NOT_APPLICABLE`) | derived |
+| `manual_confirmation_required` | bool | derived |
+| `policy_mode` | enum(`INCIDENT_PRIMARY_AND_SELECTED_SECONDARY`) | organizer-guided configurable |
+| `snapshot_mode` | enum(`COMMON_EXACT_TIMESTAMP`) | organizer-guided configurable |
+| `guidance_id` | string(`HG-001`) | provenance |
+| `basis_note` | string | derived |
+
+**公式**：
+- `affected_set = stable_unique([incident affected_segment, primary, ...selected secondary])`
+- `avg_saturation = sum / count`
+- `congestion_penalty = max(0, (avg_saturation - 0.5) * 60)`
+- `ete_minutes = base_clearance + congestion_penalty`
+
+若 affected set 沒有共同 exact timestamp，禁止 partial-set average；回傳 lower bound 與人工確認。
+### 10.9b AffectedRoadContext（HG-001）
+
+| 欄位 | 型別 | 標記 |
+| --- | --- | --- |
+| `affected_road` | string or null | immutable-official |
+| `role` | enum(`DISPLAY_AND_CONTEXT_ONLY`) | organizer-guided configurable |
+| `mandatory_action` | bool(`false`) | organizer-guided derived |
+| `enters_ete_set` | bool(`false`) | organizer-guided derived |
+| `triggers_article1_or_2` | bool(`false`) | organizer-guided derived |
+| `guidance_id` | string(`HG-001`) | provenance |
+
+BS_ 事件的 affected_road 僅供 Dashboard、事件背景與報告顯示，不得改變核心數值或布林真值。
 
 ### 10.9a AffectedIntersectionScope（Strategy E 產物，§11.6）
 | 欄位 | 型別 | 標記 |
@@ -1028,14 +1124,20 @@ flowchart LR
 | `official_golden_answer` | const `false` | provisional |
 
 ### 10.10 EvidenceTrace（R15 解釋鏈事實）
+
 | 欄位 | 型別 | 標記 |
 | --- | --- | --- |
 | `decision_id` | string | derived |
 | `classification_reasoning` | struct(值+門檻+結論) | derived |
-| `excluded_routes` | {segment_id, reason}[] | derived |
+| `observation_selection` | `{entity_id, cutoff, observation_timestamp, staleness, exact_match, mode}[]` | derived |
+| `affected_set_construction` | `{segment_id, role, included, reason}[]` | derived |
+| `excluded_routes` | `{segment_id, reason}[]` | derived |
+| `formula_substitution` | struct(sum, count, average, base, penalty, ETE) | derived |
 | `sop_citations` | SopCitation[] | derived |
-| `data_points` | {source, field, value, timestamp}[] | derived |
+| `data_points` | `{source, field, value, timestamp}[]` | derived |
+| `policy_provenance` | `{policy_mode, guidance_id, configurable}` | derived |
 
+Bedrock 僅能將上述事實轉成自然語言，不得修改任何核心欄位。
 ### 10.11 DecisionResult（拆為三表：DecisionCore + DecisionNarrative + PublishRecord）
 
 為在資料層強制 §9 界線與寫入隔離，決策結果**拆成三個獨立 DynamoDB 表**，由不同 IAM 角色寫入：`DecisionCoreTable`（不可變核心，`DecisionFn` 唯一寫入）、`DecisionNarrativeTable`（LLM 文字，`RendererFn` 寫）、`PublishRecordTable`（可變發布狀態與稽核，`PublishFn` 唯一寫入）。另有 `IdempotencyTable`（§10.11e）作為注入去重閘門。API 讀取模型（§10.11c）將 Core + Narrative + Publish 三者合併回傳。
@@ -1216,20 +1318,23 @@ core_hash = SHA-256( UTF-8( canonical_serialize( canonical_decision_payload ) ) 
 > 同鍵再請求依 `status`、`last_error`/`retryable`、租約與 `running_deadline_at` 決定行為（見 §15.2）：`status=completed` → 不 StartExecution、回既有 `decision_id`（`200 OK`）；`status=running` 且 `running_deadline_at >= now` → 不 StartExecution、回既有 `decision_id`（in-progress，`202`）；`status=running` 且 `running_deadline_at < now`（stale）→ 依上述 **E** 先經 `RecoveryGateFn` + `RECONCILE_STALE_RUNNING`（外部 fencing）轉 `processing_failed`，再依分級復原；`status=starting` 且租約未過期 → 不 StartExecution、回 **202 in-progress**；`status=start_failed`（工作流尚未啟動）→ 依 **A** 先 `start_failed → starting`（`recovery_stage=FULL_WORKFLOW`）再由**單一**請求重試 StartExecution；**`status=processing_failed` 且 `last_error=CORE_IDENTITY_CONFLICT`（`retryable=false`、`recovery_stage=NONE`，FIX 1）→ 終端、非可復原：*不* 復原、*不* StartExecution、*不* 重算 DecisionCore，一律回 `409 Conflict`（payload `{decision_id, status:processing_failed, error_code:CORE_IDENTITY_CONFLICT, retryable:false, trace_id}`）**；其餘 `status=processing_failed` 且 `retryable=true` 依 `recovery_stage` 分級：`FULL_WORKFLOW` → 依 **B** `processing_failed → starting`、`ENRICHMENT_ONLY` → 依 **C** `processing_failed → starting`；`status=starting` 且租約已過期 → 依 **D** `starting → starting` 由**單一**請求重取租約（`attempt_count += 1`）並重試 StartExecution。**任一時刻僅一個 `lease_owner` 可啟動工作流**。conditional Put 失敗且鍵已存在但尚不符復原條件者：**不** `StartExecution`、**不**重算 DecisionCore、**不**重推告警，直接回傳既有 `decision_id`。
 
 ### 10.12 CommandCenterReport（R13；交控中心建議書）
+
 | 欄位 | 型別 | 標記 |
 | --- | --- | --- |
 | `decision_id` | string | derived |
-| `event_identification` | struct(event_id + `triggered_articles` + `invoked_procedures` + `applied_formula_articles`) | derived（事實）+ LLM-writable（敘述） |
-| `classification_section` | struct（引用車流/飽和度值） | derived（值）+ LLM-writable（說明） |
-| `route_section` | struct（主/次/排除理由） | derived（決策）+ LLM-writable（說明） |
-| `signal_timing_section` | struct（art.1 A/B 級 +25%、時段） | derived + LLM-writable |
-| `cross_system_requests` | struct（北捷/公車/警力） | derived（觸發）+ LLM-writable |
-| `ete_section` | ETEResult 摘要（含 `formula_applicability`） | derived + LLM-writable（說明） |
-| `cms_section` | struct(`cms_core_text` derived/**LLM-prohibited**, `cms_explanation_text` LLM-writable) | 混合（見 §10.11b） |
+| `event_identification` | struct(event_id + triggered/invoked/applied articles) | derived + LLM-writable narrative |
+| `classification_section` | struct | derived values + LLM-writable explanation |
+| `route_section` | struct(primary/secondary/exclusions) | derived + LLM-writable explanation |
+| `affected_road_context` | AffectedRoadContext | derived |
+| `signal_timing_section` | struct | derived + LLM-writable explanation |
+| `cross_system_requests` | struct | derived + LLM-writable explanation |
+| `ete_section` | ETEResult | derived + LLM-writable explanation |
+| `timing_evidence` | event/cutoff/observation/common-snapshot/staleness | derived |
+| `policy_evidence` | policy modes, assumptions, `guidance_id` | derived |
+| `cms_section` | deterministic core text + LLM explanation | mixed |
 | `format` | enum(json/html/md/voice) | derived |
 
-> `event_identification` 之 SOP 條號須同時呈現 `triggered_articles`（觸發）、`invoked_procedures`（被啟用之處置程序，如 `article2_alternative_route_guidance`）與 `applied_formula_articles`（套用公式，如 art.7）。`cms_section.cms_core_text` 之道路、ETE 與正式指示為決定性，LLM 僅能在 `cms_explanation_text` 補充說明（§10.11b、§14.3）。
-
+報告必須完整揭露 HG-001 的時間、road set、per-road inputs、公式與假設。當 ETE 為 `INSUFFICIENT_COMMON_SNAPSHOT` 時，報告只顯示 lower bound 與人工確認提示，不虛構 ETE。
 ### 10.13 PublicAlert（R14；多語化民眾簡訊）
 | 欄位 | 型別 | 標記 |
 | --- | --- | --- |
@@ -1316,83 +1421,73 @@ core_hash = SHA-256( UTF-8( canonical_serialize( canonical_decision_payload ) ) 
 
 ### 11.1 Strategy A — 事件時間對齊（對應 OQ-001，R1）
 
-**狀態**：`RESOLVED_FOR_IMPLEMENTATION_BY_ORGANIZER_GUIDANCE (HG-001)`
-**HG-001 選定模式**：`GLOBAL_AS_OF_EVENT_CUTOFF_LATEST_PRIOR_PER_ENTITY`——以事件時間為全域截止點，每 entity 取 ≤ event_timestamp 之最新一列。其餘模式仍保留為可配置選項（Strategy 介面不變）。
+**OQ Status**: `RESOLVED_FOR_IMPLEMENTATION_BY_ORGANIZER_GUIDANCE`
 
 **介面**：`TimeAlignmentStrategy.select(entity_id, event_timestamp) -> SelectedSnapshot`
 
-**預設實作 `exact_or_latest_prior_per_entity`**：
-- 若有與 `event_timestamp` 完全相符的資料列 → 用該列（`exact_match=true`）。
-- 否則取該 entity 中 `Timestamp <= event_timestamp` 的**最新一列**（per-entity latest prior）。
-- **絕不**以事件之後的資料列作為主要判定依據。
-- 同一基地台的 `User_Count` / `Growth_Rate` / `Roaming_User_Pct` 必須取自**同一列**。
-- 記錄 `event_timestamp`、`selected_timestamp`、`exact_match`、`staleness_minutes`、`carried_forward`、`source_record`。
+**Active mode**：`GLOBAL_AS_OF_EVENT_CUTOFF_LATEST_PRIOR_PER_ENTITY`
 
-**設定**：`time_alignment.mode`、`time_alignment.max_staleness_minutes`、`time_alignment.on_insufficient`。
+1. `decision_cutoff_timestamp = event.timestamp`
+2. 對每一必要 entity 選擇 `Timestamp <= cutoff` 的最新一筆資料列
+3. exact timestamp 存在時自然被選中
+4. 同一 entity 所有欄位必須來自同一資料列
+5. 禁止未來資料、nearest-future、插值與虛構資料
+6. 保存 observation timestamp、staleness、exact_match、mode 與 `guidance_id`
+7. 無 prior observation 時回 `INSUFFICIENT_DATA` 與 `manual_confirmation_required = true`
 
-**原型 fallback `last_known_value_with_visible_staleness`**：資料不足時顯示 `provisional=true`、`data_status=stale`、`selected_timestamp`、`staleness_minutes`。
-
-**正式模式**：若無資料符合可設定的 staleness 上限 → 回傳 `insufficient_data` / `manual_confirmation_required`；**絕不捏造**。
-
+所有元件共享同一 logical cutoff，但不同 entity 可以有不同 latest-prior observation timestamp。ETE 另使用 Strategy C 的 common exact timestamp。
 ### 11.2 Strategy B — affected_road 用途（對應 OQ-002，R8）
 
-**狀態**：`RESOLVED_FOR_IMPLEMENTATION_BY_ORGANIZER_GUIDANCE (HG-001)`
-**HG-001 確認角色**：`DISPLAY_AND_CONTEXT_ONLY`——affected_road 於 UI 顯示與情境摘要中使用，但不進入 ETE 計算亦不觸發 art.2。其餘模式仍保留為可配置選項（Strategy 介面不變）。
+**OQ Status**: `RESOLVED_FOR_IMPLEMENTATION_BY_ORGANIZER_GUIDANCE`
 
-**介面**：`AffectedRoadStrategy.role() -> {display_only | context_and_ete | parallel_road_impact_explicit_host}`
+**介面**：`AffectedRoadStrategy.resolve(incident) -> AffectedRoadContext`
 
-- **`display_only`（預設，最保守）**：affected_road 僅顯示於情境，不進入任何觸發或 ETE。
-- **`context_and_ete`**：affected_road 納入情境與（若政策 C 允許）ETE 參考，但**仍不**觸發 art.2。
-- **`parallel_road_impact_explicit_host`**：**唯有主辦明確表示** affected_road 應視為道路事件時方可使用；即使如此，仍須**重新驗證**所有 art.2 正式條件（status、severity、affected_segment/道路事件語意）。
+**Active role**：`DISPLAY_AND_CONTEXT_ONLY`
 
-**硬性規則（不受描述文字影響）**：
-- `BS_` 事件的主要 SOP 路由由 `affected_segment` 決定 → **EVT_002 進入 art.3 評估流程**（實際觸發仍須計算 `User_Count>25000` 或 `Growth_Rate>0.30`；截至 22:15 BL17=31000 可滿足，但須計算，**不得斷言 EVT_002 必然觸發 art.3**）。
-- `affected_road` **不得**直接觸發 SOP art.2。
-- `RD_TPE_001` 可能因自身 Saturation 獨立觸發 art.1，但**不得**描述為 EVT_002 自動觸發 art.2。
+- `affected_segment` 仍是 BS_ 事件的權威觸發 entity
+- affected_road 保留並顯示於 Dashboard、事件細節與報告
+- 可產生非強制性的 local context note
+- `mandatory_action = false`
+- `enters_ete_set = false`
+- 不觸發 art.1/art.2
+- 不改變 A/B
+- 不自動成為 primary 或 secondary
+- Bedrock 不得更改上述真值
 
+其他模式只能作為未選取的 configurable alternatives，不得成為 active default。
 ### 11.3 Strategy C — ETE 受影響路段集合（對應 OQ-003，R12）
 
-**狀態**：`RESOLVED_FOR_IMPLEMENTATION_BY_ORGANIZER_GUIDANCE (HG-001)`
-**HG-001 預設實作**：`INCIDENT_PRIMARY_AND_SELECTED_SECONDARY`——ETE 受影響路段集合 = 事故路段 + 主疏散 + 選定次要疏散。
+**OQ Status**: `RESOLVED_FOR_IMPLEMENTATION_BY_ORGANIZER_GUIDANCE`
 
-**共同精確時間戳要求 (Common Exact Timestamp Requirement)**：
-- 所有 ETE Saturation_Score 值必須來自**同一個共同精確時間戳**（common exact timestamp），該時間戳須滿足：ETE affected set 中的**每一條道路**在該時間戳都有資料紀錄。
-- 選取規則：取 ≤ event_timestamp 之**最新**時間戳，使得 affected set 內所有道路皆有該時間戳的紀錄。
-- **若不存在此共同時間戳** → `status = INSUFFICIENT_COMMON_SNAPSHOT`、`ete_minutes = null`、`ete_lower_bound_minutes = base_clearance`、`manual_confirmation_required = true`。
+**介面**：`EteAffectedSetStrategy.resolve(incident, selected_routes, traffic_history) -> ETEResult`
 
-其餘模式仍保留為可配置選項（Strategy 介面不變）。
+**Active affected-set mode**：`INCIDENT_PRIMARY_AND_SELECTED_SECONDARY`  
+**Active snapshot mode**：`COMMON_EXACT_TIMESTAMP`
 
-**介面**：`EteAffectedSetStrategy.resolve(incident, snapshot) -> string[]`
+Affected set 依固定語意順序建立：
 
-**預設實作 `directly_affected_roads_at_event_snapshot`**（舊預設，仍可配置）：
-- `RD_` 事件：`affected_roads = [affected_segment]`。
-- 若事件明確列出多條**直接受影響**道路：僅取這些。
-- `BS_` 事件且帶 `affected_road`：是否納入由 **Strategy B** 的 role 決定。
-- Saturation 取用 **Strategy A** 的 as-of 資料。
+1. incident `affected_segment` as `INCIDENT`
+2. selected primary route as `PRIMARY`
+3. selected secondary routes as `SECONDARY`
+4. stable de-duplication
 
-**明確排除**：SOP art.7 的主要 ETE **不得**納入所有 alternatives、主疏散、次要疏散、被排除候選或其他鄰近道路。
+排除所有 raw alternatives、被排除候選、capacity-failed、non-intersecting、unranked、unrelated、fabricated roads 與 BS_ contextual affected_road。
 
-**敏感度分析（保留但非官方）**：`accident_plus_evac` 僅作為 `sensitivity_analysis` / `network_recovery_indicator`，**永不**作為官方 ETE。
+`ete_snapshot_timestamp` 是小於或等於 event timestamp，且 affected set 每一路段都存在 exact traffic record 的最新 timestamp。禁止混用 timestamp 與 partial-set average。無共同 timestamp 時回 `INSUFFICIENT_COMMON_SNAPSHOT`、`ete_minutes = null`、lower bound 與人工確認。
+### 11.4 ACC_001 ETE 範例（HG-001 DATA-VERIFIED GOLDEN）
 
-### 11.4 ACC_001 ETE 範例（ORGANIZER_GUIDED_TEAM_POLICY, guidance_id = HG-001）
+- event timestamp: `22:10`
+- affected set: `RD_TPE_002` INCIDENT, `RD_TPE_004` PRIMARY, `RD_TPE_005` SECONDARY
+- common exact timestamp: `22:00`
+- Saturation: `1.00`, `0.78`, `0.65`
+- sum: `2.43`
+- count: `3`
+- average: `0.81`
+- Critical base: `60`
+- congestion penalty: `18.6`
+- ETE: **78.6 minutes**
 
-- 事件時間 22:10。
-- ETE affected set = [RD_TPE_002, RD_TPE_004, RD_TPE_005]（事故路段 + 主疏散 + 選定次要疏散，依 HG-001 `INCIDENT_PRIMARY_AND_SELECTED_SECONDARY`）。
-- Common exact timestamp = 22:00（≤ 22:10 之最新時間戳，使 RD_TPE_002、RD_TPE_004、RD_TPE_005 三條道路皆有紀錄）。
-- Saturation：RD_TPE_002 = 1.00、RD_TPE_004 = 0.78、RD_TPE_005 = 0.65。
-- `avg_saturation = (1.00 + 0.78 + 0.65) / 3 = 0.81`。
-- `congestion_penalty = max(0, (0.81 - 0.5) * 60) = 18.6`。
-- `severity = Critical` → `base_clearance = 60`。
-- `ete_minutes = 60 + 18.6 = **78.6 minutes**`。
-
-**SOP 判定**：ACC_001 為 `triggered_articles = [1, 2]`、`applied_formula_articles = [7]`；art.7 僅作為 ETE 公式被套用，非觸發條款。
-
-**標記**：`example_classification = ORGANIZER_GUIDED_TEAM_POLICY`、`guidance_id = HG-001`、`official_golden_answer = false`。此 ETE 數值依賴 Strategy A（時間對齊，HG-001 resolved）、Strategy C（ETE 集合，HG-001 resolved）與 Common Exact Timestamp 要求；而同案的**主/次疏散路徑範例**（RD_TPE_004 / RD_TPE_005）額外依賴 **Strategy D**（`incident_anchor_from_location_text`）。故 ACC_001 例之整體 `policy_dependencies = [incident_anchor_from_location_text, GLOBAL_AS_OF_EVENT_CUTOFF_LATEST_PRIOR_PER_ENTITY, INCIDENT_PRIMARY_AND_SELECTED_SECONDARY]`。
-
-於報告與 UI 明示：**「78.6 分鐘是依 HG-001 主辦指引之團隊政策推導的範例。」**
-
-關於 `accident_plus_evac`：**不印出任何比較用 ETE 數字**；僅說明採用不同受影響集合可能得到不同 ETE，實際數值待完整資料 lineage 於設計中補齊。
-
+This Golden follows the selected organizer-guided policy and official data; it is not presented as a unique algorithm mandated by the organizer.
 ### 11.5 Strategy D — 事故錨點解析（IncidentAnchorResolutionStrategy，對應 OQ-004）
 
 **介面**：`IncidentAnchorResolutionStrategy.resolve(incident, road_network) -> IncidentAnchor`
@@ -1446,21 +1541,21 @@ core_hash = SHA-256( UTF-8( canonical_serialize( canonical_decision_payload ) ) 
 
 ### 11.8 Strategy F — 多語觸發資料範圍（MultilingualScopeStrategy，對應 OQ-005）
 
+**OQ Status**: `PARTIALLY_RESOLVED_BY_ORGANIZER_GUIDANCE`
+
+- Resolved dimension: current-state time cutoff
+- Active time policy: `GLOBAL_AS_OF_EVENT_CUTOFF_LATEST_PRIOR_PER_ENTITY`
+- Remaining open dimension: the station set represented by "任一基地台"
+- Remaining status: `OPEN / AWAITING_HOST_REPLY`
+
 **介面**：`MultilingualScopeStrategy.stationsInScope(snapshot, incident) -> BaseStation[]`
 
-**問題**：SOP6「任一基地台 Roaming_User_Pct ≥ 30%」中，「任一基地台」指哪一組站？以哪個時間快照為準？官方未定義。原設計僅寫「檢查各站」不足以界定。
+支援 station-set modes：
+- `current_snapshot_all_available_stations`
+- `incident_area_nearby_stations`
+- `explicit_host_policy`
 
-**支援模式（至少）**：
-- `current_snapshot_all_available_stations`（預設）：以**目前時間快照**中有資料的所有基地台為集合。
-- `incident_area_nearby_stations`：以事件相關路段之 `nearby_stations` 為集合。
-- `explicit_host_policy`：主辦明確指定之站集/時間範圍。
-
-**硬性規則**：**不得**把「歷史上某時點曾達 30%」當作「目前已觸發」——除非政策明確如此規定。觸發判定一律以所選 scope 於**當下時間快照**（依 Strategy A 對齊）之 `roaming_pct_value` 為準。
-
-**設定**：`policy.multilingual_scope.mode`。預設 `current_snapshot_all_available_stations`，標記 `PROVISIONAL_TEAM_POLICY / AWAITING_HOST_REPLY`。
-
----
-
+不論 station-set mode，所有 station 的 current-state observation 都必須使用相同 event cutoff 下的 latest-prior row。不得把未來或歷史任意高點當作 current-state trigger。
 ## 12. API Contracts（同步 API 合約）
 
 透過 **API Gateway HTTP API**。寫入路徑（POST）由 **Cognito** 保護（admin/what-if）；唯讀 GET 可為公開或較寬鬆保護。所有回應皆含 `schema_version`、`trace_id`、（決策相關者）`policy` 與 `provisional`。
@@ -1530,18 +1625,32 @@ core_hash = SHA-256( UTF-8( canonical_serialize( canonical_decision_payload ) ) 
     {"segment_id": "RD_TPE_008", "role": "excluded", "exclusion_reason": "capacity_vph 600 < 1000"},
     {"segment_id": "RD_TPE_006", "role": "excluded", "exclusion_reason": "不在 RD_TPE_002 的 intersections（非直接相交）"}
   ],
-  "ete": {"severity": "Critical", "base_clearance": 60, "affected_set": ["RD_TPE_002"],
-          "avg_saturation": 1.0, "congestion_penalty": 30, "ete_minutes": 90,
-          "lower_bound_only": false, "basis_note": "PROVISIONAL_DERIVED_EXAMPLE; official_golden_answer=false"},
+  "ete": {"severity": "Critical", "base_clearance": 60,
+          "affected_set": [
+            {"segment_id": "RD_TPE_002", "role": "INCIDENT"},
+            {"segment_id": "RD_TPE_004", "role": "PRIMARY"},
+            {"segment_id": "RD_TPE_005", "role": "SECONDARY"}
+          ],
+          "ete_snapshot_timestamp": "2026-05-20 22:00",
+          "saturation_inputs": [1.00, 0.78, 0.65],
+          "saturation_sum": 2.43, "road_count": 3, "avg_saturation": 0.81,
+          "congestion_penalty": 18.6, "ete_minutes": 78.6,
+          "calculation_status": "CALCULATED", "guidance_id": "HG-001"},
   "provisional": true,
-  "policy": {"classification": "PROVISIONAL_TEAM_POLICY", "status": "AWAITING_HOST_REPLY",
-             "time_alignment": {"mode": "exact_or_latest_prior_per_entity"},
+  "policy": {"classification": "ORGANIZER_GUIDED_TEAM_POLICY",
+             "status": "RESOLVED_FOR_IMPLEMENTATION_BY_ORGANIZER_GUIDANCE",
+             "guidance_id": "HG-001", "official_unique_rule": false, "configurable": true,
+             "time_alignment": {"mode": "GLOBAL_AS_OF_EVENT_CUTOFF_LATEST_PRIOR_PER_ENTITY"},
              "incident_anchor": {"mode": "incident_anchor_from_location_text"},
-             "affected_road": {"role": "display_only"},
+             "affected_road": {"role": "DISPLAY_AND_CONTEXT_ONLY"},
              "affected_intersection_scope": {"mode": "unresolved_manual_confirmation"},
              "multilingual_scope": {"mode": "current_snapshot_all_available_stations"},
-             "ete": {"affected_set": "directly_affected_roads_at_event_snapshot"}},
-  "policy_dependencies": ["incident_anchor_from_location_text", "exact_or_latest_prior_per_entity", "directly_affected_roads_at_event_snapshot"],
+             "ete": {"affected_set": "INCIDENT_PRIMARY_AND_SELECTED_SECONDARY",
+                     "snapshot_mode": "COMMON_EXACT_TIMESTAMP"}},
+  "policy_dependencies": ["incident_anchor_from_location_text",
+                          "GLOBAL_AS_OF_EVENT_CUTOFF_LATEST_PRIOR_PER_ENTITY",
+                          "INCIDENT_PRIMARY_AND_SELECTED_SECONDARY",
+                          "COMMON_EXACT_TIMESTAMP"],
   "execution": {"status": "completed", "last_error": null, "retryable": false, "attempt_count": 1}
 }
 ```
@@ -1584,7 +1693,7 @@ core_hash = SHA-256( UTF-8( canonical_serialize( canonical_decision_payload ) ) 
   "idempotency_key": "TPE_2026_ACC_001|2026-05-20 22:10|prov-2026a",
   "provisional": true,
   "trace_id": "tr-abc123",
-  "summary": {"triggered_articles": [1, 2], "invoked_procedures": ["article2_alternative_route_guidance"], "applied_formula_articles": [7], "primary_evacuation": "RD_TPE_004", "ete_minutes": 90}
+  "summary": {"triggered_articles": [1, 2], "invoked_procedures": ["article2_alternative_route_guidance"], "applied_formula_articles": [7], "primary_evacuation": "RD_TPE_004", "ete_minutes": 78.6}
 }
 ```
 
@@ -2293,10 +2402,9 @@ sequenceDiagram
 *For any* 讀取/查詢/決策操作序列，五個官方來源之原始內容於操作後應與載入時深層相等（不被改寫）。
 **Validates: Requirements 1.4**
 
-#### Property 3：事件時間對齊選取（Strategy A，PROVISIONAL）
-*For any* 事件時間與任一 entity，所選資料列之 `Timestamp` 應 `<= event_timestamp` 且為該 entity 中不超過事件時間的最新一列；同一基地台之 `User_Count`/`Growth_Rate`/`Roaming_User_Pct` 必取自同一列；無合法列時回傳 `insufficient_data` 而非事件後資料列。
-**Validates: Requirements 1.5**
-
+#### Property 3：事件時間對齊選取（HG-001）
+*For any* 事件時間與必要 entity，`decision_cutoff_timestamp == event.timestamp`；所選資料列為該 entity 中 `Timestamp <= cutoff` 的最新一列；所選時間不得晚於 cutoff；同一 entity 的欄位來自同一列；無 prior observation 時回 `INSUFFICIENT_DATA` 並要求人工確認。
+**Validates: Requirements 1.5–1.10**
 #### Property 4：壅塞分級正確性
 *For any* `Saturation_Score` 與任一路段，判定為 A 級 iff `>= 0.95`、判定為 B 級 iff `0.85 <= score < 0.95`，其餘為非 A/B；此規則對全部 15 路段一致。
 **Validates: Requirements 2.1, 2.2, 2.3, 2.4, 2.5**
@@ -2361,22 +2469,19 @@ sequenceDiagram
 *For any* 觸發 art.5 之事件，`police_per_confirmed_affected_intersection = 2` 恆成立；當受影響路口範圍（affected scope）**未確認**時，`affected_intersection_count = unresolved` 且 `total_police = unresolved`；**僅當** scope 已確認時，才可 `total_police = affected_intersection_count × 2`。人工指揮建議應含受影響路段與估計持續時間，且 CMS 含「<路段> 號誌故障，請依現場指揮通行」。
 **Validates: Requirements 10.3, 10.4**
 
-#### Property 20：SOP 第 6 條多語觸發
-*For any* 基地台讀數集合，多語通報觸發 iff 任一 `roaming_pct_value >= 0.30`；觸發時民眾簡訊於同一回應至少含 zh 與 en 並標示已觸發，未觸發時僅含 zh 並標示未觸發。
-**Validates: Requirements 11.1, 11.2, 11.3, 11.4, 11.6, 14.1, 14.2, 14.3**
-
+#### Property 20：SOP 第 6 條多語觸發與 cutoff 一致性
+*For any* 已由 configurable station-set policy 納入的基地台集合，所有 current-state 讀數均使用相同事件 cutoff 下的 latest-prior row；多語通報觸發 iff 任一 `roaming_pct_value >= 0.30`。OQ-005 的 station-set 範圍仍保持可配置。
+**Validates: Requirements 11.1–11.9**
 #### Property 21：時間格式一致
 *For any* 系統輸出之時間值，其字串格式符合 `YYYY-MM-DD HH:MM`。
 **Validates: Requirements 11.5**
 
-#### Property 22：ETE 公式正確性
-*For any* `severity` 與受影響集合平均 Saturation，`ETE_minutes == base_clearance + congestion_penalty`，其中 `base_clearance` 為 Critical→60 / High→40 / Medium→20，`congestion_penalty == max(0, (avg_saturation - 0.5) * 60)`。
-**Validates: Requirements 12.1, 12.2, 12.3**
-
-#### Property 23：壅塞加乘非負
-*For any* 平均 Saturation，`congestion_penalty >= 0`（當 `avg < 0.5` 時為 0）。
-**Validates: Requirements 12.4**
-
+#### Property 22：ETE affected set 與公式正確性（HG-001）
+*For any* 可計算的 RD_ 事件，affected set 恰為 stable unique 的 incident + selected primary + selected secondary；所有成員使用同一 exact timestamp；`ETE_minutes == base_clearance + max(0, (avg_saturation - 0.5) * 60)`。
+**Validates: Requirements 12.1–12.7, 12.9**
+#### Property 23：ETE 不得 partial average
+*For any* ETE affected set，若不存在小於或等於 event timestamp 的 common exact timestamp，則 `calculation_status == INSUFFICIENT_COMMON_SNAPSHOT`、`ete_minutes == null`、`ete_lower_bound_minutes == base_clearance`、`congestion_penalty == null` 且 `manual_confirmation_required == true`。不得只平均可取得的子集合。
+**Validates: Requirements 12.6–12.8**
 #### Property 24：交控中心建議書完整性
 *For any* 決策，交控中心建議書應含事件辨識與對應 SOP 條號、分級判定與其引用之車流/飽和度值、主要與次要疏散及排除其他候選之理由、受影響路段號誌配時調整（如 +25%）與時段、ETE 數值；且當觸發 art.3 或 art.5 時含對北捷/公車處/警力之請求。
 **Validates: Requirements 13.1, 13.2, 13.3, 13.4, 13.5, 13.6**
@@ -2409,10 +2514,9 @@ sequenceDiagram
 *For any* 觸發 art.5 之事件，`police_per_intersection == 2`（官方）恆成立；當受影響路口範圍採預設 `unresolved_manual_confirmation` 時，`affected_intersection_count` 與 `total_police` 應為 `unresolved` 且 `manual_confirmation_required == true`；任何顯示之具體警力數字必標為 `PROVISIONAL_DERIVED_EXAMPLE` 且 `official_golden_answer == false`。
 **Validates: Requirements 10.3**
 
-#### Property 32：多語觸發資料範圍以當下快照為準（Strategy F，PROVISIONAL）
-*For any* 站集範圍設定與時序資料，多語觸發判定僅依所選 scope 於**當下時間快照**（Strategy A 對齊）之 `roaming_pct_value`；歷史上曾達 30% 但當下快照未達之站，**不得**使當前判定為已觸發。
-**Validates: Requirements 11.1, 11.2**
-
+#### Property 32：SOP6 scope 與時間政策分離
+*For any* station-set mode，時間選取固定遵守 HG-001 event cutoff/latest-prior 規則；切換 station-set mode 不得使用未來資料，也不得改變同一 entity 同一 cutoff 的選取結果。station-set 維度保持 `OPEN / AWAITING_HOST_REPLY`。
+**Validates: Requirements 11.1–11.9**
 #### Property 33：注入冪等、MARK_RUNNING 註冊、內部 action 執行圍籬（current $$.Execution.Id）+ RECONCILE 外部圍籬（expected-stale-ARN+expected-attempt，FIX 3）+ apply-or-confirm、DecisionCore identity 分類（canonical core_hash，FIX 4）、async CORE_IDENTITY_CONFLICT 終端 409 時序（FIX 1）、start-failure/stale-running 復原與 ENRICHMENT_ONLY core 持久化（經 IdempotencyTable 租約狀態機 + 唯讀強一致 RecoveryGateFn）
 *For any* 相同 `idempotency_key`（`event_id|event_timestamp|policy_version`）之重複注入，以及任意 `StartExecution` 成敗、執行逾時、Lambda 回應遺失與投遞順序：
 - **(a) 去重**：`IdempotencyGateFn` 對 `IdempotencyTable` 之 `attribute_not_exists(idempotency_key)` conditional Put 至多成功一次；`status=completed`、`status=running` 且 `running_deadline_at >= now`，或 `status=starting` 且租約未過期之同鍵重試，一律不 `StartExecution`、不重算 `DecisionCore`、不重推告警，回傳既有 `decision_id`（標記 `duplicate_request`）。
@@ -2475,14 +2579,14 @@ Express 執行名稱（`workflow_execution_name`）**不**作為去重或復原�
 | art.4 大巨蛋散場 | P17 | DOME 19:00 峰值 40000、22:00 growth −0.31 |
 | art.5 號誌故障 | P18, P19, P31 | EVT_003 |
 | art.6 多語 | P20, P21, P32, P36 | BS_TPE_101 40%/45%、BS_XY_ATT 30%/35% |
-| art.7 ETE | P22, P23 | ACC_001 ETE=90（PROVISIONAL） |
+| art.7 ETE | P22, P23 | ACC_001 ETE=78.6（HG-001） |
 
 **對應所有數值邊界**（以 EDGE_CASE 單元測試 + 屬性產生器涵蓋）：
 `0.85`（B 下界，P4）、`0.95`（A 下界，P4）、`25000`（count 未達，P16）、`25001`（count 達，P16）、`0.30`（growth 未達 / roaming 觸發，P16/P20）、`1000`（capacity 門檻，P9）、`30%`（roaming 觸發，P20）。
 
 **對應 3 個官方事件**：ACC_001（Golden：`triggered_articles = [1,2]`、`invoked_procedures = [article2_alternative_route_guidance]`、`applied_formula_articles = [7]`；provisional route（主疏散 RD_TPE_004、次要 RD_TPE_005、排除 RD_TPE_006/008）/ provisional ETE；`official_golden_answer = false`）、EVT_002（art.3 評估 Golden，須計算而非假設觸發；affected_road 依 Strategy B）、EVT_003（art.5 Golden）。
 
-**對應 6 項暫定政策（A–F）**：每個 Strategy 以設定切換至少 2 種實作並各有測試——A 時間對齊（`exact_or_latest_prior_per_entity` vs `last_known_value_with_visible_staleness` vs 正式 `insufficient_data`）、B affected_road（`display_only` vs `context_and_ete` vs `parallel_road_impact_explicit_host`）、C ETE 集合（`directly_affected_roads_at_event_snapshot` vs `accident_plus_evac` 敏感度）、D 事故錨點（`incident_anchor_from_location_text` vs `explicit_host_mapping`；含無法解析 → `manual_confirmation_required`，P30）、E 受影響路口（`unresolved_manual_confirmation` vs `all_segment_intersections` vs `explicit_host_set`，P31）、F 多語站集（`current_snapshot_all_available_stations` vs `incident_area_nearby_stations` vs `explicit_host_policy`，P32）。測試驗證切換不改寫核心引擎且輸出標示 `provisional`。
+**對應 6 項可配置政策（A–F）**：A/B/C 採 HG-001 selected organizer-guided defaults，F 的時間維度採 HG-001、station-set 維度仍 provisional；D/E 與其他未解決議題仍 provisional。每個 Strategy 以設定切換至少 2 種實作並測試切換不改寫 Rule Engine。Active defaults 為 `GLOBAL_AS_OF_EVENT_CUTOFF_LATEST_PRIOR_PER_ENTITY`、`DISPLAY_AND_CONTEXT_ONLY`、`INCIDENT_PRIMARY_AND_SELECTED_SECONDARY`、`COMMON_EXACT_TIMESTAMP`。
 
 **對應跨切面正確性**：冪等、MARK_RUNNING 註冊、start-failure/stale-running 復原與重複執行去重（P33，同 `idempotency_key` → 至多一筆 DecisionCore、不重發告警；`starting → running` 僅由首狀態 `MARK_RUNNING` 以 `$$.Execution.Id` 註冊（消除註冊競態）、`InjectFn` 不寫 `running`；`StartExecution` 失敗 → `start_failed → starting` 經租約復原（PATCH 3 立即競爭）、`processing_failed → starting` 分級復原、租約過期 `starting → starting` 由**單一 `lease_owner`** 重取重試、stale `running`（`running_deadline_at < now`）由 `RECONCILE_STALE_RUNNING` 轉 `processing_failed`（`last_error=STALE_RUNNING_EXECUTION`）；全 action 執行圍籬 fencing（`workflow_execution_arn=$$.Execution.Id` AND `attempt_count`）+ apply-or-confirm（`ConsistentRead = true` → `ALREADY_APPLIED` 或 `FENCED_STALE_EXECUTION`，`MARK_COMPLETED` 寫 `completed_execution_arn`/`completed_attempt_count`）；DecisionCore Put identity 分類（`core_hash` 依 §10.11a-1 canonical 演算法比對，FIX 4；`COMMITTED`/`ALREADY_COMMITTED_SAME_DECISION` 續行、`CORE_IDENTITY_CONFLICT` fail-closed、**async 終端非可復原**：`retryable=false`/`recovery_stage=NONE`/推 `processing.failed`，原始注入回 `202` **不追溯改判**，`409` 僅回後續同鍵 POST，FIX 1）且**不重推告警**；RECONCILE_STALE_RUNNING **外部 fencing**（FIX 3：`expected_stale_execution_arn`+`expected_attempt`+`observed_running_deadline_at`，非對帳者自身 `$$.Execution.Id`）；`core_committed` 只由 `WorkflowStatusFn` `MARK_CORE_COMMITTED`（`evidence_source`∈{`DECISIONFN_COMMITTED`,`RECOVERY_GATE_CORE_EXISTS`}）寫入、`DecisionFn` 不寫 `IdempotencyTable`（`status` 之租約/復原轉移由 `InjectFn` 分區共寫，FIX 2）；復原分級以唯讀強一致 `RecoveryGateFn`（全 `ConsistentRead = true`）之 `effective_core_committed`/`missing_narrative_types` 判定（`ENRICHMENT_ONLY` 持久化 `core_committed`；`core_exists=false`→`RECOVERY_CORE_MISSING`+`FULL_WORKFLOW`）；`DecisionNarrativeTable` `REPORT`/`PUBLIC_ALERT`/`EXPLANATION` 三 item 各以 `attribute_not_exists(decision_id)` 併發 conditional Put 不覆寫、`decision.enriched` 待三型別齊備才推、`ready_event_id` effectively-once presentation）、時間正規化（P34，`timestamp_raw` 永不覆寫、`timestamp_display` 為 `YYYY-MM-DD HH:MM`）、What-if 4 階段含糊即 `clarification_required`（P35）、多語 Bedrock 失敗不退化為僅中文（P36）、CMS 核心/說明權限分離（P37）。
 
@@ -2526,6 +2630,20 @@ Express 執行名稱（`workflow_execution_name`）**不**作為去重或復原�
 
 ---
 
+#### HG-001 Active Configuration
+
+```yaml
+policy:
+  time_alignment:
+    mode: GLOBAL_AS_OF_EVENT_CUTOFF_LATEST_PRIOR_PER_ENTITY
+  affected_road:
+    role: DISPLAY_AND_CONTEXT_ONLY
+  ete:
+    affected_set: INCIDENT_PRIMARY_AND_SELECTED_SECONDARY
+    snapshot_mode: COMMON_EXACT_TIMESTAMP
+```
+
+這些值分類為 `ORGANIZER_GUIDED_TEAM_POLICY`，可配置但不得被 Bedrock 改寫。OQ-005 的 station-set mode 仍為 provisional/open。
 ## 24. IaC Approach（基礎設施即程式碼）
 
 - **採 AWS CDK（TypeScript）**：與前端同語言；以 CDK **context**（`--context env=...`）對應三環境設定檔；資源命名帶環境前綴避免衝突；輸出 API/WS endpoint 供前端建置注入。
@@ -2627,13 +2745,13 @@ flowchart TB
 
 | 風險 | 影響 | 緩解 |
 | --- | --- | --- |
-| OQ-001..OQ-011 未獲主辦回覆 | 走查數值（如 ETE 90、主疏散選擇）可能與主辦預期不同 | 以 Strategy 封裝或 `PARTIALLY_DEFINED` 標記、全程標示 PROVISIONAL、§30 一鍵切換 |
+| HG-001 未指定唯一演算法，且仍有 7 個完整 OQ 與 OQ-005 station-set 未解決 | 不同合理政策可能產生不同輸出 | Organizer-guided defaults 與未解決政策皆由 Strategy 封裝、揭露 provenance，經 §30 切換 |
 | 競賽 Region 不支援所選 Bedrock 模型 | 無法生成文字 | `model_id_fallbacks` 候選清單；仍不可用則全模板（core 不受影響） |
 | KB ingestion 耗時或失敗 | RAG citation 不可用 | S3 依 article_no 直讀 fallback |
 | LLM 嘗試改寫數值 | 破壞正確性 | IAM 隔離 + SchemaValidator 拒絕覆寫 core（§9/§18） |
 | 60 秒延遲逼近上限 | 未達官方硬指標 | Fast/Enrichment 分離、平行分支、逐段延遲指標、Bedrock 逾時降級 |
 | 資料時間對齊誤用事件後資料 | 判定失真 | Strategy A 僅取 latest prior、記錄 staleness、正式模式 insufficient_data |
-| 誤把 affected_road 當道路事件 | 錯誤觸發 art.2 | Strategy B 預設 display_only；art.2 條件須完整重驗 |
+| 誤把 affected_road 當道路事件 | 錯誤觸發 art.1/art.2 或污染 ETE | Strategy B active role 為 `DISPLAY_AND_CONTEXT_ONLY`，禁止觸發與 ETE membership |
 | 過早拆除（評審前 teardown） | 評審無法檢視、佐證遺失 | 拆除為 **POST-JUDGING CLEANUP**；freeze release、保留 Dashboard URL、待主辦確認後才 `cdk destroy`（§25 階段 5–10、§26） |
 | 注入重試造成重複決策/重複發布 | 重覆建立 DecisionCore、重覆告警 | `IdempotencyGateFn` + `IdempotencyTable` conditional Put；Express 執行名稱不去重（§15.2、P33） |
 | 競賽帳號殘留資源 | 費用/違規 | POST-JUDGING CLEANUP：`cdk destroy` 一鍵拆除 + 殘留檢查（主辦同意後） |
@@ -2642,49 +2760,40 @@ flowchart TB
 
 ## 29. Open Questions（開放問題）
 
-> 下列各項經官方來源檢視後仍**無法唯一決定**，統一編號為 **OQ-001..OQ-011**。以 Strategy 介面或 `PARTIALLY_DEFINED` 標記（§11）承接；其中 **OQ-001、OQ-002、OQ-003 已由 HG-001 主辦指引解決**（`RESOLVED_FOR_IMPLEMENTATION_BY_ORGANIZER_GUIDANCE`），其餘維持 OPEN / AWAITING_HOST_REPLY。各項團隊 fallback 一律標為 `PROVISIONAL_TEAM_POLICY / AWAITING_HOST_REPLY`（已解決者改標 `ORGANIZER_GUIDED_TEAM_POLICY / HG-001`）。
+HG-001 不建立新的官方 SOP，也不規定唯一演算法。其 resolution authority 僅用於實作政策選擇。
 
-**OQ-001 事件時間對齊（對應 R1，Strategy A，§11.1）**：事件 `timestamp` 與 CSV 時序資料列之對齊規則未由官方定義。目前以 Strategy A `GLOBAL_AS_OF_EVENT_CUTOFF_LATEST_PRIOR_PER_ENTITY`（HG-001 指引）實作。**狀態：RESOLVED_FOR_IMPLEMENTATION_BY_ORGANIZER_GUIDANCE (HG-001)。** 仍可配置切換。
+| OQ | Status | Selected implementation policy |
+|---|---|---|
+| OQ-001 | `RESOLVED_FOR_IMPLEMENTATION_BY_ORGANIZER_GUIDANCE` | `GLOBAL_AS_OF_EVENT_CUTOFF_LATEST_PRIOR_PER_ENTITY` |
+| OQ-002 | `RESOLVED_FOR_IMPLEMENTATION_BY_ORGANIZER_GUIDANCE` | `DISPLAY_AND_CONTEXT_ONLY` |
+| OQ-003 | `RESOLVED_FOR_IMPLEMENTATION_BY_ORGANIZER_GUIDANCE` | `INCIDENT_PRIMARY_AND_SELECTED_SECONDARY` + `COMMON_EXACT_TIMESTAMP` |
+| OQ-004 | `OPEN / AWAITING_HOST_REPLY` | Strategy D remains configurable |
+| OQ-005 | `PARTIALLY_RESOLVED_BY_ORGANIZER_GUIDANCE` | time resolved; station-set remains open |
+| OQ-006 | `OPEN / AWAITING_HOST_REPLY` | label-only intersection handling |
+| OQ-007 | `OPEN / AWAITING_HOST_REPLY` | no-compliant-route response |
+| OQ-008 | `OPEN / AWAITING_HOST_REPLY` | PDF/SOP saturation precedence |
+| OQ-009 | `OPEN / AWAITING_HOST_REPLY` | What-if boundary |
+| OQ-010 | `OPEN / AWAITING_HOST_REPLY` | affected-intersection scope |
+| OQ-011 | `OPEN / AWAITING_HOST_REPLY` | SOP5 duration vs ETE |
 
-**OQ-002 Event 2 affected_road 用途（對應 R8，Strategy B，§11.2）**：`TPE_2026_EVT_002` 之 `affected_road = RD_TPE_001` 於 SOP 與命題解說均無使用方式定義。目前以 Strategy B `DISPLAY_AND_CONTEXT_ONLY`（HG-001 指引）實作。**狀態：RESOLVED_FOR_IMPLEMENTATION_BY_ORGANIZER_GUIDANCE (HG-001)。** 仍可配置切換。
+**Count**: 11 total, 3 resolved for implementation, 1 partially resolved, 7 fully open.
 
-**OQ-003 ETE 受影響路段集合（對應 R12，Strategy C，§11.3）**：SOP 第 7 條「受影響路段平均 Saturation_Score」之集合未由官方界定。目前以 Strategy C `INCIDENT_PRIMARY_AND_SELECTED_SECONDARY`（HG-001 指引）實作，含共同精確時間戳要求；ACC_001 之 ETE=78.6 為 `ORGANIZER_GUIDED_TEAM_POLICY`（`guidance_id = HG-001`）。**狀態：RESOLVED_FOR_IMPLEMENTATION_BY_ORGANIZER_GUIDANCE (HG-001)。** 仍可配置切換。
-
-**OQ-004 事故錨點解析（Incident location anchor，對應 R6，Strategy D，§11.5）**：`Incident.location` 之自然語言（如「光復南路與忠孝東路口南側」）如何**唯一對映**為事故錨點（錨定路口、方位、上/下游）未由官方定義。目前以 Strategy D `incident_anchor_from_location_text`（`PROVISIONAL_TEAM_POLICY`）承接；無法唯一解析時回 `manual_confirmation_required`、不選主疏散、不自動排名直接相交路口。**狀態：OPEN / AWAITING_HOST_REPLY。**
-
-**OQ-005 SOP6「任一基地台」站集與時間快照範圍（對應 R11，Strategy F，§11.8）**：「任一基地台 `Roaming_User_Pct >= 30%`」中之**站集**與**時間快照**範圍未由官方界定。目前以 Strategy F `current_snapshot_all_available_stations`（`PROVISIONAL_TEAM_POLICY`）承接；**不得**將歷史曾達 30% 之時點視為當前已觸發。**時間維度**已由 HG-001 解決（Strategy A `GLOBAL_AS_OF_EVENT_CUTOFF_LATEST_PRIOR_PER_ENTITY`），但**站集範圍（station-set scope）仍為 OPEN**。**狀態：OPEN / AWAITING_HOST_REPLY（站集範圍部分）。**
-
-**OQ-006 無 segment_id 之路口標籤運用（intersection label 無 segment_id，對應 R7）**：`intersections` 以路段全名（路口標籤）表示，部分名稱未必對應到具 `segment_id` 之路段；官方未定義此類**純標籤**如何用於容量/上下游判定。目前團隊暫定僅用於上下游排序與顯示、不臆造其容量或路段屬性（`PROVISIONAL_TEAM_POLICY`）。**狀態：OPEN / AWAITING_HOST_REPLY。**
-
-**OQ-007 查無合規替代道路時之正式回應（對應 R6）**：SOP2 篩選後若**無任何合規替代路段**，官方未定義「載明查無合規替代路段」以外之正式處置（號誌/警力/大眾運輸指引）。目前團隊暫定僅載明查無合規替代路段並建議併行大眾運輸（`PROVISIONAL_TEAM_POLICY`）。**狀態：OPEN / AWAITING_HOST_REPLY。**
-
-**OQ-008 PDF「避開已飽和路段」與 SOP「壅塞主疏散仍維持」之調和（PDF saturation vs SOP congestion，對應 R5/R6，§11.7）**：二者關係屬適用階段問題（`PARTIALLY_DEFINED`）。目前團隊暫定：PDF 之「避開飽和」為候選**偏好/排序階段**之軟性精神、SOP 之「維持壅塞主疏散」為**選定後處置階段**之硬性規則；**不得**將 Saturation 變為 art.2 第四道硬性篩選（`PROVISIONAL_TEAM_POLICY`）。**狀態：OPEN / AWAITING_HOST_REPLY。**
-
-**OQ-009 What-if 之 LLM 判斷與決定性計算邊界（What-if LLM/deterministic boundary，對應 R16，§14.5）**：官方未明訂 What-if 中哪些部分可由 LLM 處理。本設計暫定：Bedrock 僅負責階段 1（`ScenarioParser` 解析）與階段 4（解釋），數值門檻/觸發/ETE 一律由階段 3 決定性 Rule Engine 計算，含糊即 `clarification_required`（`PROVISIONAL_TEAM_POLICY`）。**狀態：OPEN / AWAITING_HOST_REPLY。**
-
-**OQ-010 SOP5 受影響路口範圍（SOP5 affected intersections，對應 R10，Strategy E，§11.6）**：SOP5 明訂每路口 2 人，但「**哪些路口**屬受影響路口」未定義。目前以 Strategy E `unresolved_manual_confirmation`（`PROVISIONAL_TEAM_POLICY`）承接：`police_per_intersection = 2`（官方）、`affected_intersection_count = unresolved`、`total_police = unresolved`、`manual_confirmation_required = true`。**狀態：OPEN / AWAITING_HOST_REPLY。**
-
-**OQ-011 SOP5 估計持續時間與 SOP7 ETE 之關係（SOP5 duration vs SOP7 ETE，對應 R10/R12）**：SOP5 之「估計持續時間」是否等同 SOP7 之 ETE、或以何方式關聯，未由官方界定。目前團隊暫定二者**分別計算、不相互覆寫**（`PROVISIONAL_TEAM_POLICY`）；連帶影響 EVT_003 之 `FORMULA_APPLICABILITY = PARTIALLY_DEFINED`（§9.5）。**狀態：OPEN / AWAITING_HOST_REPLY。**
-
-**若於設計/實作中發現任何需求缺口**，將回到需求釐清階段，不逕自以暫定政策充當官方規則。
-
----
-
+For OQ-001/002/003 and the resolved time dimension of OQ-005:
+- `resolution_authority = ORGANIZER_WRITTEN_GUIDANCE`
+- `official_unique_rule = false`
+- `implementation_policy_selected = true`
+- `configurable = true`
 ## 30. Host Reply Change Procedure（主辦回覆變更程序）
 
-當主辦回覆任一 OPEN_QUESTION，僅需以下步驟即可切換，**不改寫核心 Rule Engine**：
+1. 保存主辦回覆原文於 private team evidence，不將私人聯絡資訊放入 public repository。
+2. 分類 authority：官方 SOP、官方資料、主辦方書面實作指引或一般建議。
+3. 對應 OQ 與 Strategy。
+4. 若主辦方未指定唯一演算法，選擇 deterministic、reproducible、configurable policy，記錄 assumptions。
+5. 更新 `ConfigProvider`、PolicyMetadata、Dashboard disclosure、EvidenceTrace 與 Golden tests。
+6. 重跑 property、boundary、Golden、DAG 與 source-integrity tests。
+7. 經獨立唯讀審查前不得授權 TASK-001。
 
-1. **對應 Strategy / OQ**：確認回覆對應哪一項——A（時間對齊，OQ-001）/ B（affected_road，OQ-002）/ C（ETE 集合，OQ-003）/ D（事故錨點，OQ-004）/ E（受影響路口，OQ-010）/ F（多語站集，OQ-005）；或屬 `PARTIALLY_DEFINED` / 暫定策略之議題（OQ-006、OQ-007、OQ-008、OQ-009、OQ-011）。
-2. **選既有實作或新增 Strategy 實作**：既有選項（如 B 的三種 role、E/F 的三種 mode）直接改設定；若回覆超出既有選項，於對應 Strategy 介面新增一個實作類別（僅實作該介面，不動 Rule Engine）。
-3. **更新設定（`ConfigProvider`）**：於對應來源（AWS 環境為 Parameter Store、LOCAL_MOCK 為本地 YAML，§23.1）改 `policy.time_alignment.mode` / `policy.affected_road.role` / `policy.ete.affected_set` / `policy.incident_anchor.mode` / `policy.affected_intersection_scope.mode` / `policy.multilingual_scope.mode` 及相關參數；`policy` metadata 版本遞增。
-4. **更新分類標記**：若主辦將某政策正式化，將該項之 `classification` 由 `PROVISIONAL_TEAM_POLICY` 改為官方、`status` 由 `AWAITING_HOST_REPLY` 改為已確認，並更新 §29 狀態（於後續版本）。
-5. **重跑測試**：跑 §22.3 之政策切換契約測試與相關屬性/Golden，確認決策依新政策改變且核心引擎未改動。
-6. **重新產證據**：重跑 3 事件 Golden，更新走查數值標記（若已官方化則移除 PROVISIONAL 標示）。
-
-**保證**：Rule Engine 只依賴 Strategy 介面與 `DecisionResult` 結構；政策切換不觸及 §9 的決定性/Bedrock 界線，Bedrock 仍只措辭、不改數值。
-
----
-
+政策變更不得越過 deterministic/Bedrock boundary，也不得修改七份官方來源雜湊。
 ## 31. Final Design Acceptance Record（最終設計驗收記錄）
 
 > 本節為 Stage 1（design.md）最終驗收記錄。**開放問題（OQ-001..OQ-011）為待主辦回覆之政策議題，*非* 技術設計阻塞項**；本節不宣稱任何 host-pending 議題已解決。
@@ -2693,30 +2802,35 @@ flowchart TB
 
 | 項目 | 值 |
 | --- | --- |
-| Design Status | **APPROVED** |
-| Task Generation Status | **READY**（Stage 2 產 tasks.md，本階段不產） |
-| Requirements Baseline | **LOCKED_PENDING_HOST_REPLIES** |
-| Crosswalk | **32 / 32**（REQ-001..032，無缺號/無重複；24 FULLY / 1 PARTIALLY（REQ-005/OQ-008）/ 0 NOT / 5 DELIVERABLE_ONLY / 2 BONUS_ONLY） |
-| Core Coverage | **31 / 32**（唯一 partial = REQ-005 / OQ-008） |
-| Open Questions | **OQ-001..OQ-011 全部維持 OPEN / AWAITING_HOST_REPLY** |
-| Unresolved Technical Design Blockers | **NONE** |
-| Correctness Properties | P1–P37（無缺號/無重複） |
-| Mermaid Diagrams | 14 |
-| Runtime Contract | **COMPETITION_AWS 採 Step Functions Express**；`StartExecution` 失敗 → `start_failed` → `503 WORKFLOW_START_FAILED` → 同鍵租約復原；**無 runtime 直呼 DecisionFn 之降級路徑**（`lambda_direct` 為 deployment-time alternative only，非 runtime） |
+| Design Status | `RECOVERED_AND_AMENDED_BY_HG-001_PENDING_READ_ONLY_REVIEW` |
+| Implementation Authorization | `NOT_AUTHORIZED_PENDING_READ_ONLY_REVIEW` |
+| Requirements Baseline | `AMENDED_BY_HG-001` |
+| Crosswalk | 32 / 32 retained |
+| Open Questions | 3 resolved for implementation, 1 partially resolved, 7 fully open |
+| Unresolved Technical Design Blockers | NONE identified in this repair; independent verification still required |
+| Correctness Properties | P1–P37 retained |
+| Mermaid Diagrams | 14 retained |
+| Runtime Contract | unchanged |
+### 31.2 Known Organizer-Guided and Provisional Policies
 
-### 31.2 Known Provisional Policies（暫定政策，AWAITING_HOST_REPLY；非技術阻塞）
+**Organizer-guided, selected, configurable**:
+- Strategy A / OQ-001: `GLOBAL_AS_OF_EVENT_CUTOFF_LATEST_PRIOR_PER_ENTITY`
+- Strategy B / OQ-002: `DISPLAY_AND_CONTEXT_ONLY`
+- Strategy C / OQ-003: `INCIDENT_PRIMARY_AND_SELECTED_SECONDARY` + `COMMON_EXACT_TIMESTAMP`
+- Strategy F / OQ-005: time cutoff resolved; station-set remains provisional/open
 
-- **Strategy A**（事件時間對齊，OQ-001）｜**Strategy B**（affected_road 用途，OQ-002）｜**Strategy C**（ETE 受影響集合，OQ-003）｜**Strategy D**（事故錨點解析，OQ-004）｜**Strategy E**（SOP5 受影響路口，OQ-010）｜**Strategy F**（SOP6 站集/時間快照，OQ-005）。
-- 其他 `PARTIALLY_DEFINED`／暫定項：**OQ-006**（無 segment_id 之路口標籤運用）、**OQ-007**（查無合規替代道路之正式回應）、**OQ-008**（PDF 避開飽和 vs SOP 維持壅塞主疏散之 precedence；REQ-005 之唯一 partial）、**OQ-009**（What-if LLM/決定性邊界）、**OQ-011**（SOP5 估計持續時間 vs SOP7 ETE 關係）。
-- 上述全部標記 `PROVISIONAL_TEAM_POLICY / AWAITING_HOST_REPLY`，經 Strategy 介面或 `PARTIALLY_DEFINED` 封裝，主辦回覆後僅需改設定切換（§30），**不改寫核心 Rule Engine**；**不得**於任何輸出宣稱為官方規則。
+**Still provisional/open**:
+- OQ-004, OQ-006, OQ-007, OQ-008, OQ-009, OQ-010, OQ-011
+- OQ-005 station-set scope
 
+All active policy values are deterministic and disclosed. They are not presented as unique official rules.
 ### 31.3 Design Acceptance Gates（7.1–7.12 語意回歸審查結果）
 
 | Gate | 審查項 | 結果 |
 | --- | --- | --- |
 | 7.1 | Source integrity（7 份官方來源＝1 PDF/1 DOCX/2 CSV/2 JSON/1 SOP TXT，§10.0b SHA-256 未變；衍生鏡像不入 OfficialSourceManifest） | **PASS** |
 | 7.2 | Crosswalk 不變（32 列、唯一、無缺/重；coverage 24/1/0/5/2；REQ-005 PARTIALLY 僅 OQ-008） | **PASS** |
-| 7.3 | OQ-001..011 全present/唯一/OPEN/AWAITING_HOST_REPLY；無任何 Strategy 標記 RESOLVED | **PASS** |
+| 7.3 | OQ IDs OQ-001..OQ-011 present and unique；status distribution：`resolved_for_implementation=3`（OQ-001、OQ-002、OQ-003）、`partially_resolved=1`（OQ-005，僅時間維度）、`fully_open=7`（OQ-004、OQ-006、OQ-007、OQ-008、OQ-009、OQ-010、OQ-011） | **PASS** |
 | 7.4 | 決定性/Bedrock 邊界（數值/布林全決定性；Bedrock 僅文字；art.1–6 觸發、art.7 公式；art.7 永不入 triggered；ACC_001 citation={1,2,7}；RendererFn 零寫 Core；DecisionFn 無 Bedrock） | **PASS** |
 | 7.5 | 表/寫入者（Core 唯 DecisionFn 且 immutable；Narrative PK+SK 唯 RendererFn 分支 conditional Put；Publish 唯 PublishFn；**IdempotencyTable 由 InjectFn 與 WorkflowStatusFn 依 FIX-2 分區共寫**；RealtimePublisher 僅 PostToConnection；RecoveryGateFn 全 ConsistentRead=true 零寫入；每欄位可辨識 writer/reader/IAM/lifecycle） | **PASS** |
 | 7.6 | 狀態機封閉（status enum 恰 5 種；合法轉移集合完整；無無寫入者之狀態/轉移；WorkflowStatusFn 恰 5 action；**4 內部 action 用 current $$.Execution.Id fencing、RECONCILE 用 expected-stale-ARN+expected-attempt 外部 fencing**；apply-or-confirm ALREADY_APPLIED/FENCED_STALE_EXECUTION） | **PASS** |
@@ -2724,7 +2838,7 @@ flowchart TB
 | 7.8 | Narrative/WebSocket（三分支 Composer→SchemaValidator→conditional Put→COMMITTED/branch_already_completed；decision.enriched 待三型別齊備；WebSocket 可重送、無物理 exactly-once、Dashboard 以 ready_event_id 去重、HTTP 輪詢+表為權威、effectively-once presentation） | **PASS** |
 | 7.9 | IAM edge 稽核（每條 diagram+text 呼叫邊之呼叫者角色具精確權限；**InjectFn→StartExecution/RecoveryGateFn/WorkflowStatusFn 精確 ARN**；**API read handler→Core/Narrative/Publish/Idempotency 唯讀**；無 Lambda invoke 萬用、無 DynamoDB 表寫入萬用、無無 IAM 之 diagram 邊、無無用途之高權限） | **PASS** |
 | 7.10 | Diagram 一致（14 圖語法完整、命名一致、writer 箭頭正確、API 時序正確；無未定義元件；無 RouteReplanner；無 RealtimePublisher 寫 Narrative；無 InjectFn runtime 直呼 DecisionFn；圖8 含 Choice Gate+RecoveryGate+三敘述分支；圖7 core 計算先於 Put；圖6 async HTTP 時序正確） | **PASS** |
-| 7.11 | Testing 一致（P1–P37 齊全、§2 對映皆指向既有屬性；P33 涵蓋 start lease/MARK_RUNNING race/execution fencing/ALREADY_APPLIED/FENCED_STALE_EXECUTION/同任務回應遺失重試/CORE_IDENTITY_CONFLICT/stale running/ENRICHMENT_ONLY/**canonical core_hash**/**async 409 時序**/narrative 分支冪等；Golden ACC_001 triggered[1,2]/invoked art.2 route/applied[7]/citation{1,2,7}/route provisional/ETE 90 provisional；P19 每確認受影響路口 2 警力、scope 確認前總數 unresolved；P27 citation 涵蓋 triggered ∪ applied_formula） | **PASS** |
+| 7.11 | Testing 一致（P1–P37 齊全、§2 對映皆指向既有屬性；P33 涵蓋 start lease/MARK_RUNNING race/execution fencing/ALREADY_APPLIED/FENCED_STALE_EXECUTION/同任務回應遺失重試/CORE_IDENTITY_CONFLICT/stale running/ENRICHMENT_ONLY/**canonical core_hash**/**async 409 時序**/narrative 分支冪等；Golden ACC_001 triggered[1,2]/invoked art.2 route/applied[7]/citation{1,2,7}/route provisional，且依選定 HG-001 政策：event timestamp=22:10、decision cutoff=22:10、common ETE snapshot=22:00、RD_TPE_002=1.00、RD_TPE_004=0.78、RD_TPE_005=0.65、sum=2.43、count=3、average=0.81、base clearance=60、congestion penalty=18.6、ETE=78.6 minutes；P19 每確認受影響路口 2 警力、scope 確認前總數 unresolved；P27 citation 涵蓋 triggered ∪ applied_formula） | **PASS** |
 | 7.12 | 部署生命週期（deploy → source verification → smoke → latency validation → freeze → 保持 Dashboard URL → 維持至評審+主辦確認 → 匯出佐證 → 主辦確認 teardown → post-judging destroy → 殘留檢查；**非**冒煙後即拆除） | **PASS** |
 
 ### 31.4 五項合約修正（FIX 1–5）套用摘要
@@ -2740,7 +2854,7 @@ flowchart TB
 ### 31.5 範圍聲明（本階段未變更/未建立）
 
 - **未修改**：`requirements.md`、`references/cursor_requirements_baseline.md`、Cursor REQ-001..032 原文、Crosswalk 之 requirement title/summary/coverage/OQ 對映、OQ-001..011 內容/狀態、官方 PDF/DOCX/CSV/JSON/SOP、官方數值/布林規則、AWS 服務選型、官方來源 SHA-256、P1–P37 編號、R1–R17 語意。
-- **未建立/未執行**：未新增 AWS 服務、未新增任何 Lambda（僅沿用既有設計；`ApiReadFnRole` 為既有 GET 讀取處理器之角色描述，非新 Lambda）、未產生程式碼、未建立 AWS 資源、未執行部署、未關閉任何 Open Question、未將暫定政策改寫為官方規則。
+- **未建立/未執行**：未新增 AWS 服務、未新增任何 Lambda（僅沿用既有設計；`ApiReadFnRole` 為既有 GET 讀取處理器之角色描述，非新 Lambda）、未產生程式碼、未建立 AWS 資源、未執行部署。未靜默或單方面關閉任何 Open Question；HG-001 明確解決 OQ-001、OQ-002、OQ-003 供實作，並部分解決 OQ-005 的時間維度，其餘未解決維度維持 `OPEN / AWAITING_HOST_REPLY`。未將暫定政策改寫為官方規則。
 - **本階段不產生 `tasks.md`**，亦不附加任何任務清單產生／導覽連結（Stage 2 另行處理）。
 
 ---
