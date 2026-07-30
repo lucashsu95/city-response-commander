@@ -1,10 +1,33 @@
 # Implementation Plan: City Response Commander (智慧交通指揮系統)
 
-Requirements Baseline: LOCKED_PENDING_HOST_REPLIES
-Design Status: APPROVED / FROZEN
-Task Plan Status: APPROVED
-Implementation Authorization: READY_PENDING_CURSOR_CROSS_REVIEW
-Open Questions: OQ-001..OQ-011 remain OPEN
+Requirements Baseline: AMENDED_BY_HG-001
+Design Status: RECOVERED_AND_AMENDED_BY_HG-001_PENDING_READ_ONLY_REVIEW
+Task Plan Status: RECOVERED_AND_AMENDED_BY_HG-001_PENDING_READ_ONLY_REVIEW
+Implementation Authorization: NOT_AUTHORIZED_PENDING_READ_ONLY_REVIEW
+Open Questions: HG-001 resolves OQ-001, OQ-002, and OQ-003 for implementation and partially resolves the time dimension of OQ-005. OQ-004 and OQ-006..OQ-011 remain OPEN / AWAITING_HOST_REPLY.
+
+## HG-001 Organizer Guidance Amendment Record (2026-07-24)
+
+**Authority**: `ORGANIZER_WRITTEN_GUIDANCE`  
+**Implementation uniqueness**: `NON_UNIQUE`  
+**Selected policy class**: `ORGANIZER_GUIDED_TEAM_POLICY`  
+**Runtime official source**: `false`  
+**Official SOP amendment**: `false`  
+**Seven-source manifest member**: `false`
+
+```text
+policy.time_alignment.mode = GLOBAL_AS_OF_EVENT_CUTOFF_LATEST_PRIOR_PER_ENTITY
+policy.affected_road.role = DISPLAY_AND_CONTEXT_ONLY
+policy.ete.affected_set = INCIDENT_PRIMARY_AND_SELECTED_SECONDARY
+policy.ete.snapshot_mode = COMMON_EXACT_TIMESTAMP
+```
+
+OQ-001, OQ-002, and OQ-003 are resolved for implementation by HG-001. OQ-005 is partially resolved for the time dimension only; its station-set scope remains open. OQ-004 and OQ-006..OQ-011 remain open. These organizer-guided policies are deterministic, reproducible, disclosed, and configurable. They are not an eighth official source and do not alter the seven official source hashes.
+
+Golden expectations:
+- ACC_001 ETE = 78.6 minutes using 22:00 common snapshot and RD_TPE_002/RD_TPE_004/RD_TPE_005.
+- EVT_002 uses the 22:15 BL17 observation for event 22:20; 22:30 is never used; affected_road is context only; ETE not applicable.
+- EVT_003 ETE = 41.0 minutes using the 22:30 common snapshot and RD_TPE_007/RD_TPE_011.
 
 ## Overview
 
@@ -18,7 +41,7 @@ Implementation language (from design, not pseudocode): **TypeScript** is the pri
 
 Hard invariants enforced by every applicable task:
 - Deterministic code owns ALL numeric/boolean truth; Bedrock writes text-only fields and is rejected by `SchemaValidator` if it attempts to overwrite core fields (§9).
-- No task closes an Open Question without organizer guidance. OQ-001/002/003 resolved by HG-001 (remain configurable); OQ-004..OQ-011 stay OPEN / AWAITING_HOST_REPLY. Provisional Strategies A–F and PARTIALLY_DEFINED items (OQ-006/007/008/009/011) MUST remain configurable via `ConfigProvider`; a task touching them records this in `provisional_policy_notes` and never bakes a provisional policy in as an official rule.
+- HG-001 resolves OQ-001, OQ-002, and OQ-003 for implementation and partially resolves only the time dimension of OQ-005. OQ-004, OQ-006..OQ-011, and the OQ-005 station-set dimension remain OPEN / AWAITING_HOST_REPLY. Organizer-guided and provisional Strategies remain configurable via `ConfigProvider`; no task may present a team-selected policy as a unique official rule.
 - No task requires an LLM to compute a numeric/boolean truth, and no task guesses an undefined official rule (such cases route to Strategy/config + `manual_confirmation_required`).
 
 Task ID scheme: flat, unique, sequential `TASK-001..TASK-180` (TASK-177 `WhatIfFnRole`, TASK-178 deployment-time KB ingestion, TASK-179 Lambda/IAM/Step-Functions final binding, and TASK-180 shared-stack final integration were added during competition-quality remediation; IDs remain unique and contiguous, physically placed in Phase 3). Test work is embedded per task via `tests_required`, and dedicated deterministic test tasks live in Phase 2 (plus cross-cutting tests in later phases). Every task carries a `delivery_class` (see "Competition Quality Principles"); `optional_marker` is retained ONLY on genuine `BONUS_OPTIONAL` tasks and is NOT a general-purpose skip flag — no core/test/security/latency/source-integrity/smoke work is ever waived. Test / security / latency / source-integrity / smoke tasks are `MANDATORY_ACCEPTANCE_GATE` (release-blocking), not optional. `CHECKPOINT` lines are not tasks and are excluded from the dependency graph and matrices.
@@ -61,7 +84,7 @@ Ten differentiators that make this entry competitive. Each is concrete and prova
 
 ## Phase 0 — Repository & Guardrails
 
-- [x] TASK-001 Initialize monorepo workspace and folder structure
+- [ ] TASK-001 Initialize monorepo workspace and folder structure
   - objective: Create the single-repository layout (IaC + application + shared) that all later phases build on, with workspace tooling wired so packages resolve each other.
   - requirements_covered: REQ-025, REQ-032 (DELIVERABLE: single GitHub repo), R-supporting (all)
   - design_sections: §6, §24 (stack split), §25.1 (single repository), §23
@@ -86,7 +109,7 @@ Ten differentiators that make this entry competitive. Each is concrete and prova
   - competition_quality_floor: Single-repo workspace resolves and typechecks across all packages (IaC + app + shared) with no missing-package errors; folder layout matches the design; no ad-hoc structure.
   - demo_or_evidence_output: `npm`/`pnpm install` + `npm run typecheck` green across workspaces; directory tree present as listed.
 
-- [x] TASK-002 Fix TypeScript/Python boundary and shared build conventions
+- [ ] TASK-002 Fix TypeScript/Python boundary and shared build conventions
   - objective: Declare TypeScript as the primary language and define the exact, narrow conditions under which a package boundary may be Python, so PBT libraries and toolchains are unambiguous downstream.
   - requirements_covered: REQ-025 (DELIVERABLE), R-supporting (all)
   - design_sections: §4.13, §22.2 (fast-check / Hypothesis)
@@ -109,12 +132,12 @@ Ten differentiators that make this entry competitive. Each is concrete and prova
   - competition_quality_floor: TS declared primary; `fast-check` the PBT library; the only allowed Python boundary defined and CI-enforced; no mixed-language package.
   - demo_or_evidence_output: Committed language-boundary doc + CI check that fails on a seeded mixed-language fixture.
 
-- [x] TASK-003 Implement shared-schemas package (types, enums, schema_version)
+- [ ] TASK-003 Implement shared-schemas package (types, enums, schema_version)
   - objective: Provide the canonical TypeScript types/enums shared across domain, backend, and frontend so contracts (§10, §12, §13) are defined once.
   - requirements_covered: REQ-001, REQ-011, REQ-012..REQ-022, R1, R13, R14
   - design_sections: §10 (all data models), §12, §13
-  - components: shared-schemas (types for DecisionCore/DecisionNarrative/PublishRecord/IdempotencyTable/RouteCandidate/ETEResult/EvidenceTrace/PolicyMetadata)
-  - files_or_modules_expected: `packages/shared-schemas/src/index.ts`, `.../decision_core.ts`, `.../decision_narrative.ts`, `.../publish_record.ts`, `.../idempotency.ts`, `.../route_candidate.ts`, `.../ete.ts`, `.../evidence.ts`, `.../policy_metadata.ts`, `.../enums.ts`
+  - components: shared-schemas (types for DecisionCore/DecisionNarrative/PublishRecord/IdempotencyTable/RouteCandidate/SelectedSnapshot/AffectedRoadContext/ETEResult/EvidenceTrace/PolicyMetadata)
+  - files_or_modules_expected: `packages/shared-schemas/src/index.ts`, `.../decision_core.ts`, `.../decision_narrative.ts`, `.../publish_record.ts`, `.../idempotency.ts`, `.../route_candidate.ts`, `.../selected_snapshot.ts`, `.../affected_road_context.ts`, `.../ete.ts`, `.../evidence.ts`, `.../policy_metadata.ts`, `.../enums.ts`
   - dependencies: [TASK-001]
   - implementation_steps:
     1. Encode enums: `narrative_type` (REPORT/PUBLIC_ALERT/EXPLANATION), `IdempotencyTable.status` (starting/running/completed/start_failed/processing_failed), `recovery_stage`, `recovery_mode`, `evidence_source`, `core_write_status`, `status_action_result`.
@@ -126,6 +149,10 @@ Ten differentiators that make this entry competitive. Each is concrete and prova
   - failure_cases: reject compilation if an LLM-writable field overlaps a core field name set.
   - done_definition: Package builds; downstream packages can import all model types.
   - provisional_policy_notes: `PolicyMetadata` type carries `classification=PROVISIONAL_TEAM_POLICY`/`status=AWAITING_HOST_REPLY` and all Strategy A–F mode fields as configurable enums (not hard-coded).
+  - hg001_amendment:
+    - Add `decision_cutoff_timestamp`, `observation_timestamp`, `staleness_minutes`, `selection_mode`, and `guidance_id` to snapshot contracts.
+    - Add `AffectedRoadContext` with `role=DISPLAY_AND_CONTEXT_ONLY`, `mandatory_action=false`, and no ETE/article trigger authority.
+    - Add ETE common-snapshot status, affected road roles, per-road inputs, lower bound, and manual-confirmation fields.
   - aws_services_touched: none (pure domain)
   - security_or_iam_notes: none
   - delivery_class: MANDATORY_IMPLEMENTATION
@@ -133,7 +160,7 @@ Ten differentiators that make this entry competitive. Each is concrete and prova
   - competition_quality_floor: Every §10 data model has an exported type; enums match design exactly (5 status values, 3 narrative_type values); no `LLM-writable` marker on any core numeric/boolean field.
   - demo_or_evidence_output: Package builds; type-level + enum-completeness tests green; downstream packages import all model types.
 
-- [x] TASK-004 Implement ConfigProvider interface and LocalFileConfigProvider
+- [ ] TASK-004 Implement ConfigProvider interface and LocalFileConfigProvider
   - objective: Provide the single entry point for configuration (`get`/`getAll`) with the offline local implementation so LOCAL_MOCK runs with zero AWS calls (§23.1).
   - requirements_covered: REQ-024 (DELIVERABLE hosting config), R-supporting (all)
   - design_sections: §23.1, §4.12
@@ -156,7 +183,7 @@ Ten differentiators that make this entry competitive. Each is concrete and prova
   - competition_quality_floor: `LocalFileConfigProvider` resolves the full config schema fully offline (zero AWS SDK on the local path); a missing required key yields a typed error, never a silent default.
   - demo_or_evidence_output: Unit tests for key resolution, prefix listing, env-override precedence + a test proving no network access.
 
-- [x] TASK-005 Implement SsmConfigProvider and environment profile selection
+- [ ] TASK-005 Implement SsmConfigProvider and environment profile selection
   - objective: Provide the AWS-backed configuration implementation and the mechanism that selects LOCAL_MOCK / PERSONAL_AWS_DEV / COMPETITION_AWS, sharing one schema across all three (§23).
   - requirements_covered: REQ-024 (DELIVERABLE), R-supporting (all)
   - design_sections: §23, §23.1, §4.12
@@ -179,8 +206,8 @@ Ten differentiators that make this entry competitive. Each is concrete and prova
   - competition_quality_floor: Both providers satisfy one interface and identical key set; SSM unavailable → fail-closed typed error (no silent fallback to hard-coded values); correct provider selected per profile.
   - demo_or_evidence_output: Unit tests with a mocked SSM client + a contract test proving both providers expose identical keys.
 
-- [x] TASK-006 Define configuration schema keys and provisional policy knobs
-  - objective: Enumerate every configurable key (endpoints, model IDs, buckets, feature flags, and all `policy.*` Strategy/OQ knobs) so provisional policies stay switchable without touching the Rule Engine (§30).
+- [ ] TASK-006 Define configuration schema keys and provisional policy knobs
+  - objective: Enumerate every configurable key (endpoints, model IDs, buckets, feature flags, and all `policy.*` Strategy/OQ knobs including HG-001 selected defaults) so provisional policies stay switchable without touching the Rule Engine (§30).
   - requirements_covered: R-supporting (all), REQ-005/013/016/018/019/022 (policy-dependent behavior)
   - design_sections: §23.1 (configurable keys), §11 (Strategies A–F), §30
   - components: config schema definition
@@ -195,6 +222,10 @@ Ten differentiators that make this entry competitive. Each is concrete and prova
   - failure_cases: unknown/mis-typed key → validation error; out-of-enum policy mode → rejected.
   - done_definition: Config schema enumerates all keys and enforces types.
   - provisional_policy_notes: This task is the central registry that keeps OQ-001..005/010 (Strategies A–F) and OQ-006/007/008/009/011 configurable; no default is presented as official.
+  - hg001_amendment:
+    - Set active defaults: `GLOBAL_AS_OF_EVENT_CUTOFF_LATEST_PRIOR_PER_ENTITY`, `DISPLAY_AND_CONTEXT_ONLY`, `INCIDENT_PRIMARY_AND_SELECTED_SECONDARY`, and `COMMON_EXACT_TIMESTAMP`.
+    - Classify selected HG-001 values as `ORGANIZER_GUIDED_TEAM_POLICY`, `configurable=true`, `guidance_id=HG-001`.
+    - Keep OQ-005 station-set scope and OQ-004/OQ-006..OQ-011 configurable/open.
   - aws_services_touched: none (pure domain)
   - security_or_iam_notes: Secret-typed keys are referenced by name only, resolved via Secrets Manager, never inlined.
   - delivery_class: MANDATORY_IMPLEMENTATION
@@ -202,7 +233,7 @@ Ten differentiators that make this entry competitive. Each is concrete and prova
   - competition_quality_floor: Every §23.1 key present and typed; each Strategy A–F has a mode key with ≥2 allowed values; provisional defaults never presented as official; central registry keeps OQ-001..011 policies switchable via config only.
   - demo_or_evidence_output: Schema-completeness test cross-checking the §23.1 key list + enum-bound validation tests.
 
-- [x] TASK-007 Implement OfficialSourceManifest, SHA-256 verifier, and 7-source STOP gate
+- [ ] TASK-007 Implement OfficialSourceManifest, SHA-256 verifier, and 7-source STOP gate
   - objective: Compute and verify SHA-256 for the seven official sources at load/boot and STOP the decision pipeline on any mismatch, never using an unknown version silently (§10.0, §15, §21).
   - requirements_covered: REQ-032, R1 (authoritative read), REQ-001
   - design_sections: §10.0, §10.0a, §10.0b (7 expected hashes), §15, §21 (source hash verification)
@@ -226,7 +257,7 @@ Ten differentiators that make this entry competitive. Each is concrete and prova
   - competition_quality_floor: 7 official sources with exact UPPERCASE SHA-256; any mismatch/missing/unreadable → STOP decisioning (never silently use an unknown version); 5-file runtime vs 7-source provenance distinguished; 命題解說 = DOCX only, PDF = 命題文件 only.
   - demo_or_evidence_output: Unit tests (verified/mismatch/missing/unreadable) + STOP-gate abort test (TASK-056); `source_manifest_hash` exposed to DecisionCore.
 
-- [x] TASK-008 Implement DerivedArtifactManifest (mirrors are NOT source of truth)
+- [ ] TASK-008 Implement DerivedArtifactManifest (mirrors are NOT source of truth)
   - objective: Register `.md`/`docx_extracted.txt` mirrors as `derived_searchable_mirror` in a separate manifest so they can never substitute for the official PDF/DOCX/SOP/CSV/JSON (§10.0c).
   - requirements_covered: REQ-032, R1
   - design_sections: §10.0c
@@ -249,7 +280,7 @@ Ten differentiators that make this entry competitive. Each is concrete and prova
   - competition_quality_floor: Mirrors registered only as `derived_searchable_mirror`; `derived_searchable_mirror` is never a valid `OfficialSourceManifest.source_type`; the decision path cannot read a mirror as authority.
   - demo_or_evidence_output: Unit test asserting mirror rejection from the official manifest + a compile/lint guard test blocking mirror imports into the decision path.
 
-- [x] TASK-009 Set up lint and format tooling
+- [ ] TASK-009 Set up lint and format tooling
   - objective: Establish consistent linting/formatting across all packages to keep the deterministic/Bedrock boundary and naming conventions enforceable.
   - requirements_covered: REQ-025 (DELIVERABLE quality)
   - design_sections: §22 (test architecture support)
@@ -272,7 +303,7 @@ Ten differentiators that make this entry competitive. Each is concrete and prova
   - competition_quality_floor: Repo-wide lint/format; a custom rule mechanically flags any renderer write to an `LLM-prohibited` core field (§9 boundary guard); not skippable.
   - demo_or_evidence_output: Lint runs repo-wide; custom-rule unit test triggers on a renderer-writing-a-core-field fixture (positive/negative).
 
-- [x] TASK-010 Set up test frameworks (fast-check for TS, Hypothesis for Python)
+- [ ] TASK-010 Set up test frameworks (fast-check for TS, Hypothesis for Python)
   - objective: Install and configure the PBT and unit-test frameworks so §22.1 properties run with ≥100 iterations and the required labels.
   - requirements_covered: R-supporting (all), REQ-032
   - design_sections: §22.1, §22.2
@@ -295,7 +326,7 @@ Ten differentiators that make this entry competitive. Each is concrete and prova
   - competition_quality_floor: PBT + unit frameworks operational; default `numRuns >= 100`; a label helper stamps `Feature: city-response-commander, Property {n}: {text}` on every property test; no framework built from scratch.
   - demo_or_evidence_output: A sample property test runs ≥100 iterations and emits the required label; root test command works.
 
-- [x] TASK-011 Establish CI skeleton (LOCAL_MOCK full deterministic run, no credentials)
+- [ ] TASK-011 Establish CI skeleton (LOCAL_MOCK full deterministic run, no credentials)
   - objective: Create CI that runs all deterministic unit/property/golden tests in LOCAL_MOCK with no AWS calls and no credentials in the repo (§22.3, §23).
   - requirements_covered: REQ-025, REQ-032 (DELIVERABLE)
   - design_sections: §22.3, §23, §23.1
@@ -318,7 +349,7 @@ Ten differentiators that make this entry competitive. Each is concrete and prova
   - competition_quality_floor: CI runs the full deterministic unit/property/golden suite in LOCAL_MOCK with zero AWS calls and no credentials; a secret-scan step fails on committed credentials; any AWS call in the deterministic job fails CI.
   - demo_or_evidence_output: Green CI on the scaffold; deterministic test job requires no AWS credentials; secret-scan on a seeded fixture.
 
-- [x] TASK-012 Enforce no-credentials-in-repo guard and .gitignore hygiene
+- [ ] TASK-012 Enforce no-credentials-in-repo guard and .gitignore hygiene
   - objective: Prevent secrets/artifacts from entering the repository and codify the "no hard-coded account/region/keys" rule (§17, §23).
   - requirements_covered: REQ-025 (DELIVERABLE), R-supporting (security)
   - design_sections: §17, §23, §4.12
@@ -347,7 +378,7 @@ CHECKPOINT A (not a task): Ensure all Phase 0 tests pass, ask the user if questi
 
 ## Phase 1 — Deterministic Domain Core (no Bedrock)
 
-- [x] TASK-013 Parse city_traffic_flow.csv into RawTrafficRecord
+- [ ] TASK-013 Parse city_traffic_flow.csv into RawTrafficRecord
   - objective: Read the traffic CSV read-only into typed `RawTrafficRecord`, preserving official fields exactly (§10.1).
   - requirements_covered: REQ-001, REQ-011, R1
   - design_sections: §10.1, §15.1, §3.1
@@ -370,7 +401,7 @@ CHECKPOINT A (not a task): Ensure all Phase 0 tests pass, ask the user if questi
   - competition_quality_floor: Read-only parse of all 15 segments; `Saturation_Score` a number in 0..1; `timestamp_raw` byte-identical to source; schema mismatch aborts (`insufficient_data`) — no fabrication, no dropped rows.
   - demo_or_evidence_output: Unit tests (well-formed + malformed rows); typed `RawTrafficRecord[]` for 15 segments; feeds P2/P34.
 
-- [x] TASK-014 Parse signaling_crowd_density.csv and implement PercentParser
+- [ ] TASK-014 Parse signaling_crowd_density.csv and implement PercentParser
   - objective: Read the crowd CSV into `RawCrowdRecord` and parse `Roaming_User_Pct` strings to `roaming_pct_value` (e.g., "30%"→0.30) (§10.2, R1.3).
   - requirements_covered: REQ-001, REQ-010, REQ-019, R1
   - design_sections: §10.2, §8 (PercentParser), §3.1
@@ -393,7 +424,7 @@ CHECKPOINT A (not a task): Ensure all Phase 0 tests pass, ask the user if questi
   - competition_quality_floor: `roaming_pct_value` exact for "5%"/"30%"/"45%"; original `Roaming_User_Pct` immutable; `User_Count` int / `Growth_Rate` number validated; unparseable percent → typed error, no fabrication.
   - demo_or_evidence_output: Unit tests + feeds P1 (percent round-trip).
 
-- [x] TASK-015 Parse road_network_geometry.json into RoadSegment and load RoadNetworkModel
+- [ ] TASK-015 Parse road_network_geometry.json into RoadSegment and load RoadNetworkModel
   - objective: Read the road network JSON into `RoadSegment` records and load them into `RoadNetworkModel` (§10.3, R7).
   - requirements_covered: REQ-026, REQ-027, REQ-028, R7
   - design_sections: §10.3, §9.4 (geometry), §15.1
@@ -416,7 +447,7 @@ CHECKPOINT A (not a task): Ensure all Phase 0 tests pass, ask the user if questi
   - competition_quality_floor: `intersections` order (upstream→downstream) and `alternatives` order preserved verbatim; empty `nearby_stations` kept empty (never filled); malformed geometry → abort, no fabrication.
   - demo_or_evidence_output: Unit tests (order-preserving, empty nearby) + feeds P13/P14/P15.
 
-- [x] TASK-016 Parse live_incidents.json into Incident
+- [ ] TASK-016 Parse live_incidents.json into Incident
   - objective: Read incidents JSON into typed `Incident` records including optional `affected_road` (only EVT_002) (§10.4).
   - requirements_covered: REQ-003, REQ-012, REQ-016, R5, R6
   - design_sections: §10.4, §3.1
@@ -439,7 +470,7 @@ CHECKPOINT A (not a task): Ensure all Phase 0 tests pass, ask the user if questi
   - competition_quality_floor: The three official events parse; `affected_road` present only where provided (EVT_002), semantics deferred to Strategy B (not interpreted here); `severity ∈ {Critical,High,Medium}`; unknown severity → typed error.
   - demo_or_evidence_output: Unit tests for ACC_001/EVT_002/EVT_003 shapes.
 
-- [x] TASK-017 Load emergency_traffic_sop.txt with article chunking metadata
+- [ ] TASK-017 Load emergency_traffic_sop.txt with article chunking metadata
   - objective: Load the 7-article SOP text and split it per article (article_no metadata) to support precise citation and S3 fallback retrieval (§14.1).
   - requirements_covered: REQ-005, REQ-020, R5, R12
   - design_sections: §14.1, §3.1, §10.0b
@@ -462,7 +493,7 @@ CHECKPOINT A (not a task): Ensure all Phase 0 tests pass, ask the user if questi
   - competition_quality_floor: Exactly 7 article chunks with correct `article_no`; verbatim text preserved for citation source location; lookup by `article_no` for the KB S3 fallback; article count != 7 → abort/flag.
   - demo_or_evidence_output: Unit test (7 chunks, verbatim) + feeds RAG citation tests (Phase 6).
 
-- [x] TASK-018 Implement timestamp normalization (raw immutable, normalized, display)
+- [ ] TASK-018 Implement timestamp normalization (raw immutable, normalized, display)
   - objective: Produce `timestamp_normalized` (for comparison) and `timestamp_display` (`YYYY-MM-DD HH:MM`) while `timestamp_raw` is never overwritten (§10.1/§10.2, R11.5).
   - requirements_covered: REQ-019, R1, R11
   - design_sections: §10.1, §10.2, §9.4 (art.6 format)
@@ -485,7 +516,7 @@ CHECKPOINT A (not a task): Ensure all Phase 0 tests pass, ask the user if questi
   - competition_quality_floor: `timestamp_display` always `YYYY-MM-DD HH:MM`; `timestamp_normalized` denotes the same instant as raw; `timestamp_raw` never overwritten; unparseable timestamp → typed error, no guessing.
   - demo_or_evidence_output: Unit tests + feeds P34/P21.
 
-- [x] TASK-019 Implement DataIngestionService orchestration (load + verify + read-only)
+- [ ] TASK-019 Implement DataIngestionService orchestration (load + verify + read-only)
   - objective: Compose the five parsers with the manifest STOP gate into one read-only ingestion entry point (§8, §15.1, Figure 4).
   - requirements_covered: REQ-001, REQ-032, R1
   - design_sections: §8, §15.1, §10.0, Figure 4
@@ -508,31 +539,35 @@ CHECKPOINT A (not a task): Ensure all Phase 0 tests pass, ask the user if questi
   - competition_quality_floor: Five parsers composed behind the manifest STOP gate into one read-only ingestion entry point; load failure / hash mismatch → `insufficient_data`, no fabrication; official data never mutated.
   - demo_or_evidence_output: Orchestration unit tests + STOP-gate integration (feeds P2 read-only invariance).
 
-- [x] TASK-020 Implement SnapshotSelector (Strategy A / TimeAlignmentStrategy)
-  - objective: Select the per-entity data row aligned to an event timestamp using the pluggable time-alignment strategy, never using post-event rows as the primary basis (§11.1, R1.5).
+- [ ] TASK-020 Implement SnapshotSelector (Strategy A / TimeAlignmentStrategy)
+  - objective: Implement HG-001 event-cutoff/latest-prior selection per entity, never using future rows, while exposing observation timestamp, staleness, provenance, and insufficient-data behavior.
   - requirements_covered: REQ-001, REQ-004, REQ-009, R1
   - design_sections: §11.1, §10.5, §8
   - components: SnapshotSelector, TimeAlignmentStrategy (A)
-  - files_or_modules_expected: `packages/domain/src/strategies/time_alignment_strategy.ts` (interface + default `exact_or_latest_prior_per_entity` + `last_known_value_with_visible_staleness` + formal `insufficient_data`), `packages/domain/src/snapshot/snapshot_selector.ts`
+  - files_or_modules_expected: `packages/domain/src/strategies/time_alignment_strategy.ts`, `packages/domain/src/snapshot/snapshot_selector.ts`
   - dependencies: [TASK-019, TASK-006]
   - implementation_steps:
-    1. Define `TimeAlignmentStrategy.select(entity_id, event_timestamp) -> SelectedSnapshot`.
-    2. Implement default: exact row else latest row with `Timestamp <= event_timestamp` per entity; same station's User_Count/Growth_Rate/Roaming from the same row.
-    3. Implement staleness fields and `insufficient_data` when no legal row within configured `max_staleness_minutes`.
-    4. Read mode/threshold from `policy.time_alignment.*`.
-  - acceptance_criteria: Never selects a post-event row as primary; `SelectedSnapshot` carries `exact_match`/`staleness_minutes`/`data_status`; mode is config-driven.
+    1. Set `decision_cutoff_timestamp = event.timestamp`.
+    2. For each required entity, select the latest row whose `Timestamp <= decision_cutoff_timestamp`; an exact row is naturally selected when present.
+    3. Take all fields for one entity from the same selected row.
+    4. Persist `entity_id`, cutoff, `observation_timestamp`, `exact_match`, `staleness_minutes`, `selection_mode`, `data_status`, and `guidance_id=HG-001`.
+    5. Never use future, nearest-future, interpolated, or fabricated data.
+    6. If no prior row exists, return `INSUFFICIENT_DATA` and `manual_confirmation_required=true`.
+  - acceptance_criteria: Active mode is `GLOBAL_AS_OF_EVENT_CUTOFF_LATEST_PRIOR_PER_ENTITY`; all components share one logical event cutoff; no selected row is after cutoff; same-entity fields are from one row; missing prior data fails closed.
   - tests_required: unit + P3 in Phase 2; policy-switch test (TASK-057).
-  - failure_cases: no legal row → `insufficient_data`/`manual_confirmation_required` (§21), never fabricate.
-  - done_definition: Strategy A selects aligned snapshots and is switchable via config.
-  - provisional_policy_notes: Strategy A = OQ-001, RESOLVED_FOR_IMPLEMENTATION_BY_ORGANIZER_GUIDANCE (HG-001); mode is a config knob (`policy.time_alignment.mode`), never presented as official; remains configurable.
+  - failure_cases: no legal prior row → `INSUFFICIENT_DATA`; never fall forward to a post-event row.
+  - done_definition: Strategy A selects reproducible as-of snapshots and exposes full timing evidence.
+  - provisional_policy_notes: OQ-001 is `RESOLVED_FOR_IMPLEMENTATION_BY_ORGANIZER_GUIDANCE`; the selected policy remains configurable because HG-001 is NON_UNIQUE.
+  - hg001_amendment:
+    - ETE uses TASK-031 common-exact-timestamp selection rather than mixed latest-prior road timestamps.
   - aws_services_touched: none (pure domain)
   - security_or_iam_notes: none
   - delivery_class: MANDATORY_IMPLEMENTATION
   - judging_criteria_contribution: technical_feasibility, completeness
-  - competition_quality_floor: Selected row `Timestamp <= event_timestamp` and per-entity latest prior; a station's User_Count/Growth_Rate/Roaming taken from one row; no legal row → `insufficient_data` (never an event-after row); Strategy A configurable and provisional-marked.
-  - demo_or_evidence_output: Feeds P3; policy-switch verification (TASK-057); provisional flag surfaced.
+  - competition_quality_floor: Latest-prior per entity, no future data, same-row fields, explicit staleness/provenance, fail-closed missing data.
+  - demo_or_evidence_output: P3 evidence showing event cutoff, observation timestamps, staleness, and rejection of future rows.
 
-- [x] TASK-021 Implement RoadNetworkModel semantics (one-way alternatives, empty nearby, upstream/downstream)
+- [ ] TASK-021 Implement RoadNetworkModel semantics (one-way alternatives, empty nearby, upstream/downstream)
   - objective: Provide geometry query methods honoring one-way `alternatives`, empty `nearby_stations` as normal, and `intersections` upstream→downstream ordering with `flow_direction` (§9.4, R7).
   - requirements_covered: REQ-026, REQ-027, REQ-028, R7
   - design_sections: §10.3, §9.4, §11.5 (used by anchor)
@@ -555,7 +590,7 @@ CHECKPOINT A (not a task): Ensure all Phase 0 tests pass, ask the user if questi
   - competition_quality_floor: `alternatives` one-way (never assume B→A, no symmetric graph search); empty `nearby_stations` kept as empty set; upstream/downstream from `intersections` order + `flow_direction`.
   - demo_or_evidence_output: Feeds P13/P14/P15.
 
-- [x] TASK-022 Implement ClassificationEngine (A/B grading)
+- [ ] TASK-022 Implement ClassificationEngine (A/B grading)
   - objective: Grade every segment A iff `>=0.95`, B iff `0.85<=score<0.95`, else neither, applied identically to all 15 segments (§9.4 art.1, R2).
   - requirements_covered: REQ-011, R2
   - design_sections: §9.4 (art.1 grading), §10.11a (classifications)
@@ -577,7 +612,7 @@ CHECKPOINT A (not a task): Ensure all Phase 0 tests pass, ask the user if questi
   - competition_quality_floor: A iff `Saturation>=0.95`; B iff `0.85<=score<0.95`; else non-A/B; consistent across all 15 segments; exact official boundaries (no drift, no rounding shortcuts).
   - demo_or_evidence_output: Feeds P4; boundary tests (TASK-052) at 0.8499/0.85/0.9499/0.95.
 
-- [x] TASK-023 Implement RuleEngine article1 (trigger segments, measures, invoked_procedures)
+- [ ] TASK-023 Implement RuleEngine article1 (trigger segments, measures, invoked_procedures)
   - objective: Encode SOP-1 measures for RD_TPE_001/002 (B-level actions; A-level additionally invokes `article2_alternative_route_guidance` recorded in `invoked_procedures`), keeping A-level alone from adding art.2 to `triggered_articles` (§9.4 art.1, R3).
   - requirements_covered: REQ-011, R3
   - design_sections: §9.4 (art.1), §10.11a (art1_measures/invoked_procedures)
@@ -600,7 +635,7 @@ CHECKPOINT A (not a task): Ensure all Phase 0 tests pass, ask the user if questi
   - competition_quality_floor: RD_TPE_001/002 — B → long-green timing + that segment's alternatives green +25% + clear intersections; A additionally INVOKES `article2_alternative_route_guidance` (recorded in `invoked_procedures`); A alone does NOT put 2 in `triggered_articles` (art.2 trigger requires its own 3 conditions).
   - demo_or_evidence_output: Feeds P5; ACC_001 golden (invoked_procedures + art.1 measures).
 
-- [x] TASK-024 Implement RuleEngine article2 trigger and candidate qualification (3-AND)
+- [ ] TASK-024 Implement RuleEngine article2 trigger and candidate qualification (3-AND)
   - objective: Encode SOP-2 trigger (status∈{Closed,Blocked,Restricted} AND severity∈{High,Critical} AND affected_segment starts with RD_) and candidate qualification as exactly three ANDs (capacity>=1000, direct intersection, upstream), with Saturation NOT a filter (§9.4 art.2, R6).
   - requirements_covered: REQ-012, REQ-013, R6
   - design_sections: §9.4 (art.2), §10.8 (RouteCandidate)
@@ -623,7 +658,7 @@ CHECKPOINT A (not a task): Ensure all Phase 0 tests pass, ask the user if questi
   - competition_quality_floor: art.2 triggers iff `status∈{Closed,Blocked,Restricted}` AND `severity∈{High,Critical}` AND `affected_segment` starts `RD_`; candidate qualification is EXACTLY 3 AND (`capacity_vph>=1000`, direct intersection, upstream); Saturation is NEVER a 4th hard filter; `BS_` routes to art.3.
   - demo_or_evidence_output: Feeds P8/P9; ACC_001 golden; TC-SOP2 capacity boundary (999/1000).
 
-- [x] TASK-025 Implement EvacuationSelector (lowest-saturation primary, downstream secondary, congested-maintain, no-candidate)
+- [ ] TASK-025 Implement EvacuationSelector (lowest-saturation primary, downstream secondary, congested-maintain, no-candidate)
   - objective: Among qualified candidates pick the lowest `Saturation_Score` as primary, list downstream intersecting arterials as secondary, maintain a congested primary (>=0.85) with long-green + public-transit note, and record "查無合規替代路段" when none qualify (§9.4 art.2, §11.7, R6).
   - requirements_covered: REQ-013, REQ-014, REQ-005, R5, R6
   - design_sections: §9.4 (art.2), §11.7 (OQ-008), §10.8
@@ -640,6 +675,9 @@ CHECKPOINT A (not a task): Ensure all Phase 0 tests pass, ask the user if questi
   - failure_cases: no legal alternative → documented, no fabrication (§21); anchor unresolved → no primary selected (defer to TASK-026).
   - done_definition: Evacuation selection + congestion handling + no-candidate path implemented.
   - provisional_policy_notes: OQ-007 (no legal alternative official response) PARTIALLY_DEFINED: only documents absence + suggests public transit; OQ-008 disclosure per §11.7; both remain configurable.
+  - hg001_amendment:
+    - Persist selected primary and selected secondary routes in deterministic order so TASK-031 can construct the ETE affected set.
+    - Route saturation comparisons use TASK-020 latest-prior observations under the same event cutoff.
   - aws_services_touched: none (pure domain)
   - security_or_iam_notes: none
   - delivery_class: MANDATORY_IMPLEMENTATION
@@ -647,7 +685,7 @@ CHECKPOINT A (not a task): Ensure all Phase 0 tests pass, ask the user if questi
   - competition_quality_floor: Primary = lowest Saturation among qualified candidates; downstream direct intersections → secondary only; congested primary (`>=0.85`) is MAINTAINED + long-green + report note + public-transit recommendation; no qualifying candidate → "no compliant alternative" (never fabricate a road). OQ-008 disclosure stays configurable.
   - demo_or_evidence_output: Feeds P9/P10/P11/P12; ACC_001 golden (primary RD_TPE_004 / secondary RD_TPE_005, PROVISIONAL).
 
-- [x] TASK-026 Implement IncidentAnchorResolutionStrategy (Strategy D) and conservative fallback
+- [ ] TASK-026 Implement IncidentAnchorResolutionStrategy (Strategy D) and conservative fallback
   - objective: Map `Incident.location` text to a structured anchor (intersection, direction, upstream/downstream) for art.2, and when it cannot be uniquely resolved, return `manual_confirmation_required` with no primary and unranked direct intersections (§11.5, R6).
   - requirements_covered: REQ-013, REQ-028, R6, R7
   - design_sections: §11.5, §10.8a (IncidentAnchor)
@@ -671,7 +709,7 @@ CHECKPOINT A (not a task): Ensure all Phase 0 tests pass, ask the user if questi
   - competition_quality_floor: Anchor uniquely resolved from `location` text → upstream/downstream via RoadNetworkModel + Strategy D (NOT time-alignment Strategy A); if not uniquely resolvable → `manual_confirmation_required`, `primary_evacuation=null`, no auto-ranking (all `unranked_direct_intersection`), no fabricated up/down; provisional and configurable.
   - demo_or_evidence_output: Feeds P30; policy-switch verification (TASK-057).
 
-- [x] TASK-027 Implement RuleEngine article3 (SOP-3 MRT shuttle)
+- [ ] TASK-027 Implement RuleEngine article3 (SOP-3 MRT shuttle)
   - objective: Encode SOP-3 OR-trigger for BS_MRT_BL17 (Growth_Rate>0.30 OR User_Count>25000) with exact boundaries and the shuttle actions (§9.4 art.3, R8).
   - requirements_covered: REQ-016, R8
   - design_sections: §9.4 (art.3), §10.7
@@ -693,7 +731,7 @@ CHECKPOINT A (not a task): Ensure all Phase 0 tests pass, ask the user if questi
   - competition_quality_floor: art.3 triggers iff `BL17 Growth_Rate>0.30` OR `User_Count>25000` (=25000 not, =25001 yes, =0.30 not); actions include skip-stop + bus shuttle + walk to BS_MRT_BL18; EVT_002 must be COMPUTED, never assumed triggered.
   - demo_or_evidence_output: Feeds P16; TC-SOP3 boundaries; EVT_002 golden (must-compute).
 
-- [x] TASK-028 Implement RuleEngine article4 (SOP-4 dome dispersal)
+- [ ] TASK-028 Implement RuleEngine article4 (SOP-4 dome dispersal)
   - objective: Encode SOP-4: mark dispersal iff BS_TPE_DOME historical peak>=30000 AND current Growth_Rate<=-0.20, then proactively invoke art.3 (§9.4 art.4, R9).
   - requirements_covered: REQ-017, R9
   - design_sections: §9.4 (art.4), §10.7
@@ -715,7 +753,7 @@ CHECKPOINT A (not a task): Ensure all Phase 0 tests pass, ask the user if questi
   - competition_quality_floor: Dispersal iff DOME historical peak `>=30000` AND current `Growth_Rate<=-0.20`; once marked, proactively links the art.3 shuttle mechanism.
   - demo_or_evidence_output: Feeds P17; DOME golden (peak 40000, growth −0.31).
 
-- [x] TASK-029 Implement RuleEngine article5 (SOP-5) and AffectedIntersectionScopeStrategy (E)
+- [ ] TASK-029 Implement RuleEngine article5 (SOP-5) and AffectedIntersectionScopeStrategy (E)
   - objective: Encode SOP-5 trigger (type=Power_Failure OR description contains 號誌失效/故障) and manual-command output with official `police_per_intersection=2`, leaving affected-intersection scope unresolved by default (§9.4 art.5, §11.6, R10).
   - requirements_covered: REQ-018, R10
   - design_sections: §9.4 (art.5), §11.6, §10.9a
@@ -739,77 +777,84 @@ CHECKPOINT A (not a task): Ensure all Phase 0 tests pass, ask the user if questi
   - competition_quality_floor: art.5 triggers iff `type=Power_Failure` OR description contains 號誌失效/故障; `police_per_intersection=2` (official); affected scope default `unresolved_manual_confirmation` → `affected_intersection_count`/`total_police=unresolved`, `manual_confirmation_required=true`; NEVER multiply all segment intersections × 2; Strategy E configurable.
   - demo_or_evidence_output: Feeds P18/P19/P31; EVT_003 golden (CMS "松高路 號誌故障，請依現場指揮通行").
 
-- [x] TASK-030 Implement RuleEngine article6 (SOP-6 trigger) and MultilingualScopeStrategy (F)
-  - objective: Encode SOP-6 multilingual trigger (any in-scope station roaming_pct_value>=0.30 at current snapshot) with the station-set/time-snapshot scope pluggable via Strategy F (§9.4 art.6, §11.8, R11).
+- [ ] TASK-030 Implement RuleEngine article6 (SOP-6 trigger) and MultilingualScopeStrategy (F)
+  - objective: Encode SOP-6 trigger using latest-prior observations at the event cutoff while keeping the station-set dimension configurable and open.
   - requirements_covered: REQ-010, REQ-019, R11
   - design_sections: §9.4 (art.6), §11.8, §14.4
   - components: RuleEngine.article6, MultilingualTrigger, MultilingualScopeStrategy (F)
   - files_or_modules_expected: `packages/domain/src/rule_engine/article6.ts`, `packages/domain/src/rule_engine/multilingual_trigger.ts`, `packages/domain/src/strategies/multilingual_scope_strategy.ts`
   - dependencies: [TASK-020, TASK-014, TASK-006]
   - implementation_steps:
-    1. Strategy F default `current_snapshot_all_available_stations` selects the station set + snapshot; other modes configurable.
-    2. `MultilingualTrigger` = any in-scope `roaming_pct_value >= 0.30` at the current (Strategy A) snapshot; never treat historical peak as current.
-    3. Set `multilingual_required` boolean (LLM-prohibited).
-  - acceptance_criteria: Boundary 30% triggers; scope is config-driven; historical-only station does not trigger current.
-  - tests_required: unit + P20/P32 in Phase 2; boundary (TASK-052).
-  - failure_cases: missing snapshot → `insufficient_data` (no guess).
-  - done_definition: Article 6 trigger + Strategy F encoded.
-  - provisional_policy_notes: Strategy F = OQ-005, PROVISIONAL; `policy.multilingual_scope.mode` configurable; never official.
+    1. Select the station set via configurable Strategy F.
+    2. For every in-scope station, use TASK-020 latest-prior observation under the same event cutoff.
+    3. Trigger iff any in-scope `roaming_pct_value >= 0.30`; never treat a future row or arbitrary historical peak as current.
+    4. Persist each station observation timestamp and staleness.
+    5. Set `multilingual_required` as LLM-prohibited deterministic truth.
+  - acceptance_criteria: 30% triggers; all evaluated values obey the event cutoff; station-set mode remains config-driven.
+  - tests_required: unit + P20/P32 in Phase 2; boundary TASK-052.
+  - failure_cases: missing prior observation → `INSUFFICIENT_DATA`, never guess.
+  - done_definition: Article 6 trigger and Strategy F timing are encoded.
+  - provisional_policy_notes: OQ-005 time dimension is `PARTIALLY_RESOLVED_BY_ORGANIZER_GUIDANCE`; station-set scope remains OPEN / AWAITING_HOST_REPLY.
   - aws_services_touched: none (pure domain)
   - security_or_iam_notes: none
   - delivery_class: MANDATORY_IMPLEMENTATION
   - judging_criteria_contribution: technical_feasibility, business_applicability, completeness
-  - competition_quality_floor: art.6 triggers iff any IN-SCOPE station `roaming_pct_value>=0.30` at the CURRENT snapshot (=30% triggers); scope via Strategy F (default `current_snapshot_all_available_stations`); a historical peak is NEVER treated as a current trigger; Strategy F configurable.
-  - demo_or_evidence_output: Feeds P20/P32; TC-SOP6 boundary (29.99% vs 30%).
+  - competition_quality_floor: Event-cutoff timing is fixed by HG-001; station-set remains visibly configurable; Bedrock cannot alter trigger truth.
+  - demo_or_evidence_output: P20/P32 and 29.99% versus 30% evidence with observation timestamps.
 
-- [x] TASK-031 Implement ETECalculator (art.7) and EteAffectedSetStrategy (C)
-  - objective: Encode the ETE formula `base_clearance + max(0,(avg_saturation-0.5)*60)` with `base_clearance` Critical/High/Medium=60/40/20, and the affected-set resolution as Strategy C, marking art.7 as applied-formula (never triggered) (§9.4 art.7, §11.3, R12).
+- [ ] TASK-031 Implement ETECalculator (art.7) and EteAffectedSetStrategy (C)
+  - objective: Encode the official ETE formula plus HG-001 affected-set and common-exact-timestamp policies, with strict insufficient-common-snapshot handling.
   - requirements_covered: REQ-009, REQ-020, REQ-015, R12
-  - design_sections: §9.4 (art.7), §11.3, §10.9 (ETEResult), §11.4
-  - components: ETECalculator, EteAffectedSetStrategy (C)
-  - files_or_modules_expected: `packages/domain/src/rule_engine/ete_calculator.ts`, `packages/domain/src/strategies/ete_affected_set_strategy.ts`
+  - design_sections: §9.4 (art.7), §11.3, §10.9, §11.4
+  - components: ETECalculator, EteAffectedSetStrategy (C), CommonSnapshotSelector
+  - files_or_modules_expected: `packages/domain/src/rule_engine/ete_calculator.ts`, `packages/domain/src/strategies/ete_affected_set_strategy.ts`, `packages/domain/src/ete/common_snapshot_selector.ts`
   - dependencies: [TASK-020, TASK-006]
   - implementation_steps:
-    1. Strategy C default `directly_affected_roads_at_event_snapshot`; exclude alternatives/primary/secondary/excluded from the primary ETE set.
-    2. Compute `congestion_penalty=max(0,(avg-0.5)*60)` and `ete_minutes`.
-    3. Set `formula_applicability` (applicable vs partially_defined) per §9.5; record `applicability_note` and `lower_bound_only`.
-    4. Record `base_clearance` from severity.
-  - acceptance_criteria: ACC_001 → 78.6 (flagged ORGANIZER_GUIDED_TEAM_POLICY, HG-001); penalty never negative; art.7 goes to `applied_formula_articles` only.
-  - tests_required: unit + P22/P23 in Phase 2; ACC_001 ETE golden (TASK-053).
-  - failure_cases: saturation missing → `lower_bound` using base_clearance, penalty marked undefined (§21).
-  - done_definition: ETE formula + Strategy C encoded.
-  - provisional_policy_notes: Strategy C = OQ-003 (with OQ-011 interplay); `policy.ete.affected_set` configurable; ACC_001=78.6 per HG-001 organizer guidance; RESOLVED_FOR_IMPLEMENTATION_BY_ORGANIZER_GUIDANCE (HG-001), remains configurable.
+    1. Build `stable_unique([incident.affected_segment, selected_primary, ...selected_secondary])` in INCIDENT, PRIMARY, SECONDARY order.
+    2. Exclude raw alternatives, rejected candidates, capacity-failed candidates, non-intersecting candidates, unranked or unrelated roads, fabricated roads, and BS contextual affected_road.
+    3. Find the latest timestamp `<= event.timestamp` for which every affected-set road has an exact traffic record.
+    4. Never mix road timestamps, use future rows, interpolate, or average only an available subset.
+    5. Compute base 60/40/20, `avg=sum/count`, `penalty=max(0,(avg-0.5)*60)`, and `ETE=base+penalty`.
+    6. If no common timestamp exists, return `INSUFFICIENT_COMMON_SNAPSHOT`, `ete_minutes=null`, `ete_lower_bound_minutes=base`, `congestion_penalty=null`, and `manual_confirmation_required=true`.
+    7. Persist roles, per-road saturation, common timestamp, sum, count, average, base, penalty, ETE, status, policy modes, and `guidance_id=HG-001`.
+  - acceptance_criteria: Active policies are `INCIDENT_PRIMARY_AND_SELECTED_SECONDARY` and `COMMON_EXACT_TIMESTAMP`; art.7 appears only in `applied_formula_articles`.
+  - tests_required: unit + P22/P23; Golden TASK-053 and TASK-055.
+  - failure_cases: no common exact timestamp fails closed; no partial average.
+  - done_definition: ETE calculation is deterministic, traceable, and policy-configurable.
+  - provisional_policy_notes: OQ-003 is `RESOLVED_FOR_IMPLEMENTATION_BY_ORGANIZER_GUIDANCE`; selected policies remain configurable and are not represented as a unique official algorithm.
   - aws_services_touched: none (pure domain)
   - security_or_iam_notes: none
   - delivery_class: MANDATORY_IMPLEMENTATION
   - judging_criteria_contribution: technical_feasibility, theme_alignment, completeness
-  - competition_quality_floor: `ETE = base_clearance + congestion_penalty`; base 60/40/20 for Critical/High/Medium; `congestion_penalty = max(0,(avg_saturation-0.5)*60)`; art.7 is ALWAYS `applied_formula_articles`, NEVER `triggered_articles`; affected_set via Strategy C; Bedrock never recomputes ETE.
-  - demo_or_evidence_output: Feeds P22/P23; ACC_001 ETE=78.6 (ORGANIZER_GUIDED_TEAM_POLICY, HG-001, official_golden_answer=false).
+  - competition_quality_floor: Correct affected set, one common exact timestamp, full formula trace, no partial average, Bedrock never recomputes ETE.
+  - demo_or_evidence_output: ACC_001 78.6 and EVT_003 41.0 derivations plus an insufficient-common-snapshot case.
 
-- [x] TASK-032 Implement AffectedRoadStrategy (Strategy B) for EVT_002 affected_road role
-  - objective: Encode the pluggable role of `affected_road` (default `display_only`) so a BS_ event's `affected_road` never directly triggers art.2 and re-validates all art.2 conditions if ever escalated (§11.2, R8).
+- [ ] TASK-032 Implement AffectedRoadStrategy (Strategy B) for EVT_002 affected_road role
+  - objective: Implement HG-001 `DISPLAY_AND_CONTEXT_ONLY` behavior for BS_ event affected_road.
   - requirements_covered: REQ-016, R8
-  - design_sections: §11.2, §10.6 (affected_road.role)
-  - components: AffectedRoadStrategy (B)
-  - files_or_modules_expected: `packages/domain/src/strategies/affected_road_strategy.ts`
+  - design_sections: §11.2, §10.9b
+  - components: AffectedRoadStrategy (B), AffectedRoadContext
+  - files_or_modules_expected: `packages/domain/src/strategies/affected_road_strategy.ts`, `packages/shared-schemas/src/affected_road_context.ts`
   - dependencies: [TASK-016, TASK-006]
   - implementation_steps:
-    1. Implement roles `display_only` (default) / `context_and_ete` / `parallel_road_impact_explicit_host`.
-    2. Hard rule: `affected_road` never triggers art.2; BS_ routing decided by `affected_segment`.
-    3. Wire role from `policy.affected_road.role`.
-  - acceptance_criteria: Default keeps affected_road out of triggers/ETE; escalated mode still re-validates art.2 conditions.
-  - tests_required: unit + policy switch (TASK-057); EVT_002 golden (TASK-054).
-  - failure_cases: never assert EVT_002 auto-triggers art.2/art.3 (must compute) (§11.2).
-  - done_definition: Strategy B implemented and switchable.
-  - provisional_policy_notes: Strategy B = OQ-002, RESOLVED_FOR_IMPLEMENTATION_BY_ORGANIZER_GUIDANCE (HG-001) default `display_only`; remains configurable.
+    1. Preserve the raw affected_road.
+    2. Emit `role=DISPLAY_AND_CONTEXT_ONLY`, `mandatory_action=false`, `enters_ete_set=false`, `triggers_article1_or_2=false`, and `guidance_id=HG-001`.
+    3. Display it in Dashboard, event details, and report; allow only an optional non-binding local context note.
+    4. Do not let it change A/B, become primary/secondary, enter ETE, trigger art.1/art.2, or create a mandatory action.
+    5. Bedrock may explain context but cannot alter these deterministic fields.
+  - acceptance_criteria: EVT_002 affected_road is visible but non-binding; BS_ routing is based on affected_segment and art.3 inputs.
+  - tests_required: unit + TASK-057 policy contract + TASK-054 Golden.
+  - failure_cases: any art.1/art.2 trigger, route role, ETE membership, or mandatory action derived from affected_road fails.
+  - done_definition: Strategy B is implemented with organizer-guidance provenance and configurable interface.
+  - provisional_policy_notes: OQ-002 is `RESOLVED_FOR_IMPLEMENTATION_BY_ORGANIZER_GUIDANCE`; selected role remains configurable because HG-001 is NON_UNIQUE.
   - aws_services_touched: none (pure domain)
   - security_or_iam_notes: none
   - delivery_class: MANDATORY_IMPLEMENTATION
   - judging_criteria_contribution: technical_feasibility, completeness
-  - competition_quality_floor: `affected_road` role via Strategy B (default `display_only`); `BS_` events route to art.3 evaluation (must-compute); `affected_road` NEVER directly triggers art.2; Strategy B configurable/provisional.
-  - demo_or_evidence_output: Feeds EVT_002 golden; policy-switch verification (TASK-057).
+  - competition_quality_floor: affected_road is context only and cannot mutate numeric/boolean truth.
+  - demo_or_evidence_output: EVT_002 panel showing RD_TPE_001 as context only and no ETE/article trigger.
 
-- [x] TASK-033 Implement triggered/applied_formula/invoked_procedures separation and citation_article_set
+- [ ] TASK-033 Implement triggered/applied_formula/invoked_procedures separation and citation_article_set
   - objective: Assemble `triggered_articles` (art.1–6), `applied_formula_articles` (art.7), `invoked_procedures`, and derive `citation_article_set = triggered ∪ applied_formula` (§9.5, §14.2).
   - requirements_covered: REQ-021, REQ-008, R13, R15
   - design_sections: §9.4/§9.5, §14.2, §10.11a
@@ -832,7 +877,7 @@ CHECKPOINT A (not a task): Ensure all Phase 0 tests pass, ask the user if questi
   - competition_quality_floor: `triggered_articles` vs `applied_formula_articles` vs `invoked_procedures` strictly separated (art.7 never triggered); `citation_article_set = triggered ∪ applied_formula` (covers art.7 when applied); ACC_001 → {1,2,7}.
   - demo_or_evidence_output: Feeds P27; ACC_001 golden citation set {1,2,7}.
 
-- [x] TASK-034 Implement EvidenceTraceBuilder
+- [ ] TASK-034 Implement EvidenceTraceBuilder
   - objective: Build the deterministic explanation-chain facts (classification reasoning, excluded routes with reasons, SOP citations, data points) for R15 (§10.10).
   - requirements_covered: REQ-008, R15
   - design_sections: §10.10, §9.2
@@ -848,6 +893,8 @@ CHECKPOINT A (not a task): Ensure all Phase 0 tests pass, ask the user if questi
   - failure_cases: missing reason → build error (no empty reasons allowed).
   - done_definition: EvidenceTrace facts produced deterministically.
   - provisional_policy_notes: Provisional route/anchor facts carry `provisional=true` markers.
+  - hg001_amendment:
+    - Record event cutoff, observation selection, staleness, affected-set construction, ETE common timestamp, formula substitution, and HG-001 provenance.
   - aws_services_touched: none (pure domain)
   - security_or_iam_notes: none
   - delivery_class: MANDATORY_IMPLEMENTATION
@@ -855,7 +902,7 @@ CHECKPOINT A (not a task): Ensure all Phase 0 tests pass, ask the user if questi
   - competition_quality_floor: EvidenceTrace records grading reasoning (values+thresholds+conclusion), a non-empty exclusion reason for every excluded route, SOP citations, and data points; deterministic facts only (no LLM authorship of facts).
   - demo_or_evidence_output: Feeds P26; drives the explanation-chain UI (TASK-129).
 
-- [x] TASK-035 Implement canonical core_hash (§10.11a-1) and DecisionCore assembly
+- [ ] TASK-035 Implement canonical core_hash (§10.11a-1) and DecisionCore assembly
   - objective: Assemble the immutable `DecisionCore` payload and compute `core_hash` via the canonical serialization algorithm (SHA-256 over canonical deterministic payload, excluding all execution-volatile metadata) (§10.11a, §10.11a-1, FIX 4).
   - requirements_covered: REQ-011..REQ-022 (core assembly), R2..R16
   - design_sections: §10.11a, §10.11a-1, §15.2, §22.1 P33(i)
@@ -872,6 +919,8 @@ CHECKPOINT A (not a task): Ensure all Phase 0 tests pass, ask the user if questi
   - failure_cases: including volatile metadata in the hash → test failure; unstable ordering → test failure.
   - done_definition: Canonical `core_hash` + DecisionCore assembly implemented.
   - provisional_policy_notes: DecisionCore embeds PolicyMetadata reflecting the active (provisional) Strategy modes; hash covers policy version/content so switching policy changes the hash intentionally.
+  - hg001_amendment:
+    - Include deterministic HG-001 decision fields in the canonical core payload; exclude volatile presentation metadata from `core_hash` according to the existing canonicalization contract.
   - aws_services_touched: none (pure domain)
   - security_or_iam_notes: none
   - delivery_class: MANDATORY_IMPLEMENTATION
@@ -887,7 +936,7 @@ CHECKPOINT B (not a task): Ensure all Phase 1 unit tests pass and the determinis
 
 > Every property test is implemented as its own `fast-check` (TS) / `Hypothesis` (Python) test with ≥100 iterations and the label `Feature: city-response-commander, Property {n}: {text}`. No test requires an LLM to compute truth. Every Phase 2 test task is a MANDATORY_ACCEPTANCE_GATE. No property, boundary, golden, policy-switch, source-integrity, failure-mode, idempotency, IAM, security, latency, or smoke test may be skipped for LOCAL_MOCK release validation, PERSONAL_AWS_DEV validation, or COMPETITION_AWS release.
 
-- [x] TASK-036 Property tests P1, P21, P34 (percent round-trip, time format, timestamp preservation)
+- [ ] TASK-036 Property tests P1, P21, P34 (percent round-trip, time format, timestamp preservation)
   - objective: Verify percent parsing round-trip, `YYYY-MM-DD HH:MM` output format, and `timestamp_raw` immutability with correct normalization.
   - requirements_covered: REQ-001, REQ-019, R1, R11
   - design_sections: §22.1 (P1,P21,P34), §10.1, §10.2
@@ -910,7 +959,7 @@ CHECKPOINT B (not a task): Ensure all Phase 1 unit tests pass and the determinis
   - competition_quality_floor: P1/P21/P34 each a single `fast-check` property with ≥100 iterations and the label `Feature: city-response-commander, Property {n}: {text}`; universal (not example-only); fails with a shrunk counterexample on any violation. Release-blocking, not skippable.
   - demo_or_evidence_output: Green ≥100-iteration runs for P1/P21/P34 with the required labels; a seeded violation is caught with a shrunk counterexample.
 
-- [x] TASK-037 Property test P2 (official data read-only invariance)
+- [ ] TASK-037 Property test P2 (official data read-only invariance)
   - objective: Verify that any sequence of read/query/decision operations leaves the five official sources deeply equal to load time.
   - requirements_covered: REQ-001, R1
   - design_sections: §22.1 (P2), §15.1
@@ -933,7 +982,7 @@ CHECKPOINT B (not a task): Ensure all Phase 1 unit tests pass and the determinis
   - competition_quality_floor: P2 a single `fast-check` property with ≥100 iterations and the required label; proves the five official sources are deep-equal before/after any read/query/decision sequence; fails with a shrunk counterexample. Release-blocking.
   - demo_or_evidence_output: Green ≥100-iteration P2 run with the label; a seeded mutation of official data is caught.
 
-- [x] TASK-038 Property test P3 (Strategy A snapshot selection)
+- [ ] TASK-038 Property test P3 (Strategy A snapshot selection)
   - objective: Verify selected row Timestamp <= event and is the per-entity latest prior, single-row field cohesion, and `insufficient_data` instead of post-event rows.
   - requirements_covered: REQ-001, R1
   - design_sections: §22.1 (P3), §11.1
@@ -948,6 +997,8 @@ CHECKPOINT B (not a task): Ensure all Phase 1 unit tests pass and the determinis
   - failure_cases: post-event selection → counterexample.
   - done_definition: P3 green.
   - provisional_policy_notes: Tests default Strategy A mode; policy-switch coverage in TASK-057.
+  - hg001_amendment:
+    - Property P3 must prove one logical cutoff, no future row, same-row fields, latest-prior selection, staleness metadata, and `INSUFFICIENT_DATA` when no prior row.
   - aws_services_touched: none (pure domain)
   - security_or_iam_notes: none
   - delivery_class: MANDATORY_ACCEPTANCE_GATE
@@ -955,7 +1006,7 @@ CHECKPOINT B (not a task): Ensure all Phase 1 unit tests pass and the determinis
   - competition_quality_floor: P3 a single `fast-check` property with ≥100 iterations and the required label; proves selected row `Timestamp <= event_timestamp` and per-entity latest-prior, same-row fields, and `insufficient_data` when no legal row (never event-after); provisional Strategy A. Release-blocking.
   - demo_or_evidence_output: Green ≥100-iteration P3 run with the label; counterexample on an event-after selection.
 
-- [x] TASK-039 Property tests P4, P5, P7 (classification, art.1 mapping, light mapping)
+- [ ] TASK-039 Property tests P4, P5, P7 (classification, art.1 mapping, light mapping)
   - objective: Verify A/B grading correctness, RD_TPE_001/002 level→measure mapping (incl. A invokes guidance without art.2 trigger), and level→light color mapping.
   - requirements_covered: REQ-011, REQ-004, R2, R3, R4
   - design_sections: §22.1 (P4,P5,P7), §9.4 (art.1)
@@ -978,7 +1029,7 @@ CHECKPOINT B (not a task): Ensure all Phase 1 unit tests pass and the determinis
   - competition_quality_floor: P4/P5/P7 each a single `fast-check` property with ≥100 iterations and the required label; exact A/B boundaries (0.85/0.95), art.1 measure mapping (A invokes article2 guidance, A alone ≠ triggered art.2), and A=red/B=yellow rendering. Release-blocking.
   - demo_or_evidence_output: Green ≥100-iteration runs for P4/P5/P7 with labels; boundary counterexamples caught.
 
-- [x] TASK-040 Property test P6 (threshold auto-popup)
+- [ ] TASK-040 Property test P6 (threshold auto-popup)
   - objective: Verify `anomaly.detected` is produced iff any road/station meets an SOP (art.1/3/4/6) threshold, and not otherwise.
   - requirements_covered: REQ-002, R4
   - design_sections: §22.1 (P6), §16.2
@@ -1000,7 +1051,7 @@ CHECKPOINT B (not a task): Ensure all Phase 1 unit tests pass and the determinis
   - competition_quality_floor: P6 a single `fast-check` property with ≥100 iterations and the required label; proves `anomaly.detected` iff any SOP art.1/3/4/6 threshold met, no popup otherwise. Release-blocking.
   - demo_or_evidence_output: Green ≥100-iteration P6 run with the label; a below-threshold false-popup is caught.
 
-- [x] TASK-041 Property tests P8, P9, P10, P11, P12 (SOP-2 trigger/qualification/selection/congestion/no-candidate)
+- [ ] TASK-041 Property tests P8, P9, P10, P11, P12 (SOP-2 trigger/qualification/selection/congestion/no-candidate)
   - objective: Verify art.2 3-AND trigger, 3-AND candidate qualification (Saturation excluded), lowest-saturation primary with downstream secondary, congested-maintain, and no-candidate documentation without fabrication.
   - requirements_covered: REQ-012, REQ-013, REQ-014, REQ-005, R5, R6
   - design_sections: §22.1 (P8–P12), §9.4 (art.2), §11.7
@@ -1025,7 +1076,7 @@ CHECKPOINT B (not a task): Ensure all Phase 1 unit tests pass and the determinis
   - competition_quality_floor: P8/P9/P10/P11/P12 each a single `fast-check` property with ≥100 iterations and the required label; proves art.2 3-AND trigger, 3-AND candidate qualification (Saturation not a 4th filter), lowest-Saturation primary / downstream secondary, congested-maintain + long-green, and no-candidate → "no compliant alternative" (no fabrication). Release-blocking.
   - demo_or_evidence_output: Green ≥100-iteration runs for P8–P12 with labels; counterexamples on a 4th-filter or fabricated-road violation.
 
-- [x] TASK-042 Property tests P13, P14, P15 (alternatives one-way, empty nearby, upstream/downstream)
+- [ ] TASK-042 Property tests P13, P14, P15 (alternatives one-way, empty nearby, upstream/downstream)
   - objective: Verify geometry semantics: directional alternatives (no symmetry), empty nearby preserved, upstream/downstream by intersections order + flow_direction.
   - requirements_covered: REQ-026, REQ-027, REQ-028, R7
   - design_sections: §22.1 (P13–P15), §10.3, §9.4
@@ -1048,7 +1099,7 @@ CHECKPOINT B (not a task): Ensure all Phase 1 unit tests pass and the determinis
   - competition_quality_floor: P13/P14/P15 each a single `fast-check` property with ≥100 iterations and the required label; proves one-way alternatives (no symmetric search), empty `nearby_stations` kept empty, and upstream/downstream from order + `flow_direction`. Release-blocking.
   - demo_or_evidence_output: Green ≥100-iteration runs for P13/P14/P15 with labels; a symmetric-search or nearby-fill violation is caught.
 
-- [x] TASK-043 Property test P30 (anchor resolution + conservative fallback)
+- [ ] TASK-043 Property test P30 (anchor resolution + conservative fallback)
   - objective: Verify unique anchor drives upstream/downstream via geometry+anchor (not Strategy A), and non-unique resolution yields manual_confirmation with null primary and unranked intersections, no invented direction.
   - requirements_covered: REQ-013, REQ-028, R6, R7
   - design_sections: §22.1 (P30), §11.5
@@ -1070,7 +1121,7 @@ CHECKPOINT B (not a task): Ensure all Phase 1 unit tests pass and the determinis
   - competition_quality_floor: P30 a single `fast-check` property with ≥100 iterations and the required label; proves upstream/downstream via RoadNetworkModel + Strategy D (not Strategy A), and non-unique anchor → `manual_confirmation_required` + `primary_evacuation=null` + no auto-ranking + no fabricated up/down. Release-blocking.
   - demo_or_evidence_output: Green ≥100-iteration P30 run with the label; a fabricated-anchor case is caught.
 
-- [x] TASK-044 Property tests P16, P17 (SOP-3 OR trigger + actions, SOP-4 dispersal)
+- [ ] TASK-044 Property tests P16, P17 (SOP-3 OR trigger + actions, SOP-4 dispersal)
   - objective: Verify art.3 OR-trigger with exact boundaries and actions, and art.4 AND-trigger with art.3 chaining.
   - requirements_covered: REQ-016, REQ-017, R8, R9
   - design_sections: §22.1 (P16,P17), §9.4 (art.3/art.4)
@@ -1092,7 +1143,7 @@ CHECKPOINT B (not a task): Ensure all Phase 1 unit tests pass and the determinis
   - competition_quality_floor: P16/P17 each a single `fast-check` property with ≥100 iterations and the required label; proves art.3 OR trigger with exact boundaries (25000/25001, 0.30) + actions, and art.4 dispersal (peak>=30000 AND growth<=-0.20) linking art.3. Release-blocking.
   - demo_or_evidence_output: Green ≥100-iteration runs for P16/P17 with labels; boundary counterexamples caught.
 
-- [x] TASK-045 Property tests P18, P19, P31 (SOP-5 trigger, manual command, unresolved police scope)
+- [ ] TASK-045 Property tests P18, P19, P31 (SOP-5 trigger, manual command, unresolved police scope)
   - objective: Verify art.5 trigger conditions, 2-per-confirmed-intersection police rule with unresolved totals until scope confirmed, and CMS annotation; Strategy E provisional behavior.
   - requirements_covered: REQ-018, R10
   - design_sections: §22.1 (P18,P19,P31), §9.4 (art.5), §11.6
@@ -1115,8 +1166,8 @@ CHECKPOINT B (not a task): Ensure all Phase 1 unit tests pass and the determinis
   - competition_quality_floor: P18/P19/P31 each a single `fast-check` property with ≥100 iterations and the required label; proves art.5 trigger (Power_Failure OR 號誌失效/故障), `police_per_confirmed_affected_intersection=2`, and unresolved scope → `affected_intersection_count`/`total_police=unresolved` (any shown number is PROVISIONAL_DERIVED_EXAMPLE). Release-blocking.
   - demo_or_evidence_output: Green ≥100-iteration runs for P18/P19/P31 with labels; an "all intersections × 2" derivation is caught.
 
-- [x] TASK-046 Property tests P20, P32 (SOP-6 trigger, current-snapshot scope)
-  - objective: Verify multilingual trigger iff any in-scope roaming>=0.30 with same-response zh+en, zh-only when not triggered, and that only the current snapshot (not historical peak) drives the trigger.
+- [ ] TASK-046 Property tests P20, P32 (SOP-6 trigger, event-cutoff timing and configurable station-set scope)
+  - objective: Verify multilingual trigger iff any in-scope roaming>=0.30 with same-response zh+en, zh-only when not triggered, and that latest-prior observations at the event cutoff drive the trigger; station-set scope remains configurable.
   - requirements_covered: REQ-010, REQ-019, R11
   - design_sections: §22.1 (P20,P32), §9.4 (art.6), §11.8
   - components: MultilingualTrigger, MultilingualScopeStrategy (F)
@@ -1130,15 +1181,17 @@ CHECKPOINT B (not a task): Ensure all Phase 1 unit tests pass and the determinis
   - failure_cases: historical-as-current trigger → counterexample.
   - done_definition: P20/P32 green.
   - provisional_policy_notes: Strategy F provisional; scope modes exercised in TASK-057.
+  - hg001_amendment:
+    - Verify OQ-005 time dimension follows HG-001 while station-set mode remains OPEN/configurable.
   - aws_services_touched: none (pure domain)
   - security_or_iam_notes: none
   - delivery_class: MANDATORY_ACCEPTANCE_GATE
   - judging_criteria_contribution: technical_feasibility, business_applicability, completeness
-  - competition_quality_floor: P20/P32 each a single `fast-check` property with ≥100 iterations and the required label; proves art.6 trigger iff any in-scope station `roaming_pct_value>=0.30` (=30% triggers), multilingual zh+en on trigger, and current-snapshot scope (historical peak never a current trigger). Release-blocking.
+  - competition_quality_floor: P20/P32 each a single `fast-check` property with ≥100 iterations and the required label; proves art.6 trigger iff any in-scope station `roaming_pct_value>=0.30` (=30% triggers), multilingual zh+en on trigger, and event-cutoff timing and configurable station-set scope (historical peak never a current trigger). Release-blocking.
   - demo_or_evidence_output: Green ≥100-iteration runs for P20/P32 with labels; a historical-peak false trigger is caught.
 
-- [x] TASK-047 Property tests P22, P23 (ETE formula, non-negative penalty)
-  - objective: Verify `ETE = base_clearance + penalty` with correct base_clearance and `penalty=max(0,(avg-0.5)*60)`, and penalty>=0.
+- [ ] TASK-047 Property tests P22, P23 (ETE affected set, common snapshot, formula, no partial average)
+  - objective: Verify incident+primary+secondary affected-set construction, one exact common timestamp, official ETE formula, non-negative penalty, and insufficient-common-snapshot behavior.
   - requirements_covered: REQ-009, REQ-020, R12
   - design_sections: §22.1 (P22,P23), §9.4 (art.7)
   - components: ETECalculator
@@ -1152,6 +1205,9 @@ CHECKPOINT B (not a task): Ensure all Phase 1 unit tests pass and the determinis
   - failure_cases: negative penalty → counterexample.
   - done_definition: P22/P23 green.
   - provisional_policy_notes: Affected-set is Strategy C (config); formula itself official.
+  - hg001_amendment:
+    - Generate road histories with and without a common timestamp; prove no mixed-timestamp or partial-subset average is accepted.
+    - Assert BS contextual affected_road is excluded.
   - aws_services_touched: none (pure domain)
   - security_or_iam_notes: none
   - delivery_class: MANDATORY_ACCEPTANCE_GATE
@@ -1159,7 +1215,7 @@ CHECKPOINT B (not a task): Ensure all Phase 1 unit tests pass and the determinis
   - competition_quality_floor: P22/P23 each a single `fast-check` property with ≥100 iterations and the required label; proves `ETE=base_clearance+congestion_penalty` (60/40/20) and `congestion_penalty=max(0,(avg-0.5)*60)>=0`. Release-blocking.
   - demo_or_evidence_output: Green ≥100-iteration runs for P22/P23 with labels; a negative-penalty violation is caught.
 
-- [x] TASK-048 Property tests P24, P25, P37 (report completeness, alert/CMS completeness, CMS permission split)
+- [ ] TASK-048 Property tests P24, P25, P37 (report completeness, alert/CMS completeness, CMS permission split)
   - objective: Verify report content completeness, public-alert + CMS content completeness, and that `cms_core_text` is deterministic/LLM-prohibited while `cms_explanation_text` is LLM-writable.
   - requirements_covered: REQ-021, REQ-022, REQ-015, REQ-014, R13, R14, R6, R10
   - design_sections: §22.1 (P24,P25,P37), §10.11b, §10.12, §14.3
@@ -1182,7 +1238,7 @@ CHECKPOINT B (not a task): Ensure all Phase 1 unit tests pass and the determinis
   - competition_quality_floor: P24/P25/P37 each a single `fast-check` property with ≥100 iterations and the required label; proves report completeness (event id + SOP clauses + grading + routes/exclusions + signal timing + cross-system + ETE), alert/CMS completeness, and `cms_core_text` LLM-prohibited vs `cms_explanation_text` LLM-writable split. Release-blocking.
   - demo_or_evidence_output: Green ≥100-iteration runs for P24/P25/P37 with labels; an LLM core-CMS overwrite is rejected.
 
-- [x] TASK-049 Property tests P26, P27 (evidence chain, citation coverage)
+- [ ] TASK-049 Property tests P26, P27 (evidence chain, citation coverage)
   - objective: Verify evidence chain completeness (reasoning + data + non-empty exclusion reasons) and that `citation_article_set` covers `triggered ∪ applied_formula` (not only triggered).
   - requirements_covered: REQ-008, R15
   - design_sections: §22.1 (P26,P27), §14.2
@@ -1204,7 +1260,7 @@ CHECKPOINT B (not a task): Ensure all Phase 1 unit tests pass and the determinis
   - competition_quality_floor: P26/P27 each a single `fast-check` property with ≥100 iterations and the required label; proves evidence-chain completeness (reasoning + non-empty exclusion reasons) and `citation_article_set ⊇ triggered ∪ applied_formula` (covers art.7 when applied, not only triggered). Release-blocking.
   - demo_or_evidence_output: Green ≥100-iteration runs for P26/P27 with labels; a citation that omits an applied-formula article is caught.
 
-- [x] TASK-050 Property tests P29, P36 (bonus ja/ko languages, multilingual template no zh-only degradation)
+- [ ] TASK-050 Property tests P29, P36 (bonus ja/ko languages, multilingual template no zh-only degradation)
   - objective: Verify that when the bonus is enabled and art.6 triggers, ja+ko are included, and that on Bedrock failure the language floor (zh+en, or zh+en+ja+ko) is met via deterministic approved templates, never degrading to zh-only.
   - requirements_covered: REQ-031, REQ-010, REQ-019, R11, R17
   - design_sections: §22.1 (P29,P36), §14.4, §21.3
@@ -1226,7 +1282,7 @@ CHECKPOINT B (not a task): Ensure all Phase 1 unit tests pass and the determinis
   - competition_quality_floor: P36 (core) and P29 (bonus scope) each a single `fast-check` property with ≥100 iterations and the required label; P36 proves SOP-6 multilingual never degrades to zh-only even when Bedrock fails (deterministic template, language floor zh+en, +ja/ko when bonus enabled); P29 proves ja/ko present when bonus enabled. Core P36 is release-blocking (the ja/ko-only assertion is the bonus portion).
   - demo_or_evidence_output: Green ≥100-iteration runs for P36/P29 with labels; a Bedrock-down zh-only degradation is caught.
 
-- [x] TASK-051 Canonical core_hash A/B/C tests (FIX 4)
+- [ ] TASK-051 Canonical core_hash A/B/C tests (FIX 4)
   - objective: Verify the canonical `core_hash`: (A) volatile-metadata-only differences → same hash; (B) any decision-fact change → different hash; (C) semantically-equal reordering → same hash.
   - requirements_covered: REQ-011..REQ-022 (integrity), R-supporting
   - design_sections: §10.11a-1, §22.1 P33(i), §22.2 (Canonical core_hash)
@@ -1249,7 +1305,7 @@ CHECKPOINT B (not a task): Ensure all Phase 1 unit tests pass and the determinis
   - competition_quality_floor: Three canonical `core_hash` properties (FIX 4) with ≥100 iterations and labels: (A) volatile-metadata-only change → same hash; (B) any decision-fact change → different hash; (C) semantically-equal reorder → same hash (set-like stable sort, lexicographic keys, null-vs-absent fixed). Release-blocking.
   - demo_or_evidence_output: Green ≥100-iteration A/B/C runs with labels; ALREADY_COMMITTED_SAME_DECISION vs CORE_IDENTITY_CONFLICT decided correctly on fixtures.
 
-- [x] TASK-052 Boundary unit tests (all official numeric boundaries)
+- [ ] TASK-052 Boundary unit tests (all official numeric boundaries)
   - objective: Encode EDGE_CASE unit tests for 0.85, 0.9499, 0.95, 25000, 25001, 0.30, 1000, 30% per the derived boundary matrix.
   - requirements_covered: REQ-011, REQ-016, REQ-019, REQ-013, R2, R8, R11, R6
   - design_sections: §22.3, cursor baseline §6 (TC-SAT/TC-SOP3/TC-SOP6/TC-SOP2)
@@ -1273,44 +1329,46 @@ CHECKPOINT B (not a task): Ensure all Phase 1 unit tests pass and the determinis
   - competition_quality_floor: Every official numeric boundary covered as an edge-case unit test with the exact official inequality (no drift): 0.8499/0.85 (B lower), 0.9499/0.95 (A lower), 25000/25001 (count), 0.30 (growth/roaming), 1000 (capacity), 30% (roaming). Release-blocking.
   - demo_or_evidence_output: Green boundary suite; each boundary asserts the exact expected classification/trigger per the derived boundary matrix.
 
-- [x] TASK-053 Golden test ACC_001 (deterministic core)
-  - objective: End-to-end deterministic golden for ACC_001: triggered=[1,2], invoked=[article2_alternative_route_guidance], applied=[7], citation={1,2,7}, primary RD_TPE_004 / secondary RD_TPE_005 (provisional), ETE=78.6 (ORGANIZER_GUIDED_TEAM_POLICY, HG-001), all provisional facts flagged.
+- [ ] TASK-053 Golden test ACC_001 (deterministic core)
+  - objective: End-to-end deterministic golden for ACC_001: triggered=[1,2], invoked=[article2_alternative_route_guidance], applied=[7], citation={1,2,7}, primary RD_TPE_004 / secondary RD_TPE_005 (provisional), ETE=78.6 under HG-001 selected policy, with full road-set and formula evidence.
   - requirements_covered: REQ-012, REQ-013, REQ-014, REQ-015, REQ-009, REQ-020, R6, R12
   - design_sections: §9.5, §11.4, §22.3
   - components: RuleEngine, EvacuationSelector, ETECalculator, DecisionCore builder
   - files_or_modules_expected: `packages/domain/test/golden/acc_001.golden.test.ts`
   - dependencies: [TASK-035, TASK-025, TASK-031, TASK-033]
   - implementation_steps:
-    1. Feed ACC_001 with default provisional strategies.
+    1. Feed ACC_001 with HG-001 selected strategies.
     2. Assert triggered/invoked/applied/citation sets and excluded reasons (RD_TPE_006 not-direct, RD_TPE_008 capacity 600<1000).
-    3. Assert primary/secondary and ETE=78.6 carry `ORGANIZER_GUIDED_TEAM_POLICY` (guidance_id=HG-001), `official_golden_answer=false`.
-  - acceptance_criteria: Golden matches the §9.5/§11.4 walkthrough with provisional flags.
+    3. Assert affected set RD_TPE_002/RD_TPE_004/RD_TPE_005, common timestamp 22:00, values 1.00/0.78/0.65, avg 0.81, base 60, penalty 18.6, ETE 78.6, and `guidance_id=HG-001`.
+  - acceptance_criteria: Golden matches the HG-001 §9.5/§11.4 walkthrough exactly.
   - tests_required: golden ACC_001.
   - failure_cases: art.1 omitted or art.7 mislabeled as trigger → failure.
   - done_definition: ACC_001 golden green.
-  - provisional_policy_notes: Route/ETE flagged provisional (Strategies A/C/D); never official answer.
+  - provisional_policy_notes: Strategy D remains provisional; HG-001 A/C policies are organizer-guided, selected, configurable, and not a unique official algorithm.
   - aws_services_touched: none (pure domain)
   - security_or_iam_notes: none
   - delivery_class: MANDATORY_ACCEPTANCE_GATE
   - judging_criteria_contribution: technical_feasibility, theme_alignment, completeness
-  - competition_quality_floor: ACC_001 end-to-end golden: `triggered_articles=[1,2]`, `invoked_procedures=[article2_alternative_route_guidance]`, `applied_formula_articles=[7]`, citation {1,2,7}, primary RD_TPE_004 / secondary RD_TPE_005 / excluded RD_TPE_006,008, ETE=78.6 — all marked ORGANIZER_GUIDED_TEAM_POLICY (guidance_id=HG-001, `official_golden_answer=false`), never presented as the host's answer. Release-blocking.
-  - demo_or_evidence_output: Green ACC_001 golden asserting the exact core sets with ORGANIZER_GUIDED_TEAM_POLICY (HG-001) markers.
+  - competition_quality_floor: ACC_001 end-to-end golden: `triggered_articles=[1,2]`, `invoked_procedures=[article2_alternative_route_guidance]`, `applied_formula_articles=[7]`, citation {1,2,7}, primary RD_TPE_004 / secondary RD_TPE_005 / excluded RD_TPE_006,008, ETE=78.6 with the complete derivation and organizer-guidance provenance. Release-blocking.
+  - demo_or_evidence_output: Green ACC_001 golden asserting the exact core sets with provisional markers.
 
-- [x] TASK-054 Golden test EVT_002 (SOP-3 evaluation, must-compute)
-  - objective: Golden for EVT_002 verifying BS_ routes to art.3 evaluation (computed, not assumed), and `affected_road` handled via Strategy B `display_only` without triggering art.2.
+- [ ] TASK-054 Golden test EVT_002 (SOP-3 evaluation, must-compute)
+  - objective: Golden for EVT_002 verifying event 22:20 uses BL17 22:15 latest-prior data, triggers art.3 by User_Count=31000, never uses 22:30, and treats affected_road as DISPLAY_AND_CONTEXT_ONLY.
   - requirements_covered: REQ-016, R8
   - design_sections: §9.5, §11.2, §22.3
   - components: RuleEngine.article3, AffectedRoadStrategy (B)
   - files_or_modules_expected: `packages/domain/test/golden/evt_002.golden.test.ts`
   - dependencies: [TASK-027, TASK-032, TASK-035]
   - implementation_steps:
-    1. Feed EVT_002; assert art.3 is evaluated by computing User_Count/Growth.
-    2. Assert affected_road=RD_TPE_001 does not trigger art.2 under default role.
+    1. Feed EVT_002 at 22:20; assert selected observation is BL17 22:15 with User_Count=31000 and Growth_Rate=0.08; assert 22:30 is never selected.
+    2. Assert art.3 triggers by User_Count>25000; affected_road=RD_TPE_001 is displayed as context only and does not trigger art.1/art.2 or enter ETE.
   - acceptance_criteria: Golden shows computed art.3 evaluation; no art.2 auto-trigger.
   - tests_required: golden EVT_002.
   - failure_cases: asserting art.3 trigger without computation → failure.
   - done_definition: EVT_002 golden green.
   - provisional_policy_notes: Strategy B default; configurable.
+  - hg001_amendment:
+    - Assert ETE is NOT_APPLICABLE for EVT_002.
   - aws_services_touched: none (pure domain)
   - security_or_iam_notes: none
   - delivery_class: MANDATORY_ACCEPTANCE_GATE
@@ -1318,8 +1376,8 @@ CHECKPOINT B (not a task): Ensure all Phase 1 unit tests pass and the determinis
   - competition_quality_floor: EVT_002 golden proves art.3 is EVALUATED (must-compute BL17 User_Count>25000 / Growth>0.30), never assumed; `affected_road=RD_TPE_001` handled via Strategy B (does not trigger art.2); provisional flags surfaced. Release-blocking.
   - demo_or_evidence_output: Green EVT_002 golden showing computed art.3 result + Strategy-B handling, not an assumed trigger.
 
-- [x] TASK-055 Golden test EVT_003 (SOP-5)
-  - objective: Golden for EVT_003 verifying art.5 trigger, CMS annotation, police_per_intersection=2, and unresolved affected-intersection scope by default.
+- [ ] TASK-055 Golden test EVT_003 (SOP-5)
+  - objective: Golden for EVT_003 verifying art.5 trigger, CMS, unresolved police scope, and HG-001 ETE=41.0.
   - requirements_covered: REQ-018, R10
   - design_sections: §9.5, §11.6, §22.3
   - components: RuleEngine.article5, AffectedIntersectionScopeStrategy (E)
@@ -1328,20 +1386,22 @@ CHECKPOINT B (not a task): Ensure all Phase 1 unit tests pass and the determinis
   - implementation_steps:
     1. Feed EVT_003; assert art.5 triggered, CMS "松高路 號誌故障，請依現場指揮通行".
     2. Assert count/total police unresolved + manual_confirmation.
-    3. Assert EVT_003 ETE = 41.0 (Medium base=20, common timestamp 22:30, RD_TPE_007=0.85 + RD_TPE_011=0.85, avg=0.85, penalty=21.0, guidance_id=HG-001).
-  - acceptance_criteria: Golden matches §9.5 with unresolved police totals; EVT_003 ETE=41.0(HG-001).
+    3. Assert affected set RD_TPE_007 INCIDENT + RD_TPE_011 PRIMARY, common timestamp 22:30, saturations 0.85/0.85, Medium base 20, penalty 21.0, ETE 41.0.
+  - acceptance_criteria: Golden matches §9.5 with unresolved police totals.
   - tests_required: golden EVT_003.
   - failure_cases: fixed total police as official → failure.
   - done_definition: EVT_003 golden green.
   - provisional_policy_notes: Strategy E default unresolved; configurable.
+  - hg001_amendment:
+    - OQ-010 and OQ-011 remain open; ETE calculation does not resolve police scope or overwrite SOP5 duration semantics.
   - aws_services_touched: none (pure domain)
   - security_or_iam_notes: none
   - delivery_class: MANDATORY_ACCEPTANCE_GATE
   - judging_criteria_contribution: technical_feasibility, completeness
-  - competition_quality_floor: EVT_003 golden proves art.5 trigger (Power_Failure), `police_per_intersection=2` (official) with unresolved scope (`affected_intersection_count`/`total_police=unresolved`), exact CMS "松高路 號誌故障，請依現場指揮通行", and ETE=41.0(HG-001). Release-blocking.
-  - demo_or_evidence_output: Green EVT_003 golden asserting CMS text + unresolved police scope (no fabricated total) + ETE=41.0(HG-001).
+  - competition_quality_floor: EVT_003 golden proves art.5 trigger (Power_Failure), `police_per_intersection=2` (official) with unresolved scope (`affected_intersection_count`/`total_police=unresolved`), and exact CMS "松高路 號誌故障，請依現場指揮通行". Release-blocking.
+  - demo_or_evidence_output: Green EVT_003 golden asserting CMS text + unresolved police scope (no fabricated total).
 
-- [x] TASK-056 Failure-mode deterministic tests (source-hash STOP, no-candidate, unresolved anchor, unresolved police)
+- [ ] TASK-056 Failure-mode deterministic tests (source-hash STOP, no-candidate, unresolved anchor, unresolved police)
   - objective: Verify STOP on source hash mismatch, no-legal-alternative documentation, unresolved-anchor conservative behavior, and unresolved police scope.
   - requirements_covered: REQ-032, REQ-005, REQ-013, REQ-018, R1, R6, R10
   - design_sections: §10.0, §21.2, §11.5, §11.6
@@ -1365,7 +1425,7 @@ CHECKPOINT B (not a task): Ensure all Phase 1 unit tests pass and the determinis
   - competition_quality_floor: Deterministic failure-mode tests: source-hash mismatch → STOP (no fabrication), no compliant alternative → documented (no invented road), unresolved anchor → `manual_confirmation_required`, unresolved police scope → `unresolved`. Release-blocking.
   - demo_or_evidence_output: Green failure-mode suite proving fail-closed/no-fabrication behaviors.
 
-- [x] TASK-057 Policy-switching contract tests (Strategies A–F, ≥2 impls each)
+- [ ] TASK-057 Policy-switching contract tests (Strategies A–F, ≥2 impls each)
   - objective: Verify that switching each Strategy's mode via `ConfigProvider` changes outputs and `policy` metadata WITHOUT modifying the Rule Engine, per §30.
   - requirements_covered: REQ-005, REQ-009, REQ-013, REQ-016, REQ-018, REQ-019, R-supporting
   - design_sections: §11, §22.3, §30, §23.1
@@ -1374,13 +1434,15 @@ CHECKPOINT B (not a task): Ensure all Phase 1 unit tests pass and the determinis
   - dependencies: [TASK-020, TASK-026, TASK-029, TASK-030, TASK-031, TASK-032, TASK-006]
   - implementation_steps:
     1. For each Strategy, run ≥2 configured modes and assert differing, correct outputs.
-    2. Assert `policy` metadata reflects active mode and `classification=PROVISIONAL_TEAM_POLICY`/`status=AWAITING_HOST_REPLY`.
+    2. Assert `policy` metadata reflects active mode and `classification=ORGANIZER_GUIDED_TEAM_POLICY` for HG-001 selected A/B/C modes, and `PROVISIONAL_TEAM_POLICY`/`AWAITING_HOST_REPLY` for unresolved modes.
     3. Assert Rule Engine source is untouched (interface-only swap).
   - acceptance_criteria: Each of A–F demonstrates ≥2 impls with correct switching; no engine change required.
   - tests_required: contract tests (A/B/C/D/E/F).
   - failure_cases: policy hard-coded / engine change needed → failure.
   - done_definition: Policy-switch contract suite green.
-  - provisional_policy_notes: This task is the guardrail proving OQ-001..005/010 stay switchable and OQ-006/007/008/009/011 remain configurable; no OQ is closed.
+  - provisional_policy_notes: This task proves HG-001 selected A/B/C and OQ-005 time policy stay configurable while unresolved OQ dimensions remain open.
+  - hg001_amendment:
+    - Changing a non-selected mode must not rewrite RuleEngine logic or erase `guidance_id`/policy provenance.
   - aws_services_touched: none (pure domain; LOCAL_MOCK ConfigProvider)
   - security_or_iam_notes: none
   - delivery_class: MANDATORY_ACCEPTANCE_GATE
@@ -1388,7 +1450,7 @@ CHECKPOINT B (not a task): Ensure all Phase 1 unit tests pass and the determinis
   - competition_quality_floor: Contract tests prove each Strategy A–F switches behavior via `ConfigProvider` (≥2 implementations each) with the decision changing and `policy` metadata reflecting the new value, WITHOUT any Rule Engine code edit; no OQ is closed. Release-blocking.
   - demo_or_evidence_output: Green policy-switch suite: flipping each Strategy mode changes output + provisional metadata, engine unchanged.
 
-- [x] TASK-058 Golden tests for SOP-4 DOME and SOP-6 stations
+- [ ] TASK-058 Golden tests for SOP-4 DOME and SOP-6 stations
   - objective: Golden for BS_TPE_DOME (peak 40000, growth -0.31 → dispersal + art.3) and art.6 stations (BS_TPE_101 40%/45%, BS_XY_ATT 30%/35% → multilingual triggered).
   - requirements_covered: REQ-017, REQ-010, REQ-019, R9, R11
   - design_sections: §22.3, §9.4 (art.4/art.6)
@@ -1418,7 +1480,7 @@ CHECKPOINT C (not a task): Ensure all Phase 2 property/boundary/golden/policy-sw
 
 > All Phase 3 tasks author **AWS CDK (TypeScript)** infrastructure definitions only (§4.13, §24). No `cdk deploy` is performed here; deployment runbooks live in Phase 11. Every resource name carries an environment prefix and is parameterized via CDK context (`--context env=...`) so LOCAL_MOCK / PERSONAL_AWS_DEV / COMPETITION_AWS switch without code edits (§23). IAM is `Deny`-by-default with per-role least privilege that mechanically enforces the §9 boundary and the FIX-1/2/3 writer isolation.
 
-- [~] TASK-059 Bootstrap CDK app, env-context profiles, and stack wiring
+- [ ] TASK-059 Bootstrap CDK app, env-context profiles, and stack wiring
   - objective: Create the CDK app root that instantiates the four stacks and resolves all three environment profiles from context, so later infra tasks attach resources to a working, parameterized app.
   - requirements_covered: REQ-032, REQ-024 (DELIVERABLE), R-supporting (all)
   - design_sections: §24 (stack split), §23 (profiles), §4.13
@@ -1441,7 +1503,7 @@ CHECKPOINT C (not a task): Ensure all Phase 2 property/boundary/golden/policy-sw
   - competition_quality_floor: CDK app bootstraps with the three env-context profiles (LOCAL_MOCK/PERSONAL_AWS_DEV/COMPETITION_AWS); resources env-prefixed; stacks wired; `--context env=...` switches params with zero code edits; no hard-coded account/region.
   - demo_or_evidence_output: `cdk synth` per profile; context switch changes parameters only (no resource redefinition).
 
-- [~] TASK-060 DataStack: S3 buckets (raw, sop_source, artifact)
+- [ ] TASK-060 DataStack: S3 buckets (raw, sop_source, artifact)
   - objective: Define the three S3 buckets for official raw data, SOP KB source, and generated artifacts with parameterized names and secure defaults (§4.8, §15.1).
   - requirements_covered: REQ-001, REQ-005, REQ-013, REQ-032, R1, R5
   - design_sections: §4.8, §15.1, §10.0 (source storage)
@@ -1464,12 +1526,12 @@ CHECKPOINT C (not a task): Ensure all Phase 2 property/boundary/golden/policy-sw
   - competition_quality_floor: raw / sop_source / artifact buckets parameterized; per-profile removal policy; official raw bucket read-only for the decision path (no public write); no hard-coded names.
   - demo_or_evidence_output: `cdk synth` assertion (three buckets, parameterized names, removal policies).
 
-- [~] TASK-061 DataStack: IdempotencyTable (DynamoDB) with TTL
+- [ ] TASK-061 DataStack: IdempotencyTable (DynamoDB) with TTL
   - objective: Define the `IdempotencyTable` (PK `idempotency_key`, TTL on `expires_at`) that backs dedup, lease state, and stale-running reconciliation (§10.11e, §15.1).
   - requirements_covered: REQ-003, REQ-004, R5
   - design_sections: §10.11e, §15.1, §6
   - components: DataStack (IdempotencyTable)
-  - files_or_modules_expected: `infra/lib/constructs/dynamo_tables.ts`
+  - files_or_modules_expected: `infra/lib/constructs/idempotency_table.ts`
   - dependencies: [TASK-059]
   - implementation_steps:
     1. Define table with PK `idempotency_key`, on-demand billing, TTL attribute `expires_at`.
@@ -1487,12 +1549,12 @@ CHECKPOINT C (not a task): Ensure all Phase 2 property/boundary/golden/policy-sw
   - competition_quality_floor: PK `idempotency_key` + TTL(`expires_at`); on-demand; schema supports the lease/recovery conditional Put/Update state machine (starting/running/completed/start_failed/processing_failed) with fencing attributes.
   - demo_or_evidence_output: `cdk synth` assertion (PK, TTL, on-demand).
 
-- [~] TASK-062 DataStack: DecisionCoreTable (immutable) DynamoDB
+- [ ] TASK-062 DataStack: DecisionCoreTable (immutable) DynamoDB
   - objective: Define the `DecisionCoreTable` (PK `decision_id`) that stores immutable core decisions written solely by DecisionFn (§10.11a, §15.1).
   - requirements_covered: REQ-011..REQ-022, R2..R16
   - design_sections: §10.11a, §15.1, §6
   - components: DataStack (DecisionCoreTable)
-  - files_or_modules_expected: `infra/lib/constructs/dynamo_tables.ts`
+  - files_or_modules_expected: `infra/lib/constructs/decision_core_table.ts`
   - dependencies: [TASK-059]
   - implementation_steps:
     1. Define table with PK `decision_id`, on-demand billing, parameterized name.
@@ -1510,12 +1572,12 @@ CHECKPOINT C (not a task): Ensure all Phase 2 property/boundary/golden/policy-sw
   - competition_quality_floor: PK `decision_id`; on-demand; immutability enforced by writer isolation (DecisionFn sole writer, TASK-077) + app-level `immutable_after_commit`; no publish/mutable state in this table.
   - demo_or_evidence_output: `cdk synth` assertion (PK decision_id, on-demand); writer-isolation asserted via IAM (TASK-077).
 
-- [~] TASK-063 DataStack: DecisionNarrativeTable (PK decision_id + SK narrative_type)
+- [ ] TASK-063 DataStack: DecisionNarrativeTable (PK decision_id + SK narrative_type)
   - objective: Define the `DecisionNarrativeTable` composite-key table so each `narrative_type` (REPORT/PUBLIC_ALERT/EXPLANATION) is an independent item written by its own RendererFn branch (§10.11b, §15.1).
   - requirements_covered: REQ-021, REQ-022, REQ-008, R13, R14, R15
   - design_sections: §10.11b, §15.1, §6
   - components: DataStack (DecisionNarrativeTable)
-  - files_or_modules_expected: `infra/lib/constructs/dynamo_tables.ts`
+  - files_or_modules_expected: `infra/lib/constructs/decision_narrative_table.ts`
   - dependencies: [TASK-059]
   - implementation_steps:
     1. Define table with PK `decision_id` + SK `narrative_type`, on-demand billing, parameterized name.
@@ -1533,12 +1595,12 @@ CHECKPOINT C (not a task): Ensure all Phase 2 property/boundary/golden/policy-sw
   - competition_quality_floor: PK `decision_id` + SK `narrative_type` (REPORT/PUBLIC_ALERT/EXPLANATION); supports per-branch `attribute_not_exists(decision_id)` conditional Put on the composite key (single-arg form only); no double-arg `attribute_not_exists`.
   - demo_or_evidence_output: `cdk synth` assertion (composite PK+SK key schema).
 
-- [~] TASK-064 DataStack: PublishRecordTable (DynamoDB)
+- [ ] TASK-064 DataStack: PublishRecordTable (DynamoDB)
   - objective: Define the `PublishRecordTable` (PK `decision_id`) holding mutable publish state + audit trail, isolated from immutable DecisionCore (§10.11d, §10.17).
   - requirements_covered: REQ-022, R11
   - design_sections: §10.11d, §10.17, §15.1
   - components: DataStack (PublishRecordTable)
-  - files_or_modules_expected: `infra/lib/constructs/dynamo_tables.ts`
+  - files_or_modules_expected: `infra/lib/constructs/publish_record_table.ts`
   - dependencies: [TASK-059]
   - implementation_steps:
     1. Define table with PK `decision_id`, on-demand billing, parameterized name.
@@ -1556,12 +1618,12 @@ CHECKPOINT C (not a task): Ensure all Phase 2 property/boundary/golden/policy-sw
   - competition_quality_floor: PK `decision_id` + optimistic-lock `version`; on-demand; physically separate from the immutable DecisionCoreTable (publish_state never written back to Core).
   - demo_or_evidence_output: `cdk synth` assertion (separate table, version attribute).
 
-- [~] TASK-065 DataStack: connections table (WebSocket)
+- [ ] TASK-065 DataStack: connections table (WebSocket)
   - objective: Define the DynamoDB `connections` table (PK `connectionId`, TTL) for WebSocket connection storage per the AWS reference pattern (§4.5, §15.1).
   - requirements_covered: REQ-001, REQ-004, R4, R5
   - design_sections: §4.5, §15.1, §6
   - components: DataStack (connections)
-  - files_or_modules_expected: `infra/lib/constructs/dynamo_tables.ts`
+  - files_or_modules_expected: `infra/lib/constructs/connections_table.ts`
   - dependencies: [TASK-059]
   - implementation_steps:
     1. Define table PK `connectionId`, on-demand, TTL for cleanup.
@@ -1578,7 +1640,7 @@ CHECKPOINT C (not a task): Ensure all Phase 2 property/boundary/golden/policy-sw
   - competition_quality_floor: PK `connectionId` + TTL; on-demand; WebSocket connection storage per the AWS reference pattern; `PostToConnection` confined to Ws roles (TASK-083).
   - demo_or_evidence_output: `cdk synth` assertion (PK connectionId, TTL) + connections-table wiring to the WebSocket API.
 
-- [~] TASK-066 DataStack: Bedrock Knowledge Base, data source, and vector store config
+- [ ] TASK-066 DataStack: Bedrock Knowledge Base, data source, and vector store config
   - objective: Define the Bedrock Knowledge Base (SOP source in S3, article-chunked) with parameterized `kb.knowledge_base_id`, `kb.embedding_model_id`, and vector store, for RAG retrieval (§4.1, §4.2, §14.1).
   - requirements_covered: REQ-005, REQ-007, REQ-008, R5, R15, R16
   - design_sections: §4.1, §4.2, §14.1
@@ -1601,7 +1663,7 @@ CHECKPOINT C (not a task): Ensure all Phase 2 property/boundary/golden/policy-sw
   - competition_quality_floor: KB + data source (7 article chunks) + vector store fully parameterized (`kb.knowledge_base_id`/`kb.embedding_model_id`/region), no hard-coded model/region; ingestion job execution deferred to deployment-time TASK-178 (never a runtime handler).
   - demo_or_evidence_output: `cdk synth` assertion showing KB + data source + parameterized vector store; documented S3 direct-read fallback.
 
-- [~] TASK-067 ComputeStack: Lambda function definitions (all 10 runtime handlers)
+- [ ] TASK-067 ComputeStack: Lambda function definitions (all 10 runtime handlers)
   - objective: Define the ten RUNTIME Lambda functions (InjectFn, WorkflowStatusFn, RecoveryGateFn, DecisionFn, RendererFn, PublishFn, ApiReadFn, WsPushFn, ConnFn, WhatIfFn) with memory/timeout/reserved-concurrency and env wiring, referencing their handler code packages (§6 圖2, §8, §20, §27). There is NO `IngestionFn` runtime Lambda — §6 圖2 defines no such runtime node; S3→KB ingestion is a DEPLOYMENT-TIME mechanism (§14.1, §25 step 1) provisioned by TASK-178, not a runtime handler. `WhatIfFn` is the dedicated What-if host (§12 POST /what-if, §14.5) so What-if never runs inside RendererFn/ApiReadFn/DecisionFn (preserves write-isolation/single-responsibility).
   - requirements_covered: REQ-003..REQ-022, REQ-006 (What-if host), R2..R16
   - design_sections: §6 圖2 (compute nodes), §8, §14.5 (What-if), §18, §20 (timeouts), §27 (concurrency)
@@ -1625,7 +1687,7 @@ CHECKPOINT C (not a task): Ensure all Phase 2 property/boundary/golden/policy-sw
   - competition_quality_floor: All 10 runtime Lambdas defined with parameterized memory/timeout/reserved-concurrency and explicit role-injection points (no auto-generated role); NO IngestionFn runtime Lambda (KB ingestion is the deployment-time CDK Custom Resource Provider, TASK-178); dedicated WhatIfFn present; no shared over-privileged role; no hard-coded account/region/model. Final role binding + grants completed by TASK-179.
   - demo_or_evidence_output: `cdk synth` assertion output listing exactly the 10 runtime functions (incl WhatIfFn, excl IngestionFn) with DecisionFn reserved concurrency, explicit role-injection points, and no auto-generated execution role (final binding verified in TASK-179).
 
-- [~] TASK-068 ComputeStack: Step Functions Express state machine (ASL)
+- [ ] TASK-068 ComputeStack: Step Functions Express state machine (ASL)
   - objective: Define the Express Workflow ASL with `MARK_RUNNING` as the first state (`$$.Execution.Id`), the DecisionFn Choice Gate, the ENRICHMENT_ONLY RecoveryGate branch, parallel enrichment branches, and terminal `MARK_COMPLETED`/`MARK_PROCESSING_FAILED` (§4.6, §6, §15.2, Figure 8).
   - requirements_covered: REQ-004, REQ-005, R5
   - design_sections: §4.6, §6, §15.2, Figure 8
@@ -1649,7 +1711,7 @@ CHECKPOINT C (not a task): Ensure all Phase 2 property/boundary/golden/policy-sw
   - competition_quality_floor: Express state machine; first state `MARK_RUNNING` (`$$.Execution.Id`); Choice Gate with the three `core_write_status` branches (COMMITTED / ALREADY_COMMITTED_SAME_DECISION / CORE_IDENTITY_CONFLICT); ENRICHMENT_ONLY RecoveryGate branch; parallel enrichment (REPORT/PUBLIC_ALERT/EXPLANATION); terminal MARK_COMPLETED / MARK_PROCESSING_FAILED; DecisionFn never before MARK_RUNNING; `lambda_direct` is deployment-time-only (never a runtime fallback).
   - demo_or_evidence_output: `cdk synth` + ASL structural assertion (first state, choice branches, parallel enrichment, exported ARN).
 
-- [~] TASK-069 NetworkAuthStack: API Gateway HTTP API + routes + Cognito authorizer
+- [ ] TASK-069 NetworkAuthStack: API Gateway HTTP API + routes + Cognito authorizer
   - objective: Define the HTTP API with all §12 routes and Cognito authorization on write paths (POST), leaving GET public/relaxed (§4.4, §12, §17).
   - requirements_covered: REQ-003, REQ-006, REQ-021, REQ-022, R5, R13, R14, R16
   - design_sections: §4.4, §12 (route table), §17
@@ -1672,7 +1734,7 @@ CHECKPOINT C (not a task): Ensure all Phase 2 property/boundary/golden/policy-sw
   - competition_quality_floor: All §12 routes synthesize; every POST (inject/what-if/publish) Cognito-protected (admin/operator/commander) and fail-closed; POST /what-if integrated to dedicated WhatIfFn; `api.endpoint` exported; no unauthenticated write path.
   - demo_or_evidence_output: `cdk synth` assertion (route count/methods, Cognito authorizer on all POSTs incl /what-if→WhatIfFn, exported api.endpoint).
 
-- [~] TASK-070 NetworkAuthStack: WebSocket API + routes
+- [ ] TASK-070 NetworkAuthStack: WebSocket API + routes
   - objective: Define the WebSocket API with `$connect`/`$disconnect`/`$default` + custom routes and `@connections` push integration, backed by the connections table (§4.5, §13).
   - requirements_covered: REQ-001, REQ-004, REQ-008, R4, R5, R15
   - design_sections: §4.5, §13, §16
@@ -1695,7 +1757,7 @@ CHECKPOINT C (not a task): Ensure all Phase 2 property/boundary/golden/policy-sw
   - competition_quality_floor: `$connect`/`$disconnect`/`$default` + custom routes; `PostToConnection` granted only to Ws roles (TASK-083); connections table wired; `ws.endpoint` exported; no broad PostToConnection grant.
   - demo_or_evidence_output: `cdk synth` assertion (three system routes + custom, connections table wired, ws.endpoint output).
 
-- [~] TASK-071 NetworkAuthStack: Cognito user pool + groups (admin/operator/commander)
+- [ ] TASK-071 NetworkAuthStack: Cognito user pool + groups (admin/operator/commander)
   - objective: Define the Cognito user pool, app client, and the three groups/scopes that separate admin (inject), operator (what-if), and commander (publish) from public read (§4.10, §17).
   - requirements_covered: REQ-003, REQ-006, REQ-022, R5, R11, R16
   - design_sections: §4.10, §17
@@ -1718,7 +1780,7 @@ CHECKPOINT C (not a task): Ensure all Phase 2 property/boundary/golden/policy-sw
   - competition_quality_floor: user pool + app client + admin/operator/commander groups/scopes; public read separate; write paths fail-closed without Cognito (§17).
   - demo_or_evidence_output: `cdk synth` assertion (three groups/scopes; write-path authorizer wiring).
 
-- [~] TASK-072 FrontendStack: Amplify Hosting (or S3+CloudFront) with hosting switch
+- [ ] TASK-072 FrontendStack: Amplify Hosting (or S3+CloudFront) with hosting switch
   - objective: Define frontend hosting selectable via `frontend.hosting` (Amplify default, S3+CloudFront alternative) with build-time endpoint injection (§4.9, §24).
   - requirements_covered: REQ-024, REQ-030, REQ-032, R4, R17
   - design_sections: §4.9, §24, §25.1
@@ -1741,7 +1803,7 @@ CHECKPOINT C (not a task): Ensure all Phase 2 property/boundary/golden/policy-sw
   - competition_quality_floor: Amplify Hosting (or S3+CloudFront) selectable via `frontend.hosting`; build injects `api.endpoint`/`ws.endpoint`; provides the hosting that yields the accessible deployment URL for the official "Dashboard Live Demo" deliverable (REQ-024, realized via TASK-167/171); no placeholder hosting.
   - demo_or_evidence_output: `cdk synth` assertion (hosting construct + hosting switch); deployment URL is the live-demo evidence (via TASK-171 keep-URL).
 
-- [~] TASK-073 SSM Parameter Store provisioning and env-param definitions
+- [ ] TASK-073 SSM Parameter Store provisioning and env-param definitions
   - objective: Define the SSM parameters for all non-secret configuration keys (§23.1) so PERSONAL_AWS_DEV/COMPETITION_AWS resolve config with no hard-coding (§4.12).
   - requirements_covered: REQ-024, REQ-032, R-supporting (all)
   - design_sections: §4.12, §23.1
@@ -1764,7 +1826,7 @@ CHECKPOINT C (not a task): Ensure all Phase 2 property/boundary/golden/policy-sw
   - competition_quality_floor: All §23.1 non-secret keys provisioned (incl `policy.*` knobs); no secrets in Parameter Store; endpoints written back post-deploy; no hard-coded account/region/model.
   - demo_or_evidence_output: `cdk synth` assertion (parameter set matches §23.1 key list).
 
-- [~] TASK-074 Secrets Manager provisioning
+- [ ] TASK-074 Secrets Manager provisioning
   - objective: Define Secrets Manager secret placeholders for any real secrets so credentials never live in code, SSM, or logs (§4.12, §17).
   - requirements_covered: REQ-032, R-supporting (security)
   - design_sections: §4.12, §17
@@ -1787,7 +1849,7 @@ CHECKPOINT C (not a task): Ensure all Phase 2 property/boundary/golden/policy-sw
   - competition_quality_floor: Secret placeholders only; retrieval failure → fail-closed (no plaintext fallback); no plaintext secret in IaC or logs.
   - demo_or_evidence_output: `cdk synth` assertion (Secrets Manager construct; no inline secret values).
 
-- [~] TASK-075 CloudWatch log groups, custom metrics, alarms, and optional X-Ray toggle
+- [ ] TASK-075 CloudWatch log groups, custom metrics, alarms, and optional X-Ray toggle
   - objective: Define per-Lambda log groups, custom latency/failure metric namespaces, latency alarms, and an `observability.xray_enabled` toggle (§4.11, §19).
   - requirements_covered: REQ-004, REQ-032, R4, R5
   - design_sections: §4.11, §19, §10.16
@@ -1810,7 +1872,7 @@ CHECKPOINT C (not a task): Ensure all Phase 2 property/boundary/golden/policy-sw
   - competition_quality_floor: Log groups + custom metrics `FastPathLatencyMs` (5s TEAM_TARGET) and `EndToEndLatencyMs` (60s OFFICIAL) + failure counters + alarms; X-Ray behind `observability.xray_enabled` toggle; structured logs never contain credentials.
   - demo_or_evidence_output: `cdk synth` assertion (metrics namespace, alarms, X-Ray toggle).
 
-- [~] TASK-076 IAM: InjectFnRole (precise allow/deny, FIX 2)
+- [ ] TASK-076 IAM: InjectFnRole (precise allow/deny, FIX 2)
   - objective: Define `InjectFnRole` with exact allows (Idempotency Get/Put/Update, StartExecution on the selected state-machine ARN, `lambda:InvokeFunction` on ONLY RecoveryGateFn + WorkflowStatusFn exact ARNs, CloudWatch Logs, SSM read) and explicit denies (no invoke wildcard, no decision-table writes, no Bedrock/KB/PostToConnection/S3-write, no DynamoDB table wildcard) (§18).
   - requirements_covered: REQ-003, REQ-004, R5
   - design_sections: §18 (InjectFnRole), §8, §15.1
@@ -1833,7 +1895,7 @@ CHECKPOINT C (not a task): Ensure all Phase 2 property/boundary/golden/policy-sw
   - competition_quality_floor: Precise ALLOW (GetItem/PutItem/UpdateItem on IdempotencyTable, StartExecution on the chosen state-machine ARN, InvokeFunction on RecoveryGateFn + WorkflowStatusFn EXACT ARNs, CloudWatch, SSM read); explicit DENY (wildcard `lambda:InvokeFunction`, Core/Narrative/Publish writes, Bedrock, KB Retrieve, PostToConnection, S3 write, DynamoDB table wildcard). FIX-2 shared-status ownership.
   - demo_or_evidence_output: IAM policy assertion (allow/deny sets) + denial test (TASK-160) proving no wildcard invoke and no decision-table write.
 
-- [~] TASK-077 IAM: DecisionFnRole (Deny IdempotencyTable writes)
+- [ ] TASK-077 IAM: DecisionFnRole (Deny IdempotencyTable writes)
   - objective: Define `DecisionFnRole` allowing S3 raw read, DecisionCoreTable read/write (sole writer), CloudWatch, SSM read, with explicit `Deny` on any IdempotencyTable write (incl `core_committed`) and no Bedrock/Narrative/Publish writes (§18, §9.3).
   - requirements_covered: REQ-011..REQ-022, R2..R16
   - design_sections: §18 (DecisionFnRole), §9.3, §15.1
@@ -1856,7 +1918,7 @@ CHECKPOINT C (not a task): Ensure all Phase 2 property/boundary/golden/policy-sw
   - competition_quality_floor: ALLOW read S3 raw + read/write DecisionCoreTable (SOLE writer) + CloudWatch + SSM; explicit DENY any IdempotencyTable write (incl `core_committed`), Narrative/Publish writes, and Bedrock. Enforces §9 at the IAM layer.
   - demo_or_evidence_output: IAM policy assertion + denial test (TASK-160) proving DecisionFn cannot write IdempotencyTable.
 
-- [~] TASK-078 IAM: RendererFnRole (Deny DecisionCore write)
+- [ ] TASK-078 IAM: RendererFnRole (Deny DecisionCore write)
   - objective: Define `RendererFnRole` allowing Bedrock InvokeModel/Converse, KB `Retrieve`, S3 SOP read, DecisionCore read-only, and conditional Put of DecisionNarrative `narrative_type` items, with explicit `Deny` on any DecisionCore write and Publish/Idempotency writes (§18, §9.3).
   - requirements_covered: REQ-021, REQ-022, REQ-008, R13, R14, R15
   - design_sections: §18 (RendererFnRole), §9.3, §10.11b
@@ -1879,7 +1941,7 @@ CHECKPOINT C (not a task): Ensure all Phase 2 property/boundary/golden/policy-sw
   - competition_quality_floor: ALLOW Bedrock InvokeModel/Converse + KB Retrieve + read S3 SOP + read-only DecisionCore + `attribute_not_exists(decision_id)` conditional Put on the DecisionNarrativeTable `narrative_type` item; explicit DENY DecisionCore write (Put/Update/Delete) and Publish/Idempotency writes. Enforces §9 (text-only) at the IAM layer.
   - demo_or_evidence_output: IAM policy assertion + denial test (TASK-160) proving zero DecisionCore write.
 
-- [~] TASK-079 IAM: WorkflowStatusFnRole (IdempotencyTable-only, fencing)
+- [ ] TASK-079 IAM: WorkflowStatusFnRole (IdempotencyTable-only, fencing)
   - objective: Define `WorkflowStatusFnRole` allowing only `GetItem` (with `ConsistentRead`) / `UpdateItem` on IdempotencyTable and CloudWatch Logs, with explicit `Deny` on writing any other DynamoDB table, Bedrock, S3 raw write, and WebSocket `PostToConnection` (§18).
   - requirements_covered: REQ-003, REQ-004, R5
   - design_sections: §18 (WorkflowStatusFnRole), §10.11e, §15.2
@@ -1902,7 +1964,7 @@ CHECKPOINT C (not a task): Ensure all Phase 2 property/boundary/golden/policy-sw
   - competition_quality_floor: ALLOW only `GetItem`(ConsistentRead)/`UpdateItem` on IdempotencyTable for the five fenced actions; explicit DENY writing any other table, Bedrock, S3 raw write, and WebSocket PostToConnection (never pushes public alerts).
   - demo_or_evidence_output: IAM policy assertion + denial test (TASK-160) proving IdempotencyTable-only writes and no PostToConnection.
 
-- [~] TASK-080 IAM: RecoveryGateFnRole (read-only, ConsistentRead)
+- [ ] TASK-080 IAM: RecoveryGateFnRole (read-only, ConsistentRead)
   - objective: Define `RecoveryGateFnRole` allowing only strong-consistent reads — `GetItem` (ConsistentRead) on Idempotency and DecisionCore, `Query` (ConsistentRead, base table only) on DecisionNarrative — plus CloudWatch Logs, with explicit `Deny` on all DynamoDB writes, Bedrock, WebSocket, and S3 write (§18).
   - requirements_covered: REQ-004, R5
   - design_sections: §18 (RecoveryGateFnRole), §10.11e, §15.2
@@ -1925,7 +1987,7 @@ CHECKPOINT C (not a task): Ensure all Phase 2 property/boundary/golden/policy-sw
   - competition_quality_floor: ALLOW only strong-consistent `GetItem` (Idempotency/Core) + `Query` (Narrative base table, not eventually-consistent GSI); explicit DENY any DynamoDB write, Bedrock, WebSocket PostToConnection, S3 write. Read/judgment separated from state change.
   - demo_or_evidence_output: IAM policy assertion + denial test (TASK-160) proving zero writes across all tables.
 
-- [~] TASK-081 IAM: ApiReadFnRole (read-only incl IdempotencyTable GetItem, FIX 1)
+- [ ] TASK-081 IAM: ApiReadFnRole (read-only incl IdempotencyTable GetItem, FIX 1)
   - objective: Define `ApiReadFnRole` allowing only read (`GetItem`/`Query`) on DecisionCore/DecisionNarrative/PublishRecord and `GetItem` (read-only) on IdempotencyTable for the execution summary, plus CloudWatch and SSM read, with explicit `Deny` on all DynamoDB writes, Bedrock, StartExecution, PostToConnection, and S3 write (§18, §10.11c FIX 1).
   - requirements_covered: REQ-021, REQ-022, REQ-008, R13, R14, R15
   - design_sections: §18 (ApiReadFnRole), §10.11c, §12
@@ -1948,7 +2010,7 @@ CHECKPOINT C (not a task): Ensure all Phase 2 property/boundary/golden/policy-sw
   - competition_quality_floor: ALLOW read-only `GetItem`/`Query` on Core/Narrative/Publish + read-only `GetItem` on IdempotencyTable (execution summary, FIX 1) + CloudWatch + SSM; explicit DENY any DynamoDB write (all tables), Bedrock, StartExecution, PostToConnection, S3 write.
   - demo_or_evidence_output: IAM policy assertion + denial test (TASK-160) proving read-only incl. IdempotencyTable GetItem and no writes.
 
-- [~] TASK-082 IAM: PublishFnRole (Deny DecisionCore write)
+- [ ] TASK-082 IAM: PublishFnRole (Deny DecisionCore write)
   - objective: Define `PublishFnRole` allowing DecisionCore/DecisionNarrative read-only, PublishRecordTable write, publish-simulation channels, and CloudWatch, with explicit `Deny` on any DecisionCore write (§18, §10.11d).
   - requirements_covered: REQ-022, R11
   - design_sections: §18 (PublishFnRole), §10.11d
@@ -1971,7 +2033,7 @@ CHECKPOINT C (not a task): Ensure all Phase 2 property/boundary/golden/policy-sw
   - competition_quality_floor: ALLOW read-only Core/Narrative + write PublishRecordTable (`publish_state`/`audit_trail`) + publish-simulation channels + CloudWatch; explicit DENY DecisionCore write; `publish_state` never written back to the immutable Core.
   - demo_or_evidence_output: IAM policy assertion + denial test (TASK-160) proving PublishFn cannot write DecisionCore.
 
-- [~] TASK-083 IAM: WsConnFnRole, OrchestratorRole, IngestionRole
+- [ ] TASK-083 IAM: WsConnFnRole, OrchestratorRole, IngestionRole
   - objective: Define the remaining roles — WsConnFnRole (connections R/W + PostToConnection), OrchestratorRole (invoke the workflow Lambdas only), IngestionRole (exact Bedrock ingestion API actions + SOP-source S3 read + config SSM read) — each least-privilege per §18. IngestionRole is an implementation-level least-privilege realization of the Frozen Design §18 isolation principle; it is attached to the deployment-time CDK Custom Resource Provider handlers defined in TASK-178 (it is NOT a runtime Lambda role, and is never attached to any application runtime Lambda). It does not alter the logical architecture.
   - requirements_covered: REQ-001, REQ-004, REQ-005, R1, R4, R5
   - design_sections: §18 (WsConnFnRole/OrchestratorRole/IngestionRole), §14.1 (deployment-time ingestion)
@@ -1994,7 +2056,7 @@ CHECKPOINT C (not a task): Ensure all Phase 2 property/boundary/golden/policy-sw
   - competition_quality_floor: Three least-privilege roles with exact allow/deny; IngestionRole realized with exact Bedrock ingestion API actions (`StartIngestionJob`/`GetIngestionJob`/`GetKnowledgeBase`/`GetDataSource`) + SOP-source S3 read + config SSM read, attached to the TASK-178 CDK Custom Resource Provider handlers (explicit owner, fully traceable), never attached to a runtime Lambda; OrchestratorRole invokes only the four workflow Lambdas and is attached only to Step Functions; no orphaned role, no over-privileged role, no wildcard.
   - demo_or_evidence_output: IAM policy assertion output for the 3 roles + denial test (TASK-160) proving IngestionRole cannot write raw/invoke Bedrock models/write state tables and Orchestrator cannot mutate data or invoke non-workflow Lambdas.
 
-- [~] TASK-177 IAM: WhatIfFnRole (dedicated What-if runtime least privilege)
+- [ ] TASK-177 IAM: WhatIfFnRole (dedicated What-if runtime least privilege)
   - objective: Define the dedicated `WhatIfFnRole` for the What-if runtime Lambda (WhatIfFn, TASK-067). `WhatIfFnRole` is an implementation-derived least-privilege IAM enforcement artifact: it is an implementation-level least-privilege realization of the Frozen Design §9 and §18 isolation principles, and it does not alter the logical architecture. What-if is an already-approved frozen capability (§12 POST /what-if Cognito(operator); §14.5 four stages) that must NOT mutate state or write any decision table, yet needs Bedrock + KB + deterministic recompute; this role introduces no new business rule, API route, DynamoDB table, AWS service, decision authority, or user capability — it uses the already-frozen Lambda service and the design's least-privilege IAM pattern (adds NO new AWS service; respects §9/§18).
   - requirements_covered: REQ-006, REQ-007, R16
   - design_sections: §9 (deterministic/Bedrock boundary), §12 (POST /what-if operator), §14.5 (4 stages), §18 (least-privilege pattern)
@@ -2017,7 +2079,7 @@ CHECKPOINT C (not a task): Ensure all Phase 2 property/boundary/golden/policy-sw
   - competition_quality_floor: Dedicated least-privilege role with exact ALLOW (Bedrock/KB/read-only/CloudWatch/SSM) and explicit DENY (all decision/narrative/publish/idempotency writes, StartExecution, PostToConnection, S3 write, wildcards); never shared/over-privileged.
   - demo_or_evidence_output: IAM policy assertion output proving the ALLOW/DENY sets; denial test showing a What-if write/StartExecution/PostToConnection attempt is rejected.
 
-- [~] TASK-178 Deployment-time KB ingestion mechanism (AWS CDK Custom Resource Provider Framework, NO runtime Lambda)
+- [ ] TASK-178 Deployment-time KB ingestion mechanism (AWS CDK Custom Resource Provider Framework, NO runtime Lambda)
   - objective: Provide the DEPLOYMENT-TIME S3→Bedrock KB ingestion mechanism whose primary and only mechanism is the **AWS CDK Custom Resource Provider Framework**: an `onEvent` handler that calls `StartIngestionJob` and an `isComplete` handler that calls `GetIngestionJob` until `COMPLETE`/`FAILED`/timeout. It loads the article-chunked SOP into the KB data source and verifies completion — replacing the removed `IngestionFn` runtime Lambda (§6 圖2 defines no runtime ingestion node; §14.1 + §25 step 1 define ingestion as deployment-time). The Provider Framework runs under `IngestionRole` (TASK-083). This is deployment-support (NOT counted among the 10 application runtime Lambdas). `scripts/kb_ingest.ts` MAY exist ONLY as a manual recovery-and-verification fallback and is never the primary mechanism.
   - requirements_covered: REQ-005, REQ-007, REQ-008, REQ-032, R5, R15, R16
   - design_sections: §14.1 (KB build, deployment-time), §25 step 1 (deploy + KB sync), §10.0 (source hash), §18 (IngestionRole)
@@ -2030,7 +2092,7 @@ CHECKPOINT C (not a task): Ensure all Phase 2 property/boundary/golden/policy-sw
     3. Require a deterministic client token: `clientToken = SHA-256(knowledge_base_id + data_source_id + source_manifest_hash)` (or an equivalent stable canonical token) so a repeat deploy of the same source version creates no semantically-duplicate ingestion job (duplicate-safe/idempotent).
     4. On ingestion failure/timeout/unknown status → fail closed and STOP gate: block competition release (no smoke/RAG until ingestion verified `COMPLETE`); derived KB mirrors never become source of truth.
     5. Expose completion verification consumed by the deploy runbook (TASK-167) and the smoke gate (TASK-169): KB ingestion `COMPLETE` is verified BEFORE any RAG smoke test.
-    6. `application_runtime_lambda_count: 10`; `deployment_support_lambda_count`: the exact number of Lambdas the CDK Custom Resource Provider actually creates (the Provider Framework provisions its own `onEvent` + `isComplete` framework Lambdas; these deployment-support Lambdas MUST NOT be counted among the 10 runtime Lambdas).
+    6. `application_runtime_lambda_count: 10`; `deployment_support_lambda_count_status: SYNTH_DERIVED`. TASK-178 and TASK-180 must use CDK synth assertions to enumerate and record the exact physical deployment-support Lambda resources separately from the ten application runtime Lambdas. Deployment-support Lambdas MUST NOT be counted among the 10 application runtime Lambdas.
   - acceptance_criteria: (1) source hash mismatch → no ingestion; (2) `StartIngestionJob` accepted with the deterministic client token; (3) repeated same client token is duplicate-safe (no semantically-duplicate job); (4) status transitions STARTING→IN_PROGRESS→COMPLETE handled; (5) `FAILED` → release blocked; (6) timeout → release blocked; (7) unknown status → fail closed; (8) RAG smoke cannot start before `COMPLETE`; (9) a derived mirror is rejected as source; (10) IngestionRole cannot mutate the source. Runs at deployment time only (never a runtime handler).
   - tests_required: unit tests for (1) source hash mismatch→no ingestion; (2) StartIngestionJob accepted; (3) repeated clientToken duplicate-safe; (4) STARTING→IN_PROGRESS→COMPLETE; (5) FAILED→release blocked; (6) timeout→release blocked; (7) unknown status→fail closed; (8) RAG smoke cannot start before COMPLETE; (9) derived mirror rejected; (10) IngestionRole cannot mutate source; deployment-validation folded into TASK-167/TASK-169 runbooks (operator-executed; no deploy here).
   - failure_cases: hash mismatch → STOP (no ingest); ingestion FAILED/timeout/unknown → fail closed, release blocked, RAG smoke not run; treating a derived mirror as source → rejected.
@@ -2043,7 +2105,7 @@ CHECKPOINT C (not a task): Ensure all Phase 2 property/boundary/golden/policy-sw
   - competition_quality_floor: Real deployment-time ingestion via the AWS CDK Custom Resource Provider Framework (onEvent StartIngestionJob + isComplete GetIngestionJob polling) with source-hash-before-ingest STOP + deterministic client-token idempotency + completion-verified-before-RAG-smoke; never a runtime Lambda, never a placeholder, never ingest-on-unknown-version, never an operator-only primary path.
   - demo_or_evidence_output: Ingestion-job completion log + verification that KB returns the 7 SOP articles before smoke (TASK-169); STOP demonstrated on a seeded hash mismatch; duplicate-safe re-deploy demonstrated with the deterministic client token.
 
-- [~] TASK-179 Finalize Lambda execution-role bindings and exact cross-resource grants
+- [ ] TASK-179 Finalize Lambda execution-role bindings and exact cross-resource grants
   - objective: Complete and verify the FINAL binding of every application runtime Lambda to its expected explicit execution role and the exact cross-resource IAM grants, so no CDK auto-generated runtime execution role exists and no runtime Lambda shares a generic role (TASK-067 only declared the specs/constructs and role-injection points; this task performs the final binding).
   - requirements_covered: REQ-003, REQ-004, REQ-005, REQ-006, REQ-032, R5, R16, R-supporting (security)
   - design_sections: §6 圖2, §8, §9.3, §15.1, §18, §4.6
@@ -2068,7 +2130,7 @@ CHECKPOINT C (not a task): Ensure all Phase 2 property/boundary/golden/policy-sw
   - competition_quality_floor: Exactly 10 runtime Lambdas each bound to its expected explicit role; zero auto-generated runtime execution roles; zero shared generic runtime roles (WsPushFn+ConnFn→WsConnFnRole is the only permitted shared mapping); Step Functions→OrchestratorRole only; exact InjectFnRole/OrchestratorRole cross-resource grants; no wildcard Lambda invoke or DynamoDB write; verified by `cdk synth` assertions.
   - demo_or_evidence_output: `cdk synth` assertion output listing every Lambda→role binding + the exact StartExecution/InvokeFunction grants; zero auto-generated/shared runtime roles proven.
 
-- [~] TASK-180 Finalize shared stack composition and concurrency-safe integration
+- [ ] TASK-180 Finalize shared stack composition and concurrency-safe integration
   - objective: As the SOLE final integration owner of the four stack shells and the app entrypoint, compose all independent construct modules into the stacks so all four stacks synthesize with zero unresolved cross-stack references, zero CloudFormation cyclic dependencies, and zero unresolved shared-file conflicts (TASK-059 may create initial shells, but TASK-060..084 and TASK-177..179 create independent construct modules, not parallel rewrites of the shells).
   - requirements_covered: REQ-024, REQ-032, R-supporting (all)
   - design_sections: §24 (stack split), §6, §23, §4.13
@@ -2076,7 +2138,7 @@ CHECKPOINT C (not a task): Ensure all Phase 2 property/boundary/golden/policy-sw
   - files_or_modules_expected: `infra/lib/data_stack.ts`, `infra/lib/compute_stack.ts`, `infra/lib/network_auth_stack.ts`, `infra/lib/frontend_stack.ts`, `infra/bin/app.ts`, `infra/test/full_stack_integration.test.ts`, `infra/test/shared_file_ownership.test.ts`
   - dependencies: [TASK-059, TASK-060, TASK-061, TASK-062, TASK-063, TASK-064, TASK-065, TASK-066, TASK-068, TASK-069, TASK-070, TASK-071, TASK-072, TASK-073, TASK-074, TASK-075, TASK-076, TASK-077, TASK-078, TASK-079, TASK-080, TASK-081, TASK-082, TASK-083, TASK-084, TASK-177, TASK-178, TASK-179]
   - implementation_steps:
-    1. Refactor so TASK-060..084 and TASK-177..179 create independent construct modules (e.g., `infra/lib/constructs/buckets.ts`, `dynamo_tables.ts`, `knowledge_base.ts`, `lambda_specs.ts`, `http_api.ts`, `ws_api.ts`, `cognito.ts`, `frontend_hosting.ts`, `ssm_params.ts`, `secrets.ts`, `observability.ts`, `kb_ingestion_provider.ts`, `runtime_bindings.ts`) rather than each re-writing the stack shells in parallel.
+    1. Refactor so TASK-060..084 and TASK-177..179 create independent construct modules (e.g., `infra/lib/constructs/buckets.ts`, `idempotency_table.ts`, `decision_core_table.ts`, `decision_narrative_table.ts`, `publish_record_table.ts`, `connections_table.ts`, `knowledge_base.ts`, `lambda_specs.ts`, `http_api.ts`, `ws_api.ts`, `cognito.ts`, `frontend_hosting.ts`, `ssm_params.ts`, `secrets.ts`, `observability.ts`, `kb_ingestion_provider.ts`, `runtime_bindings.ts`) rather than each re-writing the stack shells in parallel.
     2. TASK-180 (this task) is the SOLE final integration owner of `infra/lib/data_stack.ts`, `infra/lib/compute_stack.ts`, `infra/lib/network_auth_stack.ts`, `infra/lib/frontend_stack.ts`, and `infra/bin/app.ts`; it composes the independent construct modules into these shells.
     3. Wire the WhatIfFn route+role, the deployment-time ingestion provider + IngestionRole, and the frontend API/WebSocket endpoints; validate cross-stack references and absence of cyclic dependencies.
     4. Add full-stack integration + shared-file ownership assertion tests.
@@ -2092,7 +2154,7 @@ CHECKPOINT C (not a task): Ensure all Phase 2 property/boundary/golden/policy-sw
   - competition_quality_floor: Single-owner composition of the four stacks + app entrypoint from independent construct modules; four stacks synthesize for PERSONAL_AWS_DEV and COMPETITION_AWS; LOCAL_MOCK needs no AWS resource creation; every API route/SFN state points to an existing Lambda; every Lambda uses its expected explicit role; zero cyclic dependency; zero unresolved shared-file conflict; all CDK assertion tests pass.
   - demo_or_evidence_output: `cdk synth` (PERSONAL_AWS_DEV + COMPETITION_AWS) + `infra/test/full_stack_integration.test.ts` + `infra/test/shared_file_ownership.test.ts` all green; zero cross-stack/cyclic/shared-file conflicts.
 
-- [~] TASK-084 Teardown lifecycle, removal policies, and cdk destroy readiness (IaC only)
+- [ ] TASK-084 Teardown lifecycle, removal policies, and cdk destroy readiness (IaC only)
   - objective: Configure per-profile removal policies, `autoDeleteObjects` (non-production), and KB/vector-store cleanup so `cdk destroy` can fully remove resources later (§26) — definition only, no destroy executed here.
   - requirements_covered: REQ-032, R-supporting (all)
   - design_sections: §26, §25 (POST-JUDGING CLEANUP)
@@ -2123,7 +2185,7 @@ CHECKPOINT D (not a task): Ensure all Phase 3 `cdk synth` and IAM assertion test
 
 > This phase implements the `InjectFn`/`WorkflowStatusFn`/`RecoveryGateFn` behaviors and the Express workflow lifecycle exactly per §10.11e, §12, §15.2, and Figures 6/7/8, including FIX-1 async 409 semantics, FIX-2 shared status ownership, and FIX-3 external fencing for stale reconciliation. No task lets an LLM compute any status/boolean truth.
 
-- [~] TASK-085 Implement IdempotencyTable repository (conditional Put/Update, ConsistentRead reads)
+- [ ] TASK-085 Implement IdempotencyTable repository (conditional Put/Update, ConsistentRead reads)
   - objective: Provide the deterministic data-access primitives for the lease/status state machine (conditional Put `attribute_not_exists`, conditional Update with fencing conditions, `ConsistentRead` GetItem) shared by InjectFn/WorkflowStatusFn/RecoveryGateFn (§10.11e).
   - requirements_covered: REQ-003, REQ-004, R5
   - design_sections: §10.11e, §15.2
@@ -2146,7 +2208,7 @@ CHECKPOINT D (not a task): Ensure all Phase 3 `cdk synth` and IAM assertion test
   - competition_quality_floor: Conditional Put/Update with `attribute_not_exists(idempotency_key)`; all reads `ConsistentRead=true` where recovery depends on them; lease state-machine primitives; DecisionFn zero-write enforced at the repository boundary (FIX 2).
   - demo_or_evidence_output: Repository unit tests (conditional Put/Update, ConsistentRead) feeding P33.
 
-- [~] TASK-086 Implement InjectFn POST /inject handler + idempotency_key derivation + first lease acquisition
+- [ ] TASK-086 Implement InjectFn POST /inject handler + idempotency_key derivation + first lease acquisition
   - objective: Handle `POST /incidents/{id}/inject`, derive `idempotency_key = event_id|event_timestamp|policy_version`, and acquire the start lease via first conditional Put (`status=starting`, `attempt_count=1`, `recovery_mode=NORMAL`) (§12, §15.2 step 1).
   - requirements_covered: REQ-003, REQ-004, R5
   - design_sections: §12, §15.2 (step 1), §10.11e, Figure 6
@@ -2169,7 +2231,7 @@ CHECKPOINT D (not a task): Ensure all Phase 3 `cdk synth` and IAM assertion test
   - competition_quality_floor: `idempotency_key = event_id|event_timestamp|policy_version`; the first `attribute_not_exists` Put wins the lease (`status=starting`, `attempt_count=1`, `lease_owner`, `recovery_mode=NORMAL`); InjectFn NEVER writes `running` (that is MARK_RUNNING's job).
   - demo_or_evidence_output: Handler unit tests (key derivation, first-lease acquisition) feeding P33 (a).
 
-- [~] TASK-087 Implement InjectFn StartExecution (lease holder only) + 202 / 503 start_failed
+- [ ] TASK-087 Implement InjectFn StartExecution (lease holder only) + 202 / 503 start_failed
   - objective: Have the lease holder call `StartExecution` (Express) passing `idempotency_key/decision_id/attempt_count/lease_owner/recovery_mode` as INPUT, return `202` on success (InjectFn does NOT write `running`), and on failure transition `starting→start_failed` and return `503 WORKFLOW_START_FAILED` (§12, §15.2 steps 2–3).
   - requirements_covered: REQ-004, R5
   - design_sections: §12 (status matrix), §15.2, §4.6, Figure 6/7
@@ -2192,7 +2254,7 @@ CHECKPOINT D (not a task): Ensure all Phase 3 `cdk synth` and IAM assertion test
   - competition_quality_floor: Only the lease holder calls `StartExecution`; success → `202` (InjectFn does not write `running`); StartExecution failure → `starting → start_failed` + `503 WORKFLOW_START_FAILED` (never `202`); COMPETITION_AWS runtime NEVER falls back to a direct DecisionFn call.
   - demo_or_evidence_output: Unit/failure-injection tests: success 202 and StartExecution-failure 503 with lease cleared for recovery (P33 b).
 
-- [~] TASK-088 Implement InjectFn same-key re-request routing (200/202 branches)
+- [ ] TASK-088 Implement InjectFn same-key re-request routing (200/202 branches)
   - objective: Route same-key re-requests by `status`/lease/`running_deadline_at`: `completed`→`200`, valid `running` (`>=now`)→`202`, `starting` (lease valid)→`202`, plus dispatch to recovery/stale/conflict handlers (§12, §15.2 step 4).
   - requirements_covered: REQ-003, REQ-004, R5
   - design_sections: §12 (status matrix), §15.2 (step 4), §10.11e
@@ -2215,7 +2277,7 @@ CHECKPOINT D (not a task): Ensure all Phase 3 `cdk synth` and IAM assertion test
   - competition_quality_floor: `completed` → `200 OK`; valid `running`/`starting` (lease unexpired) → `202` in-progress; no duplicate `StartExecution`; recovery ALWAYS transitions `status` back to `starting` first (never "new lease without status transition").
   - demo_or_evidence_output: Unit tests for each same-key branch (200/202/recovery) feeding P33 (a).
 
-- [~] TASK-089 Implement WorkflowStatusFn MARK_RUNNING (first state, $$.Execution.Id)
+- [ ] TASK-089 Implement WorkflowStatusFn MARK_RUNNING (first state, $$.Execution.Id)
   - objective: Implement `MARK_RUNNING` as the workflow's first state that fences on `status=starting AND lease_owner AND attempt_count AND recovery_mode` and writes `running`, `workflow_execution_arn=$$.Execution.Id`, `running_started_at`, `running_deadline_at` — the only writer of `starting→running` (§10.11e, §15.2, PATCH 2).
   - requirements_covered: REQ-004, R5
   - design_sections: §10.11e, §15.2, §6, Figure 8
@@ -2238,7 +2300,7 @@ CHECKPOINT D (not a task): Ensure all Phase 3 `cdk synth` and IAM assertion test
   - competition_quality_floor: SFN first state; conditional Update `status=starting AND lease_owner AND attempt_count AND recovery_mode` → `running` + `workflow_execution_arn=$$.Execution.Id` + `running_deadline_at`; only after success does DecisionFn/RecoveryGate run (eliminates the registration race).
   - demo_or_evidence_output: Integration test showing MARK_RUNNING registers running and gates entry to DecisionFn (P33 c2).
 
-- [~] TASK-090 Implement WorkflowStatusFn MARK_COMPLETED and MARK_PROCESSING_FAILED (fencing + apply-or-confirm)
+- [ ] TASK-090 Implement WorkflowStatusFn MARK_COMPLETED and MARK_PROCESSING_FAILED (fencing + apply-or-confirm)
   - objective: Implement the terminal status actions with full fencing (`workflow_execution_arn=$$.Execution.Id AND attempt_count=input.attempt_count`): `MARK_COMPLETED` (`running→completed`, write `completed_execution_arn`/`completed_attempt_count`, clear lease/deadline, `recovery_stage=NONE`) and `MARK_PROCESSING_FAILED` (`running→processing_failed`, clear lease, `lease_expires_at=now`, write `last_error`, set `recovery_stage` from RecoveryGate) (§10.11e, §15.2).
   - requirements_covered: REQ-004, R5
   - design_sections: §10.11e, §15.2, Figure 8
@@ -2261,7 +2323,7 @@ CHECKPOINT D (not a task): Ensure all Phase 3 `cdk synth` and IAM assertion test
   - competition_quality_floor: Both actions fence on `workflow_execution_arn=$$.Execution.Id AND attempt_count`; `ConditionalCheckFailed → ConsistentRead → ALREADY_APPLIED | FENCED_STALE_EXECUTION`; MARK_COMPLETED writes `completed_execution_arn`/`completed_attempt_count` and clears lease/running_deadline.
   - demo_or_evidence_output: Failure-injection tests (response loss, stale execution) proving ALREADY_APPLIED/FENCED_STALE_EXECUTION (P33 d/e).
 
-- [~] TASK-091 Implement WorkflowStatusFn RECONCILE_STALE_RUNNING (external fencing, FIX 3)
+- [ ] TASK-091 Implement WorkflowStatusFn RECONCILE_STALE_RUNNING (external fencing, FIX 3)
   - objective: Implement the stale-running action invoked by InjectFn (not inside the workflow), fenced by `expected_stale_execution_arn + expected_attempt + observed_running_deadline_at` (NOT the reconciler's own `$$.Execution.Id`), transitioning stale `running→processing_failed` with `last_error=STALE_RUNNING_EXECUTION`, `retryable=true`, and `recovery_stage` from `effective_core_committed` (§10.11e, §15.2, FIX 3).
   - requirements_covered: REQ-004, R5
   - design_sections: §10.11e, §15.2 (step E), Figure 6/8
@@ -2284,7 +2346,7 @@ CHECKPOINT D (not a task): Ensure all Phase 3 `cdk synth` and IAM assertion test
   - competition_quality_floor: EXTERNAL fencing via `expected_stale_execution_arn` + `expected_attempt` + `observed_running_deadline_at` (NOT the reconciler's own `$$.Execution.Id`, FIX 3); `running_deadline_at < now` → `processing_failed`, `last_error=STALE_RUNNING_EXECUTION`, `retryable=true`.
   - demo_or_evidence_output: Failure-injection test: a stale running is reconciled to processing_failed via external fencing (P33 g).
 
-- [~] TASK-092 Implement InjectFn stale-running orchestration (detect → RecoveryGate → RECONCILE)
+- [ ] TASK-092 Implement InjectFn stale-running orchestration (detect → RecoveryGate → RECONCILE)
   - objective: In InjectFn, when a same-key request finds `status=running AND running_deadline_at < now`, call read-only RecoveryGateFn then invoke `WorkflowStatusFn(RECONCILE_STALE_RUNNING)` with the external-fencing inputs, then proceed to staged recovery (§15.2 step E, PATCH 6).
   - requirements_covered: REQ-004, R5
   - design_sections: §15.2 (step E), §10.11e, Figure 6/7
@@ -2307,7 +2369,7 @@ CHECKPOINT D (not a task): Ensure all Phase 3 `cdk synth` and IAM assertion test
   - competition_quality_floor: Detect stale (`running_deadline_at < now`) → call read-only RecoveryGateFn → WorkflowStatusFn(RECONCILE_STALE_RUNNING) → then staged recovery; a stuck `running` NEVER reports in-progress forever.
   - demo_or_evidence_output: Failure-injection test: stuck running is detected and recovered (no permanent in-progress) (P33 g).
 
-- [~] TASK-093 Implement RecoveryGateFn (read-only, strong-consistent judgment)
+- [ ] TASK-093 Implement RecoveryGateFn (read-only, strong-consistent judgment)
   - objective: Implement the read-only gate computing `core_exists`, `idempotency_core_committed`, `effective_core_committed = OR`, `existing/missing_narrative_types`, `recommended_recovery_mode`, and the stale-fencing outputs (`expected_stale_execution_arn`/`expected_attempt`/`observed_running_deadline_at`) via all-`ConsistentRead` reads on base tables only (§10.11e, §15.2, FIX 3).
   - requirements_covered: REQ-004, R5
   - design_sections: §10.11e, §15.2, §8, §18
@@ -2330,7 +2392,7 @@ CHECKPOINT D (not a task): Ensure all Phase 3 `cdk synth` and IAM assertion test
   - competition_quality_floor: All reads `ConsistentRead=true`; `GetItem` Idempotency/Core + `Query` Narrative BASE table (never eventually-consistent GSI); outputs `core_exists`/`effective_core_committed`/`missing_narrative_types` + `expected_stale_execution_arn`/`expected_attempt`/`observed_running_deadline_at`; ZERO writes, no Bedrock/PostToConnection/S3.
   - demo_or_evidence_output: Unit/integration tests proving read-only strong-consistent outputs and zero side effects.
 
-- [~] TASK-094 Implement lease recovery transitions (start_failed/processing_failed/starting)
+- [ ] TASK-094 Implement lease recovery transitions (start_failed/processing_failed/starting)
   - objective: Implement the atomic recovery transitions that always set `status` back to `starting` first — `start_failed→starting` (FULL_WORKFLOW), `processing_failed→starting` (FULL_WORKFLOW or ENRICHMENT_ONLY by `effective_core_committed`), and expired `starting→starting` — incrementing `attempt_count`, refreshing the lease, and removing the old `workflow_execution_arn` (§15.2 steps A–D, PATCH 3/4).
   - requirements_covered: REQ-004, R5
   - design_sections: §15.2 (A–D), §10.11e
@@ -2353,7 +2415,7 @@ CHECKPOINT D (not a task): Ensure all Phase 3 `cdk synth` and IAM assertion test
   - competition_quality_floor: Recovery ALWAYS sets `status` back to `starting` first (`start_failed → starting` FULL_WORKFLOW; `processing_failed → starting` FULL/ENRICHMENT per `effective_core_committed`; expired `starting → starting`); `attempt_count += 1`; single owner; REMOVE stale `workflow_execution_arn`; ENRICHMENT_ONLY never reruns DecisionFn.
   - demo_or_evidence_output: Failure-injection tests for each staged-recovery transition (P33 b/c).
 
-- [~] TASK-095 Implement apply-or-confirm shared library (ALREADY_APPLIED / FENCED_STALE_EXECUTION)
+- [ ] TASK-095 Implement apply-or-confirm shared library (ALREADY_APPLIED / FENCED_STALE_EXECUTION)
   - objective: Provide the shared idempotent semantics used by all status actions: on `ConditionalCheckFailedException`, `ConsistentRead` re-read → `ALREADY_APPLIED` (same execution+attempt reached target) or `FENCED_STALE_EXECUTION` (different execution/attempt → old execution terminates immediately) (§10.11e, §15.2).
   - requirements_covered: REQ-004, R5
   - design_sections: §10.11e (apply-or-confirm), §15.2
@@ -2376,7 +2438,7 @@ CHECKPOINT D (not a task): Ensure all Phase 3 `cdk synth` and IAM assertion test
   - competition_quality_floor: `ConditionalCheckFailed → ConsistentRead → same-execution+same-attempt = ALREADY_APPLIED` (success, continue); else `FENCED_STALE_EXECUTION` (old execution terminates: no table write, no fast_path_ready, no enrichment, no public alert).
   - demo_or_evidence_output: Unit tests for both branches; reused by all fenced status actions (P33 d).
 
-- [~] TASK-096 Implement CORE_IDENTITY_CONFLICT terminal handling + async 409 on later same-key POST (FIX 1)
+- [ ] TASK-096 Implement CORE_IDENTITY_CONFLICT terminal handling + async 409 on later same-key POST (FIX 1)
   - objective: Implement the terminal, non-recoverable identity-conflict path — set `processing_failed`/`last_error=CORE_IDENTITY_CONFLICT`/`retryable=false`/`recovery_stage=NONE`, push `processing.failed`, log a security alert — and return `409` ONLY to later same-key POSTs (the original `202` is never retroactively changed) (§12, §15.2, FIX 1).
   - requirements_covered: REQ-003, REQ-004, R5
   - design_sections: §12 (async semantics), §15.2 (step 6), §21, FIX 1
@@ -2399,7 +2461,7 @@ CHECKPOINT D (not a task): Ensure all Phase 3 `cdk synth` and IAM assertion test
   - competition_quality_floor: Identity mismatch → `CORE_IDENTITY_CONFLICT` terminal (`retryable=false`, `recovery_stage=NONE`), fail-closed, security alert, MARK_PROCESSING_FAILED, `processing.failed`; the original `202` is NEVER retro-changed; `409` returned ONLY to a later same-key POST reading `processing_failed`+`CORE_IDENTITY_CONFLICT` (async semantics, FIX 1).
   - demo_or_evidence_output: Contract/failure test proving async 409 timing (original 202 unchanged; later same-key POST → 409; execution summary reflects terminal state) (P33 h).
 
-- [~] TASK-097 Wire Step Functions status actions, Choice Gate, and recovery_mode branch
+- [ ] TASK-097 Wire Step Functions status actions, Choice Gate, and recovery_mode branch
   - objective: Wire the ASL to call the status actions in order and branch on `recovery_mode` (NORMAL/FULL_WORKFLOW → DecisionFn; ENRICHMENT_ONLY → RecoveryGate then MARK_CORE_COMMITTED with `evidence_source=RECOVERY_GATE_CORE_EXISTS`), plus the DecisionFn Choice Gate (§15.2, Figure 8).
   - requirements_covered: REQ-004, REQ-005, R5
   - design_sections: §15.2, §6, Figure 8
@@ -2422,7 +2484,7 @@ CHECKPOINT D (not a task): Ensure all Phase 3 `cdk synth` and IAM assertion test
   - competition_quality_floor: Choice Gate has at least COMMITTED / ALREADY_COMMITTED_SAME_DECISION / CORE_IDENTITY_CONFLICT; recovery_mode branch (NORMAL/FULL_WORKFLOW → DecisionFn; ENRICHMENT_ONLY → RecoveryGate); MARK_CORE_COMMITTED gates `fast_path_ready`; a safe same-task retry is never routed to a leftover-running terminal.
   - demo_or_evidence_output: ASL wiring + integration test exercising all Choice-Gate branches and the recovery_mode split.
 
-- [~] TASK-098 Injection/workflow lifecycle integration & failure-injection tests (P33)
+- [ ] TASK-098 Injection/workflow lifecycle integration & failure-injection tests (P33)
   - objective: Verify the full idempotency/recovery/fencing lifecycle (P33 a–i): dedup, MARK_RUNNING registration, internal fencing (current `$$.Execution.Id`), RECONCILE external fencing, apply-or-confirm, DecisionCore identity classification, async CORE_IDENTITY_CONFLICT 409 timing, start-failure/stale recovery, ENRICHMENT_ONLY core persistence.
   - requirements_covered: REQ-003, REQ-004, R5
   - design_sections: §22.1 (P33), §22.2 (Integration/Failure-injection/Async 409), §15.2, §10.11e
@@ -2453,7 +2515,7 @@ CHECKPOINT E (not a task): Ensure the injection/workflow lifecycle behaves per �
 
 > This phase wires the deterministic domain core (Phase 1) into `DecisionFn`, persists the immutable `DecisionCore` via conditional Put with canonical-`core_hash` identity classification, and emits `decision.fast_path_ready` only after the `MARK_CORE_COMMITTED` checkpoint. Fast Path uses no Bedrock; the 5s TEAM_TARGET and 60s official deadline are instrumented via `LatencyTrace`.
 
-- [~] TASK-099 Implement DecisionFn handler (invoke deterministic core → DecisionCore payload)
+- [ ] TASK-099 Implement DecisionFn handler (invoke deterministic core → DecisionCore payload)
   - objective: Wire `DecisionFn` to run the deterministic pipeline (ingestion → snapshot → rule engine → evacuation → ETE → evidence → DecisionCore assembly) and produce the `DecisionCore` payload with `core_hash` (§6, §8, Figure 7/8).
   - requirements_covered: REQ-011..REQ-022, R2..R16
   - design_sections: §6, §8, §9.4, §10.11a, Figure 8
@@ -2476,7 +2538,7 @@ CHECKPOINT E (not a task): Ensure the injection/workflow lifecycle behaves per �
   - competition_quality_floor: Invokes the deterministic core → DecisionCore payload; DecisionFn writes ONLY DecisionCoreTable (never IdempotencyTable); Bedrock is not called on the Fast Path; owns all numeric/boolean truth (§9).
   - demo_or_evidence_output: Handler unit/integration tests producing a DecisionCore from the 3 official events; fast-path has no Bedrock call.
 
-- [~] TASK-100 Implement DecisionCore immutable conditional Put (COMMITTED)
+- [ ] TASK-100 Implement DecisionCore immutable conditional Put (COMMITTED)
   - objective: Persist DecisionCore with `attribute_not_exists(decision_id)` conditional Put returning `core_write_status=COMMITTED` (execution-local) on success, enforcing immutability (§6, §10.11a, §15.2).
   - requirements_covered: REQ-011..REQ-022, R2..R16
   - design_sections: §10.11a, §15.2, §6
@@ -2499,7 +2561,7 @@ CHECKPOINT E (not a task): Ensure the injection/workflow lifecycle behaves per �
   - competition_quality_floor: `attribute_not_exists(decision_id)` conditional Put; success → `core_write_status=COMMITTED` (execution-local); `immutable_after_commit`; DecisionFn performs no IdempotencyTable write.
   - demo_or_evidence_output: Integration test showing a single COMMITTED write and immutability of the committed core.
 
-- [~] TASK-101 Implement DecisionCore Put-failure identity classification (canonical core_hash)
+- [ ] TASK-101 Implement DecisionCore Put-failure identity classification (canonical core_hash)
   - objective: On conditional-Put failure, `ConsistentRead` GetItem the existing core and compare `decision_id`/`idempotency_key`/`source_manifest_hash`/`core_hash` (canonical §10.11a-1)/`schema_version` → `ALREADY_COMMITTED_SAME_DECISION` (all match, safe retry) or `CORE_IDENTITY_CONFLICT` (mismatch, fail-closed) (§6, §15.2, FIX 4).
   - requirements_covered: REQ-011..REQ-022, R-supporting
   - design_sections: §6, §10.11a-1, §15.2, §21, FIX 4
@@ -2522,7 +2584,7 @@ CHECKPOINT E (not a task): Ensure the injection/workflow lifecycle behaves per �
   - competition_quality_floor: Put failure → `ConsistentRead` GetItem, compare `decision_id`/`idempotency_key`/`source_manifest_hash`/`core_hash`(§10.11a-1)/`schema_version` → all match = ALREADY_COMMITTED_SAME_DECISION (safe retry), mismatch = CORE_IDENTITY_CONFLICT (fail-closed); NEVER blanket-treat all Put failures as duplicates.
   - demo_or_evidence_output: Unit tests for both classifications using canonical core_hash fixtures (feeds P33 d′).
 
-- [~] TASK-102 Wire MARK_CORE_COMMITTED checkpoint (evidence_source=DECISIONFN_COMMITTED)
+- [ ] TASK-102 Wire MARK_CORE_COMMITTED checkpoint (evidence_source=DECISIONFN_COMMITTED)
   - objective: After `COMMITTED`/`ALREADY_COMMITTED_SAME_DECISION`, have the workflow call `MARK_CORE_COMMITTED` (fenced) to set `core_committed=true` with `evidence_source=DECISIONFN_COMMITTED`; only after this (or ALREADY_APPLIED) may `decision.fast_path_ready` be pushed (§10.11e, §15.2).
   - requirements_covered: REQ-004, REQ-005, R5
   - design_sections: §10.11e, §15.2, §6, Figure 8
@@ -2545,7 +2607,7 @@ CHECKPOINT E (not a task): Ensure the injection/workflow lifecycle behaves per �
   - competition_quality_floor: `core_committed` written ONLY here by WorkflowStatusFn (`evidence_source=DECISIONFN_COMMITTED`); `fast_path_ready` gated on this checkpoint; DecisionFn never writes `core_committed`.
   - demo_or_evidence_output: Integration test proving core_committed sole-writer and fast_path_ready gating (feeds P33 e).
 
-- [~] TASK-103 Implement decision.fast_path_ready emission (ready_event_id)
+- [ ] TASK-103 Implement decision.fast_path_ready emission (ready_event_id)
   - objective: Emit the `decision.fast_path_ready` WebSocket event (with `ready_event_id = decision_id|event_type|core_version_ref`) after the checkpoint, carrying the deterministic core summary, with a `GET /decisions/{id}` polling fallback (§13, §16.3).
   - requirements_covered: REQ-004, REQ-008, R4, R5, R6, R12
   - design_sections: §13, §16.3, Figure 7/8
@@ -2568,7 +2630,7 @@ CHECKPOINT E (not a task): Ensure the injection/workflow lifecycle behaves per �
   - competition_quality_floor: Emitted ONLY after MARK_CORE_COMMITTED; `ready_event_id = decision_id|event_type|core_version_ref`; publisher performs no table writes; `GET /decisions/{id}` polling fallback documented.
   - demo_or_evidence_output: Integration test: fast_path_ready fires post-checkpoint with ready_event_id; publisher writes nothing.
 
-- [~] TASK-104 Implement LatencyTrace instrumentation
+- [ ] TASK-104 Implement LatencyTrace instrumentation
   - objective: Instrument the pipeline stages to populate `LatencyTrace` (`fast_path_ms`, `end_to_end_ms`, `fast_path_target_met<=5000`, `official_deadline_met<=60000`) (§10.16, §20).
   - requirements_covered: REQ-004, R5
   - design_sections: §10.16, §20 (budget)
@@ -2591,7 +2653,7 @@ CHECKPOINT E (not a task): Ensure the injection/workflow lifecycle behaves per �
   - competition_quality_floor: Per-stage `LatencyTrace` (start/end/duration), `fast_path_ms`/`end_to_end_ms`; deterministic measurement feeding CloudWatch metrics.
   - demo_or_evidence_output: LatencyTrace unit tests + emitted stage timings for a full run.
 
-- [~] TASK-105 Wire Fast Path 5s team target and 60s official deadline measurement
+- [ ] TASK-105 Wire Fast Path 5s team target and 60s official deadline measurement
   - objective: Connect `LatencyTrace` targets to the fast-path (≤5s TEAM_TARGET) and end-to-end (≤60s official) measurement points so both are observable per decision (§19, §20).
   - requirements_covered: REQ-004, R5
   - design_sections: §19, §20
@@ -2614,7 +2676,7 @@ CHECKPOINT E (not a task): Ensure the injection/workflow lifecycle behaves per �
   - competition_quality_floor: `FastPathLatencyMs` measured vs the 5s TEAM_TARGET (non-official) and `EndToEndLatencyMs` vs the 60s OFFICIAL hard deadline; both measured, not simulated.
   - demo_or_evidence_output: Metric wiring + a run showing FastPath and end-to-end timings against the two thresholds.
 
-- [~] TASK-106 DecisionCore persistence integration tests (COMMITTED/ALREADY_COMMITTED/CONFLICT)
+- [ ] TASK-106 DecisionCore persistence integration tests (COMMITTED/ALREADY_COMMITTED/CONFLICT)
   - objective: Verify the three-way conditional-Put outcomes, MARK_CORE_COMMITTED gating, and fast_path_ready emission against DecisionCore/IdempotencyTable.
   - requirements_covered: REQ-011..REQ-022, REQ-004, R2..R16
   - design_sections: §22.2 (Integration), §15.2, §10.11a
@@ -2637,7 +2699,7 @@ CHECKPOINT E (not a task): Ensure the injection/workflow lifecycle behaves per �
   - competition_quality_floor: Integration tests for COMMITTED / ALREADY_COMMITTED_SAME_DECISION / CORE_IDENTITY_CONFLICT (1–3 representative cases each) verifying immutability + writer isolation (DecisionFn sole Core writer, no IdempotencyTable write). Release-blocking.
   - demo_or_evidence_output: Green persistence integration suite covering the three Put classifications.
 
-- [~] TASK-107 Fast-path latency tests
+- [ ] TASK-107 Fast-path latency tests
   - objective: Verify `FastPathLatencyMs`/`EndToEndLatencyMs` are measured and the target booleans compute correctly under representative loads.
   - requirements_covered: REQ-004, R5
   - design_sections: §22.2 (Latency), §20
@@ -2668,7 +2730,7 @@ CHECKPOINT F (not a task): Ensure DecisionCore persistence + fast path meet §15
 
 > This phase implements the enrichment path: SOP retrieval (KB `Retrieve` + S3 fallback), the three narrative composers writing independent `narrative_type` items via `attribute_not_exists(decision_id)` conditional Put, the `SchemaValidator` that rejects any core-field overwrite, deterministic multilingual template fallback (never zh-only), and the `decision.enriched` gate. Bedrock writes text-only fields; it never computes numeric/boolean truth. Bedrock failure must not block the Fast Path.
 
-- [~] TASK-108 Implement SopRetriever (Bedrock KB Retrieve)
+- [ ] TASK-108 Implement SopRetriever (Bedrock KB Retrieve)
   - objective: Implement `SopRetriever` using Bedrock KB `Retrieve` to fetch SOP passages + verbatim citations (content, metadata, source location, score) for the deterministic `citation_article_set` (§4.2, §14.1, §14.2).
   - requirements_covered: REQ-005, REQ-007, REQ-008, R5, R15, R16
   - design_sections: §4.2, §14.1, §14.2, Figure 9
@@ -2691,7 +2753,7 @@ CHECKPOINT F (not a task): Ensure DecisionCore persistence + fast path meet §15
   - competition_quality_floor: KB `Retrieve` returns content + source location + score; citation kept VERBATIM; Bedrock only explains, never changes numbers/level/route; requires KB ingestion COMPLETE (TASK-178) before RAG smoke.
   - demo_or_evidence_output: RAG citation integration test mapping a query to the correct article source location.
 
-- [~] TASK-109 Implement SopRetriever S3 article_no fallback
+- [ ] TASK-109 Implement SopRetriever S3 article_no fallback
   - objective: Add the S3 direct-read fallback (by `article_no`) so citation remains available when KB is unavailable (§4.2, §14.1, §21).
   - requirements_covered: REQ-005, R5, R15
   - design_sections: §4.2, §14.1, §21.2 (KB retrieval failure)
@@ -2714,7 +2776,7 @@ CHECKPOINT F (not a task): Ensure DecisionCore persistence + fast path meet §15
   - competition_quality_floor: KB failure → S3 read by `article_no`; citation source location still present; wording via template; no fabrication of SOP content.
   - demo_or_evidence_output: Failure-injection test: KB down → S3 article fallback still yields correct citation.
 
-- [~] TASK-110 Implement citation_article_set assembly (triggered ∪ applied_formula)
+- [ ] TASK-110 Implement citation_article_set assembly (triggered ∪ applied_formula)
   - objective: Provide the deterministic `citation_article_set = triggered_articles ∪ applied_formula_articles` used to drive RAG queries and citation coverage (§14.2, P27).
   - requirements_covered: REQ-008, REQ-021, R13, R15
   - design_sections: §14.2, §9.5, §22.1 (P27)
@@ -2737,7 +2799,7 @@ CHECKPOINT F (not a task): Ensure DecisionCore persistence + fast path meet §15
   - competition_quality_floor: `citation_article_set = triggered ∪ applied_formula` (covers art.7 when applied, not only triggered); verbatim source location preserved.
   - demo_or_evidence_output: Feeds P27; citation set for ACC_001 = {1,2,7}.
 
-- [~] TASK-111 Implement SchemaValidator (text-only; reject core-field overwrite)
+- [ ] TASK-111 Implement SchemaValidator (text-only; reject core-field overwrite)
   - objective: Implement the deterministic `SchemaValidator` that accepts only allowed text fields from Bedrock output and rejects any attempt to overwrite core fields (e.g., `ete_minutes`, `classification`, `primary_evacuation`, `cms_core_text`), falling back to templates on rejection (§9.3, §10.11b, P37).
   - requirements_covered: REQ-015, REQ-021, REQ-022, R13, R14
   - design_sections: §9.3, §10.11b, §14.3, §22.1 (P37)
@@ -2760,7 +2822,7 @@ CHECKPOINT F (not a task): Ensure DecisionCore persistence + fast path meet §15
   - competition_quality_floor: Validates LLM output fills ONLY allowed text fields; ANY attempt to overwrite a core field (`ete_minutes`/`classification`/`primary_evacuation`/`triggered_articles`/`cms_core_text`...) is rejected → template fallback; mechanical §9 enforcement.
   - demo_or_evidence_output: Unit tests: a crafted LLM core-overwrite is rejected and the template is used (core unchanged).
 
-- [~] TASK-112 Implement Bedrock adapter (InvokeModel/Converse) + Mock adapter + model fallbacks
+- [ ] TASK-112 Implement Bedrock adapter (InvokeModel/Converse) + Mock adapter + model fallbacks
   - objective: Provide a Bedrock adapter (InvokeModel/Converse) with client timeouts, `bedrock.model_id_fallbacks` handling, and a LOCAL_MOCK Mock adapter returning fixed text, so enrichment runs offline in CI (§4.1, §21, §23).
   - requirements_covered: REQ-013, REQ-014, REQ-015, R13, R14, R15
   - design_sections: §4.1, §21.2 (Bedrock/region failure), §23
@@ -2783,7 +2845,7 @@ CHECKPOINT F (not a task): Ensure DecisionCore persistence + fast path meet §15
   - competition_quality_floor: `InvokeModel`/`Converse` via parameterized `model_id`/`region` + `model_id_fallbacks`; Mock adapter for LOCAL_MOCK (zero AWS); client timeout → template fallback; Bedrock never on the Fast Path.
   - demo_or_evidence_output: Adapter unit tests + LOCAL_MOCK run with the Mock adapter (no AWS calls).
 
-- [~] TASK-113 Implement ReportComposer (REPORT item conditional Put)
+- [ ] TASK-113 Implement ReportComposer (REPORT item conditional Put)
   - objective: Implement `ReportComposer` producing `report_text`/`cms_explanation_text`/`citations_presentation`, validated text-only, and writing the `REPORT` item via `attribute_not_exists(decision_id)` conditional Put (branch_already_completed on re-put) (§10.11b, §14.3).
   - requirements_covered: REQ-021, REQ-015, R13
   - design_sections: §10.11b, §14.3, Figure 8
@@ -2806,7 +2868,7 @@ CHECKPOINT F (not a task): Ensure DecisionCore persistence + fast path meet §15
   - competition_quality_floor: Generates REPORT text from DECIDED facts; `attribute_not_exists(decision_id)` conditional Put of the REPORT item only (single-arg form); never overwrites another `narrative_type`; `cms_core_text` unchanged (LLM may write only `cms_explanation_text`).
   - demo_or_evidence_output: Integration test writing a REPORT item; re-Put returns branch_already_completed; cms_core_text untouched.
 
-- [~] TASK-114 Implement PublicAlertComposer (PUBLIC_ALERT item, multilingual)
+- [ ] TASK-114 Implement PublicAlertComposer (PUBLIC_ALERT item, multilingual)
   - objective: Implement `PublicAlertComposer` producing `public_alert_text` (zh/en/ja/ko per trigger + bonus), validated text-only, written to the `PUBLIC_ALERT` item via conditional Put (§10.11b, §14.4).
   - requirements_covered: REQ-022, REQ-010, REQ-019, R11, R14
   - design_sections: §10.11b, §14.4, Figure 8/11
@@ -2829,7 +2891,7 @@ CHECKPOINT F (not a task): Ensure DecisionCore persistence + fast path meet §15
   - competition_quality_floor: `zh` always; `+en` on SOP-6 trigger; `+ja/ko` when the bonus is enabled; produced in the SAME response; conditional Put of the PUBLIC_ALERT item only; `sop6_triggered`/`languages` are LLM-prohibited (deterministic).
   - demo_or_evidence_output: Integration test producing multilingual alert text with the correct language set for the trigger state.
 
-- [~] TASK-115 Implement ExplanationComposer (EXPLANATION item from EvidenceTrace + citations)
+- [ ] TASK-115 Implement ExplanationComposer (EXPLANATION item from EvidenceTrace + citations)
   - objective: Implement `ExplanationComposer` (`RendererFn(mode=EXPLANATION)`) generating `explanation_text` from the deterministic `EvidenceTrace` + `citation_article_set`, validated text-only, written to the `EXPLANATION` item via conditional Put (no standalone `explanation.ready`) (§10.11b, §8).
   - requirements_covered: REQ-008, R15
   - design_sections: §10.11b, §8, §14.2, Figure 8
@@ -2845,6 +2907,8 @@ CHECKPOINT F (not a task): Ensure DecisionCore persistence + fast path meet §15
   - failure_cases: Bedrock failure → template explanation from evidence facts.
   - done_definition: ExplanationComposer implemented.
   - provisional_policy_notes: none
+  - hg001_amendment:
+    - Expose timing evidence, affected_road context, ETE road roles/inputs/formula/status, and `guidance_id` to report and read-model consumers.
   - aws_services_touched: Amazon Bedrock, DynamoDB (client)
   - security_or_iam_notes: RendererFnRole; text-only writes.
   - delivery_class: MANDATORY_IMPLEMENTATION
@@ -2852,7 +2916,7 @@ CHECKPOINT F (not a task): Ensure DecisionCore persistence + fast path meet §15
   - competition_quality_floor: Generated from `EvidenceTrace` + `citation_article_set`; conditional Put of the EXPLANATION item only; no independent `explanation.ready` (readiness via `decision.enriched`); text-only, no numeric/route change.
   - demo_or_evidence_output: Integration test producing an EXPLANATION item citing the correct articles from EvidenceTrace.
 
-- [~] TASK-116 Implement DecisionNarrative writer (PK+SK conditional Put per branch)
+- [ ] TASK-116 Implement DecisionNarrative writer (PK+SK conditional Put per branch)
   - objective: Provide the shared narrative writer that each composer uses to write its own `narrative_type` item with `attribute_not_exists(decision_id)` (PK+SK provided; single-arg condition; never the two-arg form), returning `branch_already_completed` on re-put and never overwriting another branch (§10.11b, §15.1).
   - requirements_covered: REQ-021, REQ-022, REQ-008, R13, R14, R15
   - design_sections: §10.11b, §15.1, §8
@@ -2875,7 +2939,7 @@ CHECKPOINT F (not a task): Ensure DecisionCore persistence + fast path meet §15
   - competition_quality_floor: Each branch writes its OWN `narrative_type` item via `attribute_not_exists(decision_id)` (PK+SK provided, single-arg form only); re-Put same `(decision_id, narrative_type)` → `branch_already_completed`; never overwrites another branch; RealtimePublisher never writes DecisionNarrativeTable.
   - demo_or_evidence_output: Concurrency integration test proving three branches never overwrite each other and the publisher performs no NARR write.
 
-- [~] TASK-117 Implement multilingual template fallback (never zh-only)
+- [ ] TASK-117 Implement multilingual template fallback (never zh-only)
   - objective: Implement the deterministic approved multilingual templates (zh/en/ja/ko) that meet the language floor when Bedrock fails (triggered → zh+en; bonus → zh+en+ja+ko), inserting only deterministic facts (§14.4, §21.3, P36).
   - requirements_covered: REQ-010, REQ-019, REQ-031, R11, R17
   - design_sections: §14.4, §21.3, §22.1 (P36)
@@ -2898,7 +2962,7 @@ CHECKPOINT F (not a task): Ensure DecisionCore persistence + fast path meet §15
   - competition_quality_floor: SOP-6 triggered but Bedrock fails → deterministic APPROVED templates (zh/en/ja/ko) inserting only deterministic facts; language floor preserved (trigger → zh+en; bonus → +ja/ko); NEVER degrades to zh-only.
   - demo_or_evidence_output: Feeds P36; Bedrock-down test shows multilingual template output, not zh-only.
 
-- [~] TASK-118 Implement missing_narrative_types recovery (ENRICHMENT_ONLY)
+- [ ] TASK-118 Implement missing_narrative_types recovery (ENRICHMENT_ONLY)
   - objective: In ENRICHMENT_ONLY recovery, use RecoveryGateFn's `missing_narrative_types` to retry only the missing `narrative_type` items (each conditional Put; branch_already_completed if present), never rerunning DecisionFn (§15.2 C, §10.11b).
   - requirements_covered: REQ-021, REQ-022, REQ-008, R13, R14, R15
   - design_sections: §15.2 (staged recovery C), §10.11b
@@ -2921,7 +2985,7 @@ CHECKPOINT F (not a task): Ensure DecisionCore persistence + fast path meet §15
   - competition_quality_floor: ENRICHMENT_ONLY recovers ONLY missing `narrative_type` items via `RecoveryGateFn.missing_narrative_types`; never reruns DecisionFn, never rewrites core, never re-emits `fast_path_ready`; each narrative item commits at most once.
   - demo_or_evidence_output: Failure-injection test: partial enrichment recovers only the missing item(s) (P33 e/f).
 
-- [~] TASK-119 Implement decision.enriched emission (after all 3 committed)
+- [ ] TASK-119 Implement decision.enriched emission (after all 3 committed)
   - objective: Emit `decision.enriched` only after the required set {REPORT, PUBLIC_ALERT, EXPLANATION} are all `COMMITTED` or `branch_already_completed`, with `ready_event_id` for dedup and a polling fallback (§13, §10.11b, PATCH 5).
   - requirements_covered: REQ-021, REQ-008, R13, R15
   - design_sections: §13, §10.11b, Figure 8
@@ -2944,7 +3008,7 @@ CHECKPOINT F (not a task): Ensure DecisionCore persistence + fast path meet §15
   - competition_quality_floor: `decision.enriched` pushed ONLY after the required set {REPORT, PUBLIC_ALERT, EXPLANATION} are all COMMITTED/`branch_already_completed`; also represents EXPLANATION readiness; `ready_event_id` dedup (effectively-once presentation).
   - demo_or_evidence_output: Integration test proving enriched fires only after all three items and is deduped by ready_event_id.
 
-- [~] TASK-120 RAG citation + Bedrock schema-validation + narrative concurrency integration tests
+- [ ] TASK-120 RAG citation + Bedrock schema-validation + narrative concurrency integration tests
   - objective: Verify verbatim citation coverage (KB + S3 fallback), SchemaValidator core-overwrite rejection, and the three-branch concurrent conditional Put (no overwrite; branch_already_completed; enriched gate) (§22.2).
   - requirements_covered: REQ-005, REQ-008, REQ-021, REQ-022, R5, R13, R14, R15
   - design_sections: §22.2 (RAG citation / Bedrock schema-validation / Integration)
@@ -2975,7 +3039,7 @@ CHECKPOINT G (not a task): Ensure enrichment path + §9 boundary hold, and Bedro
 
 > This phase builds the React/TS SPA (§8, §16), consuming the read model and WebSocket events with a polling fallback and `ready_event_id` dedup. The dashboard renders deterministic truth only (A=red/B=yellow, routes, ETE, evidence chain); it never computes numeric/boolean truth. REQ-030 (visual design) and REQ-031 (ja/ko UI) are bonus.
 
-- [~] TASK-121 Scaffold React/TS SPA and inject endpoints via ConfigProvider
+- [ ] TASK-121 Scaffold React/TS SPA and inject endpoints via ConfigProvider
   - objective: Create the SPA skeleton (routing, state, API client) with `api.endpoint`/`ws.endpoint` injected at build-time, no hard-coded endpoints (§8, §16, §4.9).
   - requirements_covered: REQ-001, REQ-024, R4
   - design_sections: §8, §16, §4.9, §23.1
@@ -2998,7 +3062,7 @@ CHECKPOINT G (not a task): Ensure enrichment path + §9 boundary hold, and Bedro
   - competition_quality_floor: SPA shell defines the global UX-state contract every panel honors — loading, empty, error, insufficient-data, stale-data indicator, WebSocket→polling degraded badge, provisional-policy badge, clear status hierarchy, keyboard accessibility, responsive baseline layout, and NO placeholder panels; endpoints injected via ConfigProvider (no hard-coded api/ws URLs).
   - demo_or_evidence_output: SPA builds; shell renders every UX state (snapshot/Storybook); endpoints resolved from config, not literals.
 
-- [~] TASK-122 Implement WebSocket client + connection state machine + polling fallback
+- [ ] TASK-122 Implement WebSocket client + connection state machine + polling fallback
   - objective: Implement the WebSocket client with `connected→polling→connected` state machine (configurable 2s interval) and per-event HTTP polling fallback, surfacing "realtime degraded to polling" (§13, §16.4).
   - requirements_covered: REQ-001, REQ-004, R4, R5
   - design_sections: §13, §16.4
@@ -3021,7 +3085,7 @@ CHECKPOINT G (not a task): Ensure enrichment path + §9 boundary hold, and Bedro
   - competition_quality_floor: `connected → (drop/onerror) → polling` (configurable, default 2s) `→ reconnect → connected` (stop polling); UI shows the WebSocket→polling degraded indicator; live updates continue during degradation.
   - demo_or_evidence_output: State-machine tests + a demo step dropping the WebSocket showing the degraded badge while updates continue.
 
-- [~] TASK-123 Implement ready_event_id dedup (effectively-once presentation)
+- [ ] TASK-123 Implement ready_event_id dedup (effectively-once presentation)
   - objective: Deduplicate incoming events by `ready_event_id` so WebSocket re-delivery never double-renders, treating DecisionNarrative + HTTP polling as authoritative (§13, PATCH 3/5).
   - requirements_covered: REQ-004, REQ-008, R4, R5
   - design_sections: §13 (effectively-once presentation)
@@ -3044,7 +3108,7 @@ CHECKPOINT G (not a task): Ensure enrichment path + §9 boundary hold, and Bedro
   - competition_quality_floor: Dashboard dedups by `ready_event_id` (effectively-once presentation); a resent WebSocket event never double-renders; the narrative table + HTTP polling are the authoritative state.
   - demo_or_evidence_output: Test replaying a duplicate WebSocket event shows a single rendered update.
 
-- [~] TASK-124 Implement timeline playback UI (GET /timeline)
+- [ ] TASK-124 Implement timeline playback UI (GET /timeline)
   - objective: Render the timeline playback control that advances through timestamps and requests corresponding traffic/crowd data, driven by `timeline.updated` with polling fallback (§16.1, R1.5/R4.1).
   - requirements_covered: REQ-001, R1, R4
   - design_sections: §16.1, Figure 5, §12 (/timeline)
@@ -3060,6 +3124,8 @@ CHECKPOINT G (not a task): Ensure enrichment path + §9 boundary hold, and Bedro
   - failure_cases: WebSocket down → polling advances timeline.
   - done_definition: Timeline playback implemented.
   - provisional_policy_notes: none
+  - hg001_amendment:
+    - Display event timestamp, decision cutoff, selected observation timestamp, and staleness during timeline playback.
   - aws_services_touched: HTTP/WebSocket API (client)
   - security_or_iam_notes: none
   - delivery_class: MANDATORY_IMPLEMENTATION
@@ -3067,7 +3133,7 @@ CHECKPOINT G (not a task): Ensure enrichment path + §9 boundary hold, and Bedro
   - competition_quality_floor: Timeline playback from `GET /timeline`; loading/empty/error states; time axis; updates on `timeline.updated`; no placeholder panel.
   - demo_or_evidence_output: Playback advancing through timestamps in the demo; empty/error states rendered.
 
-- [~] TASK-125 Implement road/traffic visualization + A=red / B=yellow lights
+- [ ] TASK-125 Implement road/traffic visualization + A=red / B=yellow lights
   - objective: Render per-segment traffic + A/B light colors from the deterministic grading (A→red, B→yellow) via `GET /roads` (§16, R4.3, P7).
   - requirements_covered: REQ-001, REQ-011, R2, R4
   - design_sections: §16, §12 (/roads), §22.1 (P7)
@@ -3083,6 +3149,8 @@ CHECKPOINT G (not a task): Ensure enrichment path + §9 boundary hold, and Bedro
   - failure_cases: client re-deriving level → rejected in review (truth is server-side).
   - done_definition: Road viz + lights implemented.
   - provisional_policy_notes: none
+  - hg001_amendment:
+    - Show selected snapshot provenance and stale/insufficient-data states on traffic panels.
   - aws_services_touched: HTTP API (client)
   - security_or_iam_notes: none
   - delivery_class: MANDATORY_IMPLEMENTATION
@@ -3090,7 +3158,7 @@ CHECKPOINT G (not a task): Ensure enrichment path + §9 boundary hold, and Bedro
   - competition_quality_floor: A=red / B=yellow per backend classification for all 15 segments (client never recomputes level); loading/empty/insufficient-data states shown.
   - demo_or_evidence_output: Road panel showing correct red/yellow for the official events; insufficient-data state rendered.
 
-- [~] TASK-126 Implement crowd/signaling visualization
+- [ ] TASK-126 Implement crowd/signaling visualization
   - objective: Render base-station crowd metrics + multilingual/dispersal flags via `GET /crowd` (§16, R8/R9/R11).
   - requirements_covered: REQ-001, REQ-010, REQ-016, REQ-017, R8, R9, R11
   - design_sections: §16, §12 (/crowd)
@@ -3105,6 +3173,8 @@ CHECKPOINT G (not a task): Ensure enrichment path + §9 boundary hold, and Bedro
   - failure_cases: none (display-only of server truth).
   - done_definition: Crowd viz implemented.
   - provisional_policy_notes: none
+  - hg001_amendment:
+    - Show base-station observation timestamps, staleness, and OQ-005 station-scope policy.
   - aws_services_touched: HTTP API (client)
   - security_or_iam_notes: none
   - delivery_class: MANDATORY_IMPLEMENTATION
@@ -3112,7 +3182,7 @@ CHECKPOINT G (not a task): Ensure enrichment path + §9 boundary hold, and Bedro
   - competition_quality_floor: Crowd/roaming/dome flags visualized from backend truth (no client recompute); insufficient-data and stale-data indicators shown.
   - demo_or_evidence_output: Crowd panel reflecting BL17/DOME/roaming flags; stale indicator on old snapshot.
 
-- [~] TASK-127 Implement anomaly auto-popup (anomaly.detected)
+- [ ] TASK-127 Implement anomaly auto-popup (anomaly.detected)
   - objective: Render the automatic analysis-summary + warning popup on `anomaly.detected` (SOP threshold crossings), with polling fallback comparing thresholds (§16.2, R4.2, P6).
   - requirements_covered: REQ-002, R4
   - design_sections: §16.2, §13 (anomaly.detected), §22.1 (P6)
@@ -3128,6 +3198,8 @@ CHECKPOINT G (not a task): Ensure enrichment path + §9 boundary hold, and Bedro
   - failure_cases: missed popup at threshold → failure.
   - done_definition: Anomaly popup implemented.
   - provisional_policy_notes: none
+  - hg001_amendment:
+    - Anomaly popups include the cutoff, source observation timestamp, and policy provenance.
   - aws_services_touched: WebSocket/HTTP API (client)
   - security_or_iam_notes: none
   - delivery_class: MANDATORY_IMPLEMENTATION
@@ -3135,7 +3207,7 @@ CHECKPOINT G (not a task): Ensure enrichment path + §9 boundary hold, and Bedro
   - competition_quality_floor: `anomaly.detected` → automatic popup with analysis summary (no manual query); below-threshold never pops; clear status hierarchy; dismiss/ack handled; no placeholder.
   - demo_or_evidence_output: Injecting a threshold-crossing event auto-pops the warning summary in the demo.
 
-- [~] TASK-128 Implement incident injection UI (POST /inject, admin)
+- [ ] TASK-128 Implement incident injection UI (POST /inject, admin)
   - objective: Build the admin injection UI that posts `live_incidents` events to `POST /incidents/{id}/inject` (Cognito admin), showing 202/200/503/409 outcomes (§16.3, §12, R5).
   - requirements_covered: REQ-003, R5
   - design_sections: §16.3, §12, Figure 6
@@ -3151,6 +3223,8 @@ CHECKPOINT G (not a task): Ensure enrichment path + §9 boundary hold, and Bedro
   - failure_cases: 409 CORE_IDENTITY_CONFLICT shown as terminal (no auto-retry).
   - done_definition: Injection UI implemented.
   - provisional_policy_notes: none
+  - hg001_amendment:
+    - Incident details display BS-event affected_road as `DISPLAY_AND_CONTEXT_ONLY`.
   - aws_services_touched: HTTP API, Cognito (client)
   - security_or_iam_notes: Admin-only; token via Cognito; no secrets stored client-side.
   - delivery_class: MANDATORY_IMPLEMENTATION
@@ -3158,7 +3232,7 @@ CHECKPOINT G (not a task): Ensure enrichment path + §9 boundary hold, and Bedro
   - competition_quality_floor: Admin-only injection with an explicit command-confirmation step before POST; renders 202 / 503 (start_failed) / 409 (non-retryable CORE_IDENTITY_CONFLICT) outcomes distinctly; loading/error states; no placeholder.
   - demo_or_evidence_output: Injection flow with confirmation + correct outcome rendering for 202/503/409.
 
-- [~] TASK-129 Implement explanation-chain display (EvidenceTrace + citations)
+- [ ] TASK-129 Implement explanation-chain display (EvidenceTrace + citations)
   - objective: Render the reasoning chain (classification reasoning + data points + exclusion reasons + SOP citations) from the read model (§16, R15, P26/P27).
   - requirements_covered: REQ-008, R15
   - design_sections: §16, §10.10, §22.1 (P26/P27)
@@ -3174,6 +3248,8 @@ CHECKPOINT G (not a task): Ensure enrichment path + §9 boundary hold, and Bedro
   - failure_cases: missing exclusion reason surfaced as data error (server guarantees non-empty).
   - done_definition: Explanation chain implemented.
   - provisional_policy_notes: Provisional facts labeled (route/anchor/ETE).
+  - hg001_amendment:
+    - Evidence panel displays observation selection, affected-set construction, exclusions, common timestamp, and formula substitution.
   - aws_services_touched: HTTP API (client)
   - security_or_iam_notes: none
   - delivery_class: MANDATORY_IMPLEMENTATION
@@ -3181,7 +3257,7 @@ CHECKPOINT G (not a task): Ensure enrichment path + §9 boundary hold, and Bedro
   - competition_quality_floor: EvidenceTrace viewing (grading reasoning + data points) AND SOP citation viewing (art.1/2/7 with source location) AND excluded-route reasons; empty/loading states; no placeholder panel.
   - demo_or_evidence_output: Reasoning panel for ACC_001 showing why A-level and why alternates excluded, with citations {1,2,7}.
 
-- [~] TASK-130 Implement route display (primary/secondary/excluded reasons)
+- [ ] TASK-130 Implement route display (primary/secondary/excluded reasons)
   - objective: Render primary/secondary evacuation and excluded candidates with reasons, marking provisional route facts (§16, R6/R13).
   - requirements_covered: REQ-013, REQ-014, R6, R13
   - design_sections: §16, §10.8, §10.12
@@ -3197,6 +3273,8 @@ CHECKPOINT G (not a task): Ensure enrichment path + §9 boundary hold, and Bedro
   - failure_cases: unresolved anchor → shows manual-confirmation, no fabricated primary.
   - done_definition: Route display implemented.
   - provisional_policy_notes: Route facts flagged provisional (Strategies A/C/D).
+  - hg001_amendment:
+    - ETE panel displays INCIDENT/PRIMARY/SECONDARY roles, per-road saturation, sum/count/average, base, penalty, result, and insufficient status.
   - aws_services_touched: HTTP API (client)
   - security_or_iam_notes: none
   - delivery_class: MANDATORY_IMPLEMENTATION
@@ -3204,30 +3282,34 @@ CHECKPOINT G (not a task): Ensure enrichment path + §9 boundary hold, and Bedro
   - competition_quality_floor: Primary/secondary/excluded routes each with a non-empty exclusion reason; provisional badge where policy-dependent (Strategy D); `manual_confirmation_required` flow shown when the anchor is unresolved (no fabricated ranking).
   - demo_or_evidence_output: Route panel showing primary RD_TPE_004 / secondary RD_TPE_005 / excluded reasons + provisional badge (ACC_001).
 
-- [~] TASK-131 Implement ETE display + provisional markers
-  - objective: Render the ETE value + calculation basis with `formula_applicability` and `ORGANIZER_GUIDED_TEAM_POLICY`/`official_golden_answer=false` markers (§16, R12).
+- [ ] TASK-131 Implement ETE display + provisional markers
+  - objective: Render the ETE value, full calculation basis, timing and affected-set evidence, `formula_applicability`, and organizer-guidance provenance without presenting the selected policy as an OFFICIAL_SOP-mandated unique algorithm (§16, R12).
   - requirements_covered: REQ-009, REQ-020, R12
   - design_sections: §16, §10.9, §11.4
   - components: DashboardService (ETE display)
   - files_or_modules_expected: `packages/frontend/src/decision/ete_panel.tsx`
   - dependencies: [TASK-129]
   - implementation_steps:
-    1. Render `ete_minutes` + `basis_note` + `formula_applicability`.
-    2. Show provisional markers (e.g., "78.6 分為 HG-001 主辦方指導之團隊政策值，非官方指定答案").
-    3. Show `lower_bound_only` when data insufficient.
-  - acceptance_criteria: ETE + basis + provisional markers render; never presented as official.
+    1. Render `ete_minutes`, calculation basis, and `formula_applicability`.
+    2. Render event timestamp, decision cutoff, common ETE snapshot timestamp, affected road set and roles, and each road's Saturation_Score.
+    3. Render sum, count, average, base clearance, congestion penalty, and final ETE with full formula substitution.
+    4. Render organizer-guidance provenance and classify the selected policy as `ORGANIZER_GUIDED_TEAM_POLICY`, `NON_UNIQUE`, `CONFIGURABLE`, and `DETERMINISTIC_AND_REPRODUCIBLE`; state that the organizer did not mandate one unique algorithm.
+    5. Show `INSUFFICIENT_COMMON_SNAPSHOT` and `lower_bound_only` states when applicable.
+  - acceptance_criteria: ETE, complete basis, timing, road roles and inputs, formula substitution, and policy provenance render; the selected 78.6-minute result is never presented as an OFFICIAL_SOP-mandated unique Golden answer; insufficient-common-snapshot and lower-bound states are explicit.
   - tests_required: component test (TASK-135).
-  - failure_cases: presenting HG-001 guided ETE as official → review rejection.
-  - done_definition: ETE display implemented.
-  - provisional_policy_notes: ETE provisional (Strategies A/C, OQ-003/011); markers mandatory.
+  - failure_cases: presenting the organizer-guided ETE as an official unique algorithm, omitting calculation provenance, or fabricating ETE when no common snapshot exists → review rejection.
+  - done_definition: ETE display implemented with complete deterministic evidence, organizer-guidance provenance, and insufficient-data states.
+  - provisional_policy_notes: Strategies A/C are `ORGANIZER_GUIDED_TEAM_POLICY`, `NON_UNIQUE`, `CONFIGURABLE`, and `DETERMINISTIC_AND_REPRODUCIBLE`; OQ-003 is resolved for implementation by HG-001 while OQ-011 remains open.
+  - hg001_amendment:
+    - Report view discloses event timestamp, decision cutoff, common ETE snapshot, affected-set roles, per-road saturation, sum/count/average/base/penalty/final ETE, assumptions, and `guidance_id=HG-001`.
   - aws_services_touched: HTTP API (client)
   - security_or_iam_notes: none
   - delivery_class: MANDATORY_IMPLEMENTATION
   - judging_criteria_contribution: theme_alignment, business_applicability, completeness
-  - competition_quality_floor: ETE value + calculation basis; `ORGANIZER_GUIDED_TEAM_POLICY` badge where applicable; lower-bound display when data insufficient; HG-001 guided ETE never presented as the official/host answer.
-  - demo_or_evidence_output: ETE panel showing 78.6 min for ACC_001 with the ORGANIZER_GUIDED_TEAM_POLICY (HG-001) badge and basis note.
+  - competition_quality_floor: ETE value + complete calculation basis; event/cutoff/common-snapshot timing; affected road roles and inputs; full formula substitution; organizer-guidance provenance; explicit insufficient-common-snapshot/lower-bound display; selected policy never presented as the official/host-mandated unique answer.
+  - demo_or_evidence_output: ETE panel for ACC_001 showing 78.6 minutes, 22:00 common ETE snapshot, RD_TPE_002/RD_TPE_004/RD_TPE_005 roles and saturation values, full formula substitution, and HG-001 organizer-guidance provenance.
 
-- [~] TASK-132 Implement report + public-alert panels
+- [ ] TASK-132 Implement report + public-alert panels
   - objective: Render the command-center report and multilingual public alert from the read model (Core+Narrative), with template-text indication when narratives are not yet ready (§16, R13/R14).
   - requirements_covered: REQ-021, REQ-022, R13, R14
   - design_sections: §16, §10.11c, §10.12, §10.13
@@ -3243,6 +3325,8 @@ CHECKPOINT G (not a task): Ensure enrichment path + §9 boundary hold, and Bedro
   - failure_cases: narrative missing → template shown ("系統模板").
   - done_definition: Report + alert panels implemented.
   - provisional_policy_notes: none
+  - hg001_amendment:
+    - Public-facing output never fabricates ETE when common snapshot is unavailable and never treats contextual affected_road as a route or trigger.
   - aws_services_touched: HTTP/WebSocket API (client)
   - security_or_iam_notes: none
   - delivery_class: MANDATORY_IMPLEMENTATION
@@ -3250,7 +3334,7 @@ CHECKPOINT G (not a task): Ensure enrichment path + §9 boundary hold, and Bedro
   - competition_quality_floor: Report panel + multilingual public-alert panel (zh/en, +ja/ko when enabled) with citations; publish-confirmation flow; loading/empty/error states; no placeholder.
   - demo_or_evidence_output: Report + multilingual alert panels rendered for the official events with a publish-confirmation step.
 
-- [~] TASK-133 Implement execution status/error display (execution summary + processing.failed)
+- [ ] TASK-133 Implement execution status/error display (execution summary + processing.failed)
   - objective: Render the read-only `execution` summary (`status`/`last_error`/`retryable`/`attempt_count`) and `processing.failed` events, including terminal CORE_IDENTITY_CONFLICT (§10.11c, §13, FIX 1).
   - requirements_covered: REQ-003, REQ-004, R5
   - design_sections: §10.11c, §13, §12, FIX 1
@@ -3273,7 +3357,7 @@ CHECKPOINT G (not a task): Ensure enrichment path + §9 boundary hold, and Bedro
   - competition_quality_floor: Execution summary (`status`/`last_error`/`retryable`/`attempt_count`) + `processing.failed`; the non-retryable `CORE_IDENTITY_CONFLICT` shown distinctly (not a generic error); `manual_confirmation_required` flow; stale-data and degraded indicators; clear status hierarchy; no placeholder.
   - demo_or_evidence_output: Status panel showing a terminal non-retryable conflict distinctly and a manual-confirmation prompt.
 
-- [~] TASK-134 Implement responsive design (REQ-030 bonus) and ja/ko UI (REQ-031 bonus)
+- [ ] TASK-134 Implement responsive design (REQ-030 bonus) and ja/ko UI (REQ-031 bonus)
   - objective: Add responsive/visually-designed layout (REQ-030 bonus) and Japanese/Korean UI localization surfacing ja/ko alerts (REQ-031 bonus) (§8, §16, §14.4).
   - requirements_covered: REQ-030, REQ-031, R17
   - design_sections: §8, §16, §14.4, §21.3
@@ -3297,7 +3381,7 @@ CHECKPOINT G (not a task): Ensure enrichment path + §9 boundary hold, and Bedro
   - demo_or_evidence_output: Polished responsive layout + ja/ko UI toggle in the demo (bonus evidence; not required for a functional submission).
   - optional_marker: * (BONUS_OPTIONAL — genuinely skippable; +5% design/ja-ko polish only)
 
-- [~] TASK-135 Frontend component/snapshot tests
+- [ ] TASK-135 Frontend component/snapshot tests
   - objective: Add component + snapshot tests for the dashboard panels, realtime dedup, polling fallback, and injection outcomes (UI appearance is non-PBT per §22.1).
   - requirements_covered: REQ-001, REQ-004, REQ-030, R4, R17
   - design_sections: §22.1 (UI non-PBT), §22.2 (component/snapshot)
@@ -3328,7 +3412,7 @@ CHECKPOINT H (not a task): Ensure the dashboard renders deterministic truth with
 
 > This phase implements the four-stage What-if flow (§14.5): Bedrock parses (stage 1) and explains (stage 4) only; deterministic code validates (stage 2) and recomputes (stage 3). `raw_question` is `UNTRUSTED_USER_INPUT`; Bedrock never decides any threshold/numeric truth; ambiguity yields `clarification_required` (no guessing); What-if never mutates decision state (OQ-009 stays configurable/PARTIALLY_DEFINED).
 
-- [~] TASK-136 Implement WhatIfFn: POST /what-if handler (dedicated Lambda) + Cognito operator auth + untrusted-input handling
+- [ ] TASK-136 Implement WhatIfFn: POST /what-if handler (dedicated Lambda) + Cognito operator auth + untrusted-input handling
   - objective: Implement the dedicated `WhatIfFn` runtime Lambda handler for `POST /what-if` (Cognito operator), treat `raw_question` as `UNTRUSTED_USER_INPUT`, and orchestrate the four stages returning `WhatIfResult` (§12, §14.5, §17). Hosted on the dedicated WhatIfFn (provisioned TASK-067, IAM WhatIfFnRole TASK-177) so What-if never runs inside RendererFn/ApiReadFn/DecisionFn; What-if writes NO decision/narrative/publish/idempotency table and never mutates state.
   - requirements_covered: REQ-006, REQ-007, R16
   - design_sections: §12, §14.5, §17, §10.14, §10.15, §6 圖2 (WhatIfFn host), §18
@@ -3351,7 +3435,7 @@ CHECKPOINT H (not a task): Ensure the dashboard renders deterministic truth with
   - competition_quality_floor: Full COMPETITION_AWS What-if path on the dedicated WhatIfFn (NL ScenarioParser → schema+domain validation → clarification_required → deterministic recompute → no-state-mutation → Bedrock explanation → SOP citation → frontend → error/fallback UX); never front-end-only/chat-only/hard-coded-options/no-validation/no-citation/no-IAM; writes no state table.
   - demo_or_evidence_output: Integration test (TASK-142) shows WhatIfResult with triggered/applied articles + SOP citations + `does_not_mutate_state=true`; ambiguity test (TASK-143) shows `clarification_required`.
 
-- [~] TASK-137 Implement ScenarioParser (stage 1, Bedrock) NL→structured assumptions
+- [ ] TASK-137 Implement ScenarioParser (stage 1, Bedrock) NL→structured assumptions
   - objective: Implement stage-1 `ScenarioParser` using Bedrock to convert the NL question into structured assumptions `{entity_id, field, operator, value}` only (no truth decision) (§14.5).
   - requirements_covered: REQ-006, R16
   - design_sections: §14.5 (stage 1), §10.14, Figure 10
@@ -3374,7 +3458,7 @@ CHECKPOINT H (not a task): Ensure the dashboard renders deterministic truth with
   - competition_quality_floor: Stage-1 Bedrock outputs ONLY structured assumptions `{entity_id, field, operator, value}`; never computes triggers/thresholds/ETE; Bedrock failure → `clarification_required` (no guess); runs on WhatIfFn under WhatIfFnRole.
   - demo_or_evidence_output: Integration test: NL "BL17=40000" → structured assumption, with no numeric/boolean decision made by Bedrock.
 
-- [~] TASK-138 Implement SchemaValidator + DomainValidator (stage 2) + clarification_required
+- [ ] TASK-138 Implement SchemaValidator + DomainValidator (stage 2) + clarification_required
   - objective: Implement deterministic stage-2 validation (entity exists, field legal, type correct, value in range, ambiguity) returning `clarification_required` + `clarification_prompt` on any failure, never guessing (§14.5, P35).
   - requirements_covered: REQ-006, R16
   - design_sections: §14.5 (stage 2), §10.14, §22.1 (P35)
@@ -3397,7 +3481,7 @@ CHECKPOINT H (not a task): Ensure the dashboard renders deterministic truth with
   - competition_quality_floor: Stage-2 deterministic Schema + Domain validation (entity/field/type/range/ambiguity); any invalid/ambiguous input → `clarification_required` + `clarification_prompt`, no guessing, no entry to stage 3.
   - demo_or_evidence_output: Unit tests: valid → proceed; invalid/ambiguous → clarification_required (feeds P35).
 
-- [~] TASK-139 Implement deterministic recompute (stage 3, does_not_mutate_state)
+- [ ] TASK-139 Implement deterministic recompute (stage 3, does_not_mutate_state)
   - objective: Implement stage-3 deterministic recompute that reruns the Rule Engine on validated assumptions to produce `triggered_articles`/`applied_formula_articles`/`expected_actions`/`ete_preview` without mutating any real decision state (§14.5, P28).
   - requirements_covered: REQ-007, R16
   - design_sections: §14.5 (stage 3), §10.15, §22.1 (P28)
@@ -3420,7 +3504,7 @@ CHECKPOINT H (not a task): Ensure the dashboard renders deterministic truth with
   - competition_quality_floor: Stage-3 re-runs the deterministic Rule Engine on validated assumptions (triggered/applied/expected_actions/ete_preview); `does_not_mutate_state=true` — ZERO writes to any decision/narrative/publish/idempotency table.
   - demo_or_evidence_output: Feeds P28; integration test proving recompute equals a fresh Rule-Engine run with no state change.
 
-- [~] TASK-140 Implement Bedrock explanation (stage 4) + SOP citation
+- [ ] TASK-140 Implement Bedrock explanation (stage 4) + SOP citation
   - objective: Implement stage-4 Bedrock explanation grounded in stage-3 facts + RAG citations, producing `explanation_text` only (no threshold/number changes) (§14.5).
   - requirements_covered: REQ-007, R16
   - design_sections: §14.5 (stage 4), §14.2, Figure 10
@@ -3443,7 +3527,7 @@ CHECKPOINT H (not a task): Ensure the dashboard renders deterministic truth with
   - competition_quality_floor: Stage-4 Bedrock explanation from stage-3 facts + RAG citation; explains ONLY (never changes numbers/thresholds/route); SOP citation attached; failure → explanation template (facts unchanged).
   - demo_or_evidence_output: Integration test: explanation cites the correct SOP articles and matches stage-3 facts verbatim.
 
-- [~] TASK-141 Implement What-if UI (dialog window)
+- [ ] TASK-141 Implement What-if UI (dialog window)
   - objective: Build the dashboard What-if dialog that submits questions and renders `WhatIfResult` (triggered/applied articles, expected actions, ETE preview, citations, or clarification prompt) (§16, R16).
   - requirements_covered: REQ-006, REQ-007, R16
   - design_sections: §16, §14.5, §12
@@ -3466,7 +3550,7 @@ CHECKPOINT H (not a task): Ensure the dashboard renders deterministic truth with
   - competition_quality_floor: What-if dialog with loading/empty/error states, the `clarification_required` prompt (no auto-guess), triggered-articles + expected-actions + SOP-citation viewing, an explicit "does not change live state" indication, command confirmation, keyboard accessibility, and responsive layout; no placeholder; never chat-only/hard-coded-options.
   - demo_or_evidence_output: Live "BL17=40000" query in the demo returns triggered articles + citations with a no-state-change indicator; an ambiguous query shows the clarification prompt.
 
-- [~] TASK-142 What-if 4-stage integration tests (P28, P35)
+- [ ] TASK-142 What-if 4-stage integration tests (P28, P35)
   - objective: Verify stage-2 clarification (no stage 3 on ambiguity), stage-3 equivalence to a rule-engine rerun, `does_not_mutate_state`, and stage-4 citation grounding.
   - requirements_covered: REQ-006, REQ-007, R16
   - design_sections: §22.1 (P28, P35), §14.5
@@ -3489,7 +3573,7 @@ CHECKPOINT H (not a task): Ensure the dashboard renders deterministic truth with
   - competition_quality_floor: P28/P35 each a single property (≥100 iterations, labeled): the What-if result equals a deterministic Rule-Engine re-run with `does_not_mutate_state=true`; an ambiguous/invalid input yields `clarification_required` with no stage-3 compute. Release-blocking.
   - demo_or_evidence_output: Green ≥100-iteration P28/P35 runs with labels; a state-mutation or guess attempt is caught.
 
-- [~] TASK-143 What-if clarification/ambiguity failure tests
+- [ ] TASK-143 What-if clarification/ambiguity failure tests
   - objective: Verify ambiguous/invalid/injection-style inputs never reach stage 3, never mutate state, and always yield a clarification prompt (§14.5, §17).
   - requirements_covered: REQ-006, R16
   - design_sections: §14.5, §17, §21
@@ -3520,7 +3604,7 @@ CHECKPOINT I (not a task): Ensure What-if is deterministic-truth + does_not_muta
 
 > This phase implements one-click publish (`PublishFn` → `PublishRecordTable`, commander-authorized) with an audit trail, simulated CMS/SMS channels, and the `DecisionReadModel` that merges FOUR sources: DecisionCore + DecisionNarrative + PublishRecord + the read-only IdempotencyTable execution summary (§10.11c/d, §12, §13, §19). Publish state is never written back to immutable DecisionCore.
 
-- [~] TASK-144 Implement PublishFn handler + Cognito commander auth
+- [ ] TASK-144 Implement PublishFn handler + Cognito commander auth
   - objective: Handle `POST /decisions/{id}/publish` (Cognito commander), reading core+narrative read-only and writing publish state to `PublishRecordTable` (§12, §17, §10.11d).
   - requirements_covered: REQ-022, R11
   - design_sections: §12, §17, §10.11d, §10.17
@@ -3543,7 +3627,7 @@ CHECKPOINT I (not a task): Ensure What-if is deterministic-truth + does_not_muta
   - competition_quality_floor: Commander-only (Cognito) publish; writes PublishRecordTable ONLY; never writes DecisionCore; `publish_state` never written back to the immutable Core.
   - demo_or_evidence_output: Publish handler test: commander scope enforced; PublishRecord written; Core untouched.
 
-- [~] TASK-145 Implement PublishRecord state machine (draft→approved→published/publish_failed)
+- [ ] TASK-145 Implement PublishRecord state machine (draft→approved→published/publish_failed)
   - objective: Implement the publish state transitions (`draft→approved→published`, or `publish_failed`) with optimistic-lock `version` on `PublishRecordTable` (§10.11d, §10.17).
   - requirements_covered: REQ-022, R11
   - design_sections: §10.11d, §10.17
@@ -3566,7 +3650,7 @@ CHECKPOINT I (not a task): Ensure What-if is deterministic-truth + does_not_muta
   - competition_quality_floor: `draft → approved → published` (or `publish_failed`); every transition appends to `audit_trail`; optimistic-lock `version`; no illegal transitions.
   - demo_or_evidence_output: State-machine test covering all transitions + audit-trail entries.
 
-- [~] TASK-146 Implement simulated CMS/SMS channels + one-click copy/export
+- [ ] TASK-146 Implement simulated CMS/SMS channels + one-click copy/export
   - objective: Implement the demo publish channels (CMS/SMS mock, one-click copy, one-click export) — no real telecom gateway — surfacing published payload from the read model (§10.17, §12).
   - requirements_covered: REQ-022, R11
   - design_sections: §10.17, §10.11d
@@ -3589,7 +3673,7 @@ CHECKPOINT I (not a task): Ensure What-if is deterministic-truth + does_not_muta
   - competition_quality_floor: Demo-grade CMS/SMS simulation + one-click copy + one-click export; no real telco gateway required; the publish flow is operable end-to-end in the demo.
   - demo_or_evidence_output: One-click copy/export produces the published payload; simulated channels shown in the demo.
 
-- [~] TASK-147 Implement audit_trail + optimistic lock
+- [ ] TASK-147 Implement audit_trail + optimistic lock
   - objective: Record every publish transition into `audit_trail` (actor, action, from_state, to_state, at) with `approved_by`/`published_by` (Cognito), preserved via optimistic lock (§10.11d, §19).
   - requirements_covered: REQ-022, R11
   - design_sections: §10.11d, §19
@@ -3612,7 +3696,7 @@ CHECKPOINT I (not a task): Ensure What-if is deterministic-truth + does_not_muta
   - competition_quality_floor: Every state transition appends `{actor, action, from_state, to_state, at}` to `audit_trail`; optimistic lock prevents lost updates; audit trail is tamper-evident and complete.
   - demo_or_evidence_output: Test showing a concurrent update is rejected by optimistic lock and the audit trail is complete.
 
-- [~] TASK-148 Implement publish.status_changed event
+- [ ] TASK-148 Implement publish.status_changed event
   - objective: Emit the `publish.status_changed` WebSocket event on each transition (carrying `publish_state` + `audit_trail`) with a `GET /decisions/{id}` polling fallback (§13).
   - requirements_covered: REQ-022, R11
   - design_sections: §13, §10.11d
@@ -3635,7 +3719,7 @@ CHECKPOINT I (not a task): Ensure What-if is deterministic-truth + does_not_muta
   - competition_quality_floor: Emits `publish.status_changed` with state + `audit_trail`; `GET /decisions/{id}` polling fallback carries `publish_state` + `audit_trail`.
   - demo_or_evidence_output: Event emitted on each transition; Dashboard reflects draft→approved→published in the demo.
 
-- [~] TASK-149 Implement DecisionReadModel merge (Core+Narrative+Publish+execution summary)
+- [ ] TASK-149 Implement DecisionReadModel merge (Core+Narrative+Publish+execution summary)
   - objective: Implement the `ApiReadFn` read model that merges DecisionCore (authoritative numbers) + DecisionNarrative (all narrative_type items) + PublishRecord (publish state) + the read-only IdempotencyTable `execution` summary (§10.11c, FIX 1).
   - requirements_covered: REQ-021, REQ-022, REQ-008, R13, R14, R15
   - design_sections: §10.11c, §12, FIX 1
@@ -3651,6 +3735,8 @@ CHECKPOINT I (not a task): Ensure What-if is deterministic-truth + does_not_muta
   - failure_cases: narrative not ready → template; not published → draft/absent.
   - done_definition: Read model merge implemented (4 sources).
   - provisional_policy_notes: none
+  - hg001_amendment:
+    - Read model exposes all HG-001 deterministic fields without allowing narrative overwrite.
   - aws_services_touched: DynamoDB (client)
   - security_or_iam_notes: ApiReadFnRole read-only incl IdempotencyTable GetItem (TASK-081).
   - delivery_class: MANDATORY_IMPLEMENTATION
@@ -3658,7 +3744,7 @@ CHECKPOINT I (not a task): Ensure What-if is deterministic-truth + does_not_muta
   - competition_quality_floor: Merges Core + Narrative (3 items) + Publish + a read-only `execution` summary from IdempotencyTable (FIX 1); core numbers come from the immutable Core; an unready narrative → core + template; not-published → `draft`/absent; three tables aligned by `decision_id`/`version`.
   - demo_or_evidence_output: Read-model test returning merged view incl. execution summary (status/last_error/retryable/attempt_count).
 
-- [~] TASK-150 Implement GET read handlers (/timeline,/roads,/crowd,/incidents,/decisions,/reports)
+- [ ] TASK-150 Implement GET read handlers (/timeline,/roads,/crowd,/incidents,/decisions,/reports)
   - objective: Implement the public read-only GET handlers returning the §12 payloads (with `schema_version`/`trace_id`/`policy`/`provisional`), backed by ApiReadFn (§12).
   - requirements_covered: REQ-001, REQ-011, REQ-021, REQ-022, REQ-008, R1, R13, R14, R15
   - design_sections: §12 (route table)
@@ -3674,6 +3760,8 @@ CHECKPOINT I (not a task): Ensure What-if is deterministic-truth + does_not_muta
   - failure_cases: insufficient data surfaced (not fabricated).
   - done_definition: GET read handlers implemented.
   - provisional_policy_notes: Responses carry `policy`/`provisional` markers.
+  - hg001_amendment:
+    - API responses include cutoff/observation/common-snapshot/policy fields and deterministic affected_road context.
   - aws_services_touched: HTTP API, DynamoDB (client)
   - security_or_iam_notes: Public read-only; ApiReadFnRole.
   - delivery_class: MANDATORY_IMPLEMENTATION
@@ -3681,7 +3769,7 @@ CHECKPOINT I (not a task): Ensure What-if is deterministic-truth + does_not_muta
   - competition_quality_floor: `GET /timeline,/roads,/crowd,/incidents,/decisions/{id},/reports/{id}` via ApiReadFn (read-only, incl. IdempotencyTable GetItem for the execution summary); every response carries `schema_version`/`trace_id`/`policy`/`provisional`.
   - demo_or_evidence_output: Contract test: each GET returns the §12 schema with required fields; no write side effects.
 
-- [~] TASK-151 Implement publish idempotency (no duplicate publish)
+- [ ] TASK-151 Implement publish idempotency (no duplicate publish)
   - objective: Ensure publish dedup via `decision_id` + `publish_state` + optimistic `version`, so retries never re-emit `public_alert.ready` or re-trigger one-click publish (§15.2).
   - requirements_covered: REQ-022, R11
   - design_sections: §15.2 (no duplicate publish), §10.11d
@@ -3704,7 +3792,7 @@ CHECKPOINT I (not a task): Ensure What-if is deterministic-truth + does_not_muta
   - competition_quality_floor: Publish dedup by `decision_id` + `publish_state` + optimistic `version`; a retry NEVER re-emits `public_alert.ready` or re-triggers a publish.
   - demo_or_evidence_output: Test replaying a publish shows a single published state, no duplicate alert.
 
-- [~] TASK-152 Publish + read-model integration tests
+- [ ] TASK-152 Publish + read-model integration tests
   - objective: Verify the publish state machine, audit trail, idempotency, and the 4-source read model merge (incl execution summary + terminal conflict projection).
   - requirements_covered: REQ-021, REQ-022, REQ-008, R11, R13, R14, R15
   - design_sections: §22.2 (Integration/Contract), §10.11c/d
@@ -3735,7 +3823,7 @@ CHECKPOINT J (not a task): Ensure publish/audit + 4-source read model are correc
 
 > This phase implements structured logging/metrics, the unified error model, throttling/backoff, the §21 failure fallbacks, the identity-conflict security alert, IAM-denial tests, secrets redaction, and Cognito fail-closed — all without weakening the §9 boundary or the FIX-1/2/3 contracts.
 
-- [~] TASK-153 Implement CloudWatch structured logging (trace_id/decision_id, no credentials)
+- [ ] TASK-153 Implement CloudWatch structured logging (trace_id/decision_id, no credentials)
   - objective: Add structured logging across Lambdas with `trace_id`/`decision_id`/stage timings and guaranteed no-credential output (§19, §17).
   - requirements_covered: REQ-004, REQ-032, R4, R5
   - design_sections: §19, §17
@@ -3758,7 +3846,7 @@ CHECKPOINT J (not a task): Ensure publish/audit + 4-source read model are correc
   - competition_quality_floor: Structured logs with `trace_id`/`decision_id`/stage timings; NEVER contains credentials; secrets referenced by key name only.
   - demo_or_evidence_output: Log sample showing structured fields and redaction; a credential-in-log test fails the build.
 
-- [~] TASK-154 Implement custom latency metrics + alarms
+- [ ] TASK-154 Implement custom latency metrics + alarms
   - objective: Emit `FastPathLatencyMs` and `EndToEndLatencyMs` and wire the 60s alarm (§19, §20).
   - requirements_covered: REQ-004, R5
   - design_sections: §19, §20, §10.16
@@ -3781,7 +3869,7 @@ CHECKPOINT J (not a task): Ensure publish/audit + 4-source read model are correc
   - competition_quality_floor: `FastPathLatencyMs` (5s TEAM_TARGET) + `EndToEndLatencyMs` (60s OFFICIAL) metrics + alarm on 60s breach / high Bedrock failure; metric write is best-effort (failure never blocks the main flow).
   - demo_or_evidence_output: Metrics visible + a seeded 60s breach raises the alarm (competition smoke).
 
-- [~] TASK-155 Implement failure/fallback counters
+- [ ] TASK-155 Implement failure/fallback counters
   - objective: Emit `BedrockFailureCount`, `KbFallbackCount`, `SchemaValidationRejectCount`, `WsToPollingFallbackCount`, `InsufficientDataCount` (§19).
   - requirements_covered: REQ-032, R-supporting
   - design_sections: §19
@@ -3804,7 +3892,7 @@ CHECKPOINT J (not a task): Ensure publish/audit + 4-source read model are correc
   - competition_quality_floor: `BedrockFailureCount`/`KbFallbackCount`/`SchemaValidationRejectCount`/`WsToPollingFallbackCount`/`InsufficientDataCount`; best-effort emission (never blocks the decision path).
   - demo_or_evidence_output: Counters increment under injected failures (feeds the failure-injection suite).
 
-- [~] TASK-156 Implement unified structured error model
+- [ ] TASK-156 Implement unified structured error model
   - objective: Implement the `{error_code, message, trace_id, retryable}` error model across API/events, with `429` (retryable) and insufficient-data (`200` + `data_status`) semantics (§12, §21).
   - requirements_covered: REQ-003, REQ-004, R5
   - design_sections: §12 (error model), §21
@@ -3827,7 +3915,7 @@ CHECKPOINT J (not a task): Ensure publish/audit + 4-source read model are correc
   - competition_quality_floor: Unified `{error_code, message, trace_id, retryable}`; `429` retryable; insufficient-data → `200` + `data_status`; `CORE_IDENTITY_CONFLICT` → `409` (`retryable=false`), NEVER `500`; consistent across all handlers.
   - demo_or_evidence_output: Contract tests asserting the error envelope and the exact status codes per §12.
 
-- [~] TASK-157 Implement throttling + exponential backoff
+- [ ] TASK-157 Implement throttling + exponential backoff
   - objective: Implement exponential backoff/retry for API Gateway `429` and DynamoDB throttling, with reserved-concurrency awareness for Fast Path (§4.3, §21, §27).
   - requirements_covered: REQ-004, R5
   - design_sections: §21.2, §4.3, §27
@@ -3850,7 +3938,7 @@ CHECKPOINT J (not a task): Ensure publish/audit + 4-source read model are correc
   - competition_quality_floor: Exponential backoff/retry on transient DynamoDB/API throttling (`429`); DecisionFn reserved concurrency preserves the Fast Path under load; retries bounded (no infinite loop).
   - demo_or_evidence_output: Failure-injection test: throttling is retried with backoff and Fast Path stays prioritized.
 
-- [~] TASK-158 Implement Bedrock/KB/DynamoDB/WebSocket failure handling + fallbacks
+- [ ] TASK-158 Implement Bedrock/KB/DynamoDB/WebSocket failure handling + fallbacks
   - objective: Wire the §21 fallbacks: Bedrock timeout → template; KB failure → S3 article read; DynamoDB transient → backoff/degrade; WebSocket drop → polling — always deterministic-result-first (§21.2).
   - requirements_covered: REQ-004, REQ-005, R5
   - design_sections: §21.1, §21.2, Figure 12
@@ -3873,7 +3961,7 @@ CHECKPOINT J (not a task): Ensure publish/audit + 4-source read model are correc
   - competition_quality_floor: Bedrock timeout → template; KB failure → S3 article read; WebSocket drop → polling; DynamoDB transient → backoff; region-no-model → `model_id_fallbacks` → template; the Fast Path and core numbers are NEVER blocked by a Bedrock/KB failure (§20/§21).
   - demo_or_evidence_output: Failure-injection: each dependency failure engages its fallback; core decision unchanged.
 
-- [~] TASK-159 Implement stale-running + identity-conflict security alert
+- [ ] TASK-159 Implement stale-running + identity-conflict security alert
   - objective: Emit a security alert on `CORE_IDENTITY_CONFLICT` and structured signals on stale-running reconciliation, feeding CloudWatch (§15.2, §19, §21).
   - requirements_covered: REQ-004, R5
   - design_sections: §15.2, §19, §21.2
@@ -3896,7 +3984,7 @@ CHECKPOINT J (not a task): Ensure publish/audit + 4-source read model are correc
   - competition_quality_floor: `STALE_RUNNING_EXECUTION` reconciliation and `CORE_IDENTITY_CONFLICT` are logged as security alerts; fail-closed; no silent downgrade of permissions or safety checks.
   - demo_or_evidence_output: Test asserting a security alert is logged on identity conflict and stale reconciliation.
 
-- [~] TASK-160 Implement IAM-denial tests (least-privilege enforcement)
+- [ ] TASK-160 Implement IAM-denial tests (least-privilege enforcement)
   - objective: Verify each role's explicit denies actually block the forbidden actions (e.g., DecisionFn cannot write IdempotencyTable; RendererFn cannot write DecisionCore; WorkflowStatusFn/RecoveryGateFn cannot PostToConnection; InjectFn has no invoke wildcard) (§18).
   - requirements_covered: REQ-032, R-supporting (security)
   - design_sections: §18
@@ -3919,7 +4007,7 @@ CHECKPOINT J (not a task): Ensure publish/audit + 4-source read model are correc
   - competition_quality_floor: Per-role denial tests prove EVERY explicit DENY (DecisionFn no IdempotencyTable write; Renderer no Core write; WorkflowStatus/RecoveryGate/ApiRead scoped; WhatIfFn no writes/StartExecution/PostToConnection; Ingestion no raw write); no wildcard invoke or table-write. Release-blocking.
   - demo_or_evidence_output: Green IAM-denial suite: each role is rejected for every out-of-scope action.
 
-- [~] TASK-161 Implement secrets redaction + Cognito fail-closed tests
+- [ ] TASK-161 Implement secrets redaction + Cognito fail-closed tests
   - objective: Verify logs never contain secrets and that write paths fail closed when Cognito is unavailable while read paths remain available (§17).
   - requirements_covered: REQ-032, R-supporting (security)
   - design_sections: §17, §4.10
@@ -3942,7 +4030,7 @@ CHECKPOINT J (not a task): Ensure publish/audit + 4-source read model are correc
   - competition_quality_floor: Logs never contain secret values (redaction verified); Cognito unavailable → write paths fail-closed while reads remain available (§17). Release-blocking.
   - demo_or_evidence_output: Green tests: seeded secret is redacted in logs; a Cognito-down scenario rejects writes and allows reads.
 
-- [~] TASK-162 Wire optional X-Ray tracing
+- [ ] TASK-162 Wire optional X-Ray tracing
   - objective: Enable X-Ray tracing behind `observability.xray_enabled`, with CloudWatch segment metrics (`LatencyTrace`) as the fallback when disabled (§4.11, §19).
   - requirements_covered: REQ-004, R5
   - design_sections: §4.11, §19
@@ -3966,7 +4054,7 @@ CHECKPOINT J (not a task): Ensure publish/audit + 4-source read model are correc
   - demo_or_evidence_output: X-Ray trace map across API GW→Lambda→Bedrock/DynamoDB when enabled (bonus evidence); CloudWatch segments when disabled.
   - optional_marker: * (BONUS_OPTIONAL — genuinely skippable; non-essential deep X-Ray only)
 
-- [~] TASK-163 Implement failure-injection suite (§21 matrix)
+- [ ] TASK-163 Implement failure-injection suite (§21 matrix)
   - objective: Verify each §21.2 failure path (Bedrock timeout, KB failure, WS drop, DDB throttle, region-no-model, IAM denied, 429, StartExecution failure, MARK_RUNNING mismatch, lease expiry, stale running, MARK_CORE_COMMITTED failure, all-action fencing, DecisionCore identity classification, RECONCILE external fencing, staged recovery).
   - requirements_covered: REQ-004, REQ-005, R5
   - design_sections: §21.2, §22.2 (Failure-injection), §15.2
@@ -3989,7 +4077,7 @@ CHECKPOINT J (not a task): Ensure publish/audit + 4-source read model are correc
   - competition_quality_floor: Covers EVERY §21 failure path (Bedrock timeout, KB failure, WS drop, DDB throttle, region-no-model, IAM denied, 429, StartExecution failure→503, MARK_RUNNING fencing, stale-running, MARK_CORE_COMMITTED apply-or-confirm, DecisionCore identity classification, RECONCILE external fencing, staged recovery); no fabrication under any failure. Release-blocking.
   - demo_or_evidence_output: Green §21 failure-injection matrix; each row engages the documented fallback with no fabrication.
 
-- [~] TASK-164 Observability/resilience integration tests
+- [ ] TASK-164 Observability/resilience integration tests
   - objective: Verify logs/metrics/alarms/error-model/backoff/security-alert wiring end-to-end in LOCAL_MOCK.
   - requirements_covered: REQ-004, REQ-032, R5
   - design_sections: §19, §21, §22.2
@@ -4020,7 +4108,7 @@ CHECKPOINT K (not a task): Ensure observability, resilience, and security contro
 
 > Every Phase 11 task AUTHORS a runbook and/or automated helper script (a file-creation coding task); NONE executes a deployment, runs the app end-to-end manually, or performs `cdk destroy`. Actual deploy/teardown are operator actions gated by the runbooks and (for teardown) organizer confirmation (§25, §26). Smoke/latency helpers are automated scripts, not manual runs.
 
-- [x] TASK-165 Author LOCAL_MOCK rehearsal runbook + script
+- [ ] TASK-165 Author LOCAL_MOCK rehearsal runbook + script
   - objective: Author the runbook/script to rehearse the full deterministic suite offline (LOCAL_MOCK, Mock Bedrock, no AWS) so the team validates correctness before any AWS use (§23, §22.3).
   - requirements_covered: REQ-025, REQ-032, R-supporting
   - design_sections: §23, §22.3
@@ -4043,7 +4131,7 @@ CHECKPOINT K (not a task): Ensure observability, resilience, and security contro
   - competition_quality_floor: Offline rehearsal script runs the full deterministic suite + a Mock-Bedrock end-to-end walkthrough with ZERO AWS calls; reproducible from the GitHub repo. Release-blocking (proves correctness without AWS).
   - demo_or_evidence_output: Green offline rehearsal log (all deterministic tests + mock walkthrough) with no credentials.
 
-- [~] TASK-166 Author PERSONAL_AWS_DEV validation runbook
+- [ ] TASK-166 Author PERSONAL_AWS_DEV validation runbook
   - objective: Author the runbook to deploy-and-validate in the team's own low-cost account (1–3 integration/RAG-citation examples), independent from the competition account (§23, §22.3).
   - requirements_covered: REQ-024, REQ-032, R-supporting
   - design_sections: §23, §22.3, §25
@@ -4066,7 +4154,7 @@ CHECKPOINT K (not a task): Ensure observability, resilience, and security contro
   - competition_quality_floor: Validation runbook exercising 1–3 integration / RAG-citation examples on the team account; verifies real Bedrock/KB/DynamoDB/WebSocket wiring and KB ingestion (TASK-178) completeness before RAG. Release-blocking pre-competition gate.
   - demo_or_evidence_output: PERSONAL_AWS_DEV validation report (integration + RAG citation) on the team account.
 
-- [~] TASK-167 Author COMPETITION_AWS deploy instructions runbook (P0a–P0d + step 1)
+- [ ] TASK-167 Author COMPETITION_AWS deploy instructions runbook (P0a–P0d + step 1)
   - objective: Author the competition deploy runbook covering pre-deploy checks (account/region, Bedrock model access, KB support, Parameter Store seeding) and step 1 deploy + data/SOP upload + KB sync (§25 P0a–P0d, step 1).
   - requirements_covered: REQ-024, REQ-032, R-supporting
   - design_sections: §25 (P0a–P0d, step 1), §4
@@ -4089,7 +4177,7 @@ CHECKPOINT K (not a task): Ensure observability, resilience, and security contro
   - competition_quality_floor: Complete COMPETITION_AWS deploy runbook: P0a–P0d (identity, Bedrock model access, KB support, SSM seeding) + step-1 `cdk deploy` + upload of the 5 runtime files + SOP + deployment-time KB ingestion (TASK-178) with completion VERIFIED before RAG smoke; operator-executed (no deploy run here); no simplified/placeholder deploy path.
   - demo_or_evidence_output: `runbooks/02_competition_deploy.md` covering pre-deploy + deploy step 1 + KB-ingestion completion gate (used to produce the live deployment URL deliverable).
 
-- [x] TASK-168 Author source-manifest gate runbook (step 2, 7 SHA-256 STOP)
+- [ ] TASK-168 Author source-manifest gate runbook (step 2, 7 SHA-256 STOP)
   - objective: Author the runbook/script for step-2 source hash verification (7 official sources, §10.0b) that STOPs deployment on any mismatch (§25 step 2).
   - requirements_covered: REQ-032, R1
   - design_sections: §25 (step 2), §10.0b, §21
@@ -4112,7 +4200,7 @@ CHECKPOINT K (not a task): Ensure observability, resilience, and security contro
   - competition_quality_floor: Step-2 script computes SHA-256 for all 7 official sources and STOPs deployment on ANY mismatch (never enable an unknown version); documents the manual STOP decision. Release-blocking source-integrity gate.
   - demo_or_evidence_output: `scripts/verify_sources.sh` passing on known-good and STOPping on an altered fixture; `runbooks/03_source_hash_gate.md`.
 
-- [~] TASK-169 Author smoke-test runbook + automated 3-event script
+- [ ] TASK-169 Author smoke-test runbook + automated 3-event script
   - objective: Author the automated smoke-test script + runbook injecting ACC_001/EVT_002/EVT_003 and asserting decisions/reports/alerts + core numbers match the walkthrough (§25 step 3).
   - requirements_covered: REQ-032, R5, R6
   - design_sections: §25 (step 3), §9.5, §22.3
@@ -4135,7 +4223,7 @@ CHECKPOINT K (not a task): Ensure observability, resilience, and security contro
   - competition_quality_floor: Automated 3-event smoke (ACC_001/EVT_002/EVT_003) asserting core sets/routes/ETE (provisional flags) + report/alert produced + 60s observable; runs ONLY after KB ingestion COMPLETE (TASK-178). Release-blocking.
   - demo_or_evidence_output: `scripts/smoke_test.ts` + `runbooks/04_smoke_test.md` with core-number assertions; doubles as the demo recording basis.
 
-- [~] TASK-170 Author latency-validation runbook + script (5s/60s + WS/polling)
+- [ ] TASK-170 Author latency-validation runbook + script (5s/60s + WS/polling)
   - objective: Author the runbook/script that validates `FastPathLatencyMs ≤ 5s` and `EndToEndLatencyMs ≤ 60s` and simulates WebSocket drop → polling (§25 step 4).
   - requirements_covered: REQ-004, REQ-032, R5
   - design_sections: §25 (step 4), §20, §16.4
@@ -4151,6 +4239,8 @@ CHECKPOINT K (not a task): Ensure observability, resilience, and security contro
   - failure_cases: >60s → fail; no fallback → fail.
   - done_definition: Latency-validation runbook/script authored.
   - provisional_policy_notes: none
+  - hg001_amendment:
+    - Release validation executes ACC_001=78.6, EVT_002 observation 22:15 with no 22:30 use, and EVT_003=41.0.
   - aws_services_touched: CloudWatch, WebSocket (in operator run)
   - security_or_iam_notes: none
   - delivery_class: MANDATORY_ACCEPTANCE_GATE
@@ -4158,7 +4248,7 @@ CHECKPOINT K (not a task): Ensure observability, resilience, and security contro
   - competition_quality_floor: Validates `FastPathLatencyMs ≤ 5s` and `EndToEndLatencyMs ≤ 60s` and simulates WebSocket drop → polling fallback. Release-blocking (60s is the official hard indicator).
   - demo_or_evidence_output: `scripts/latency_check.ts` + `runbooks/05_latency_validation.md` with pass/fail on both thresholds + fallback proof.
 
-- [~] TASK-171 Author freeze-release + keep-Dashboard-URL runbook
+- [ ] TASK-171 Author freeze-release + keep-Dashboard-URL runbook
   - objective: Author the runbook for step-5 freeze release (pin image/artifact/params + `source_manifest_hash`) and step-6 keeping the Dashboard URL accessible for judging (§25 steps 5–6).
   - requirements_covered: REQ-024, REQ-032, R-supporting
   - design_sections: §25 (steps 5–6)
@@ -4181,7 +4271,7 @@ CHECKPOINT K (not a task): Ensure observability, resilience, and security contro
   - competition_quality_floor: Freeze the release (pin image/artifact/params + `source_manifest_hash`) and KEEP the Dashboard URL accessible for judging; maintain until judging + organizer confirmation ends (teardown is NOT done here). The preserved URL is the official "Dashboard Live Demo" deliverable (REQ-024).
   - demo_or_evidence_output: `runbooks/06_freeze_and_keep_url.md`; a pinned release + a reachable Dashboard URL held through judging.
 
-- [~] TASK-172 Author demo script + recorded-video plan
+- [ ] TASK-172 Author demo script + recorded-video plan
   - objective: Author the demo narrative/script and recorded-video plan (REQ-029) using the smoke/evidence flow as the recording basis (§25 steps 3/8, §25.1).
   - requirements_covered: REQ-029, REQ-032, R-supporting
   - design_sections: §25 (steps 3/8), §25.1
@@ -4197,6 +4287,8 @@ CHECKPOINT K (not a task): Ensure observability, resilience, and security contro
   - failure_cases: none (authoring only).
   - done_definition: Demo/video plan authored.
   - provisional_policy_notes: Demo surfaces provisional markers (never official).
+  - hg001_amendment:
+    - Demo evidence explicitly shows the three HG-001 policy decisions and complete calculation trail.
   - aws_services_touched: none (planning)
   - security_or_iam_notes: none
   - delivery_class: COMPETITION_MUST_HAVE
@@ -4204,7 +4296,7 @@ CHECKPOINT K (not a task): Ensure observability, resilience, and security contro
   - competition_quality_floor: Demo script covering the FULL operable journey (inject → fast-path decision → route/ETE/evidence → report/alert/explanation → What-if → publish/audit → recovery/fallback) + a recorded-video plan; the recorded video is DELIVERY EVIDENCE, never a functional substitute for the operable system.
   - demo_or_evidence_output: `runbooks/07_demo_and_video.md` with a step-by-step operable demo + video shot list mapped to REQ-029.
 
-- [~] TASK-173 Author evidence-export runbook + script (metrics/logs/artifacts)
+- [ ] TASK-173 Author evidence-export runbook + script (metrics/logs/artifacts)
   - objective: Author the runbook/script for step-8 evidence export (CloudWatch metrics/logs, smoke results, report/alert artifacts) as judging evidence (§25 step 8).
   - requirements_covered: REQ-032, R-supporting
   - design_sections: §25 (step 8), §19
@@ -4220,6 +4312,8 @@ CHECKPOINT K (not a task): Ensure observability, resilience, and security contro
   - failure_cases: credential in export → redaction failure.
   - done_definition: Evidence-export runbook/script authored.
   - provisional_policy_notes: none
+  - hg001_amendment:
+    - Architecture and source-provenance documents classify HG-001 as organizer guidance, not an eighth official source.
   - aws_services_touched: CloudWatch, S3 (read, in operator run)
   - security_or_iam_notes: Redaction enforced.
   - delivery_class: COMPETITION_MUST_HAVE
@@ -4227,7 +4321,7 @@ CHECKPOINT K (not a task): Ensure observability, resilience, and security contro
   - competition_quality_floor: Export architecture diagram + CloudWatch metrics/logs + smoke results + report/alert artifacts as submission evidence; auditable and complete (no missing artifact).
   - demo_or_evidence_output: `scripts/export_evidence.*` + `runbooks/08_evidence_export.md` producing the evidence bundle.
 
-- [~] TASK-174 Author architecture-diagram export + GitHub delivery runbook
+- [ ] TASK-174 Author architecture-diagram export + GitHub delivery runbook
   - objective: Author the runbook for exporting the AWS architecture diagram (REQ-023) and delivering the single GitHub repository (REQ-025) with reproducible-build notes (§25.1, §24).
   - requirements_covered: REQ-023, REQ-025, REQ-032, R-supporting
   - design_sections: §25.1, §24, §6 (Figure 2)
@@ -4243,6 +4337,8 @@ CHECKPOINT K (not a task): Ensure observability, resilience, and security contro
   - failure_cases: none (authoring only).
   - done_definition: Architecture/GitHub runbook authored.
   - provisional_policy_notes: none
+  - hg001_amendment:
+    - Operator documentation explains insufficient-data and manual-confirmation behavior.
   - aws_services_touched: none (delivery)
   - security_or_iam_notes: No secrets in repo (TASK-012).
   - delivery_class: COMPETITION_MUST_HAVE
@@ -4250,7 +4346,7 @@ CHECKPOINT K (not a task): Ensure observability, resilience, and security contro
   - competition_quality_floor: Export the AWS architecture diagram (REQ-023, official deliverable 1) and deliver the COMPLETE GitHub source (REQ-025) as a single reproducible repository; the diagram matches the frozen §6 圖2 architecture; no missing source.
   - demo_or_evidence_output: `runbooks/09_arch_and_github.md`; exported architecture diagram + a public/complete GitHub repository link.
 
-- [~] TASK-175 Author post-judging cleanup runbook (cdk destroy, organizer-gated)
+- [ ] TASK-175 Author post-judging cleanup runbook (cdk destroy, organizer-gated)
   - objective: Author the runbook for step-9/10 POST-JUDGING CLEANUP — organizer confirmation → `cdk destroy --all` — explicitly NOT executed as a post-smoke step (§25 steps 9–10, §26).
   - requirements_covered: REQ-032, R-supporting
   - design_sections: §25 (steps 9–10), §26
@@ -4266,6 +4362,8 @@ CHECKPOINT K (not a task): Ensure observability, resilience, and security contro
   - failure_cases: premature teardown → documented prohibition.
   - done_definition: Post-judging cleanup runbook authored.
   - provisional_policy_notes: none
+  - hg001_amendment:
+    - Final evidence package includes hashes, OQ status counts, Golden outputs, and no-mojibake verification.
   - aws_services_touched: (documented target: full stack destroy) — not executed here
   - security_or_iam_notes: Organizer-gated; no premature teardown.
   - delivery_class: COMPETITION_MUST_HAVE
@@ -4273,7 +4371,7 @@ CHECKPOINT K (not a task): Ensure observability, resilience, and security contro
   - competition_quality_floor: AUTHORING the organizer-gated cleanup runbook (`cdk destroy --all`) is COMPETITION_MUST_HAVE and required for submission completeness; the DESTROY EXECUTION is POST_JUDGING_ONLY and runs ONLY after organizer confirmation (§25 steps 9–10); the runbook must forbid teardown before judging + organizer confirmation.
   - demo_or_evidence_output: `runbooks/10_post_judging_cleanup.md` (authoring); the destroy step is explicitly marked organizer-gated / post-judging (not executed as part of this plan).
 
-- [~] TASK-176 Author residual-resource-check runbook + script
+- [ ] TASK-176 Author residual-resource-check runbook + script
   - objective: Author the runbook/script for step-11 residual verification (`aws cloudformation list-stacks` + resource inventory) confirming no leftover billable resources after teardown (§25 step 11, §26).
   - requirements_covered: REQ-032, R-supporting
   - design_sections: §25 (step 11), §26
@@ -4289,6 +4387,8 @@ CHECKPOINT K (not a task): Ensure observability, resilience, and security contro
   - failure_cases: residual resource → flagged.
   - done_definition: Residual-check runbook/script authored.
   - provisional_policy_notes: none
+  - hg001_amendment:
+    - Final release gate requires independent read-only review of the amended requirements, design, and task plan before TASK-001 authorization.
   - aws_services_touched: CloudFormation (read, in operator run)
   - security_or_iam_notes: Read-only inventory.
   - delivery_class: COMPETITION_MUST_HAVE
@@ -4303,11 +4403,33 @@ CHECKPOINT L (not a task): Ensure all deployment/evidence runbooks and helper sc
 ## Notes
 
 - Every task carries a `delivery_class` (see "Competition Quality Principles" and Section 8). `optional_marker` is retained ONLY on the two genuine `BONUS_OPTIONAL` tasks (TASK-134, TASK-162) and is never a general-purpose skip flag; no core, test, security, latency, source-integrity, or smoke work is ever waived. `MANDATORY_ACCEPTANCE_GATE` tasks (tests / IAM / security / latency / source-integrity / smoke) are release-blocking. Top-level phases are never optional. TASK-179 (final Lambda/IAM/Step-Functions binding) and TASK-180 (shared-stack final integration) are `MANDATORY_IMPLEMENTATION` and placed in Phase 3 immediately after TASK-178.
-- No task closes an Open Question without organizer guidance. OQ-001/002/003 resolved by HG-001 (remain configurable); OQ-004..OQ-011 remain OPEN / AWAITING_HOST_REPLY. Provisional Strategies A–F and PARTIALLY_DEFINED items (OQ-006/007/008/009/011) stay configurable via `ConfigProvider`; the `provisional_policy_notes` field on each touching task records this. No default is presented as an official rule.
+- HG-001 resolves OQ-001/002/003 for implementation and partially resolves OQ-005 time. OQ-004, OQ-006..OQ-011, and OQ-005 station-set remain OPEN / AWAITING_HOST_REPLY. All selected organizer-guided and unresolved policies stay configurable; no selected default is presented as a unique official rule.
 - No task lets an LLM compute a numeric/boolean truth or guess an undefined official rule; such cases route to a Strategy/config knob plus `manual_confirmation_required`.
 - Phase 11 tasks AUTHOR runbooks/scripts only; they never execute a deployment or `cdk destroy`. Actual deploy/teardown are operator actions gated by the runbooks (teardown additionally gated by organizer confirmation, §25/§26).
 - `CHECKPOINT A..L` lines are not tasks and are excluded from the matrices and the dependency waves.
 - Each property test is a single `fast-check` (TS) / `Hypothesis` (Py) test with ≥100 iterations and the label `Feature: city-response-commander, Property {n}: {text}` (§22.1/§22.2).
+
+---
+
+## Frozen Design Implementation Realization Record
+
+- `logical_design_capability`:
+  - POST `/what-if`
+  - ScenarioParser
+  - SchemaValidator
+  - DomainValidator
+  - WhatIfEngine
+  - deterministic recomputation
+  - SOP retrieval and citation
+  - Bedrock explanation
+  - no production-state mutation
+- `deployment_realization`: Dedicated WhatIfFn Lambda
+- `realization_class`: `IMPLEMENTATION_DEPLOYMENT_UNIT`
+- `design_amendment`: `NO`
+- `reason`: WhatIfFn is the AWS Lambda packaging and hosting unit for the already-approved POST `/what-if` and WhatIfEngine capability. It introduces no new business rule, API route, DynamoDB table, AWS service, decision authority, or user capability.
+- `WhatIfFnRole classification`: `IMPLEMENTATION_DERIVED_LEAST_PRIVILEGE_ENFORCEMENT_ARTIFACT`
+
+This record documents an implementation realization of the Frozen Design, not a design amendment.
 
 ---
 
@@ -4445,28 +4567,23 @@ Coverage result: **every property P1–P37 has ≥1 dedicated property/integrati
 
 ---
 
-## Matrix 4 — OQ-001..011 → Strategy/config task mapping (CONFIGURABLE, NOT resolved)
+## Matrix 4 — OQ-001..011 → Strategy/config task mapping
 
-> Every OQ stays **OPEN / AWAITING_HOST_REPLY**. The tasks below make each provisional policy switchable via `ConfigProvider`; none closes an OQ or bakes a provisional policy in as official. Switching a policy after a host reply is a config change (§30), never a Rule Engine edit.
+| OQ | Topic | Implementation landing | Config / Test | Status |
+| --- | --- | --- | --- | --- |
+| OQ-001 | Event time alignment | TASK-020 Strategy A | TASK-006 / TASK-038 / TASK-057 | `RESOLVED_FOR_IMPLEMENTATION_BY_ORGANIZER_GUIDANCE` |
+| OQ-002 | Event 2 affected_road | TASK-032 Strategy B | TASK-006 / TASK-054 / TASK-057 | `RESOLVED_FOR_IMPLEMENTATION_BY_ORGANIZER_GUIDANCE` |
+| OQ-003 | ETE affected set and timestamp | TASK-031 Strategy C | TASK-006 / TASK-047 / TASK-053 / TASK-055 / TASK-057 | `RESOLVED_FOR_IMPLEMENTATION_BY_ORGANIZER_GUIDANCE` |
+| OQ-004 | Incident anchor | TASK-026 Strategy D | TASK-043 / TASK-057 | `OPEN / AWAITING_HOST_REPLY` |
+| OQ-005 | SOP6 time and station scope | TASK-030 Strategy F | TASK-046 / TASK-057 | `PARTIALLY_RESOLVED_BY_ORGANIZER_GUIDANCE`; station set open |
+| OQ-006 | Intersection label without segment_id | TASK-021 | TASK-042 / TASK-057 | `OPEN / AWAITING_HOST_REPLY` |
+| OQ-007 | No compliant alternative | TASK-025 | TASK-056 | `OPEN / AWAITING_HOST_REPLY` |
+| OQ-008 | PDF/SOP saturation precedence | TASK-024 / TASK-025 | TASK-041 | `OPEN / AWAITING_HOST_REPLY` |
+| OQ-009 | What-if LLM/deterministic boundary | TASK-136..TASK-139 | TASK-142 / TASK-143 | `OPEN / AWAITING_HOST_REPLY` |
+| OQ-010 | SOP5 affected intersections | TASK-029 Strategy E | TASK-045 / TASK-057 | `OPEN / AWAITING_HOST_REPLY` |
+| OQ-011 | SOP5 duration versus ETE | TASK-029 / TASK-031 | TASK-047 / TASK-055 | `OPEN / AWAITING_HOST_REPLY` |
 
-| OQ | Issue | Strategy / mechanism | Implementing task(s) | Config knob | Switchability test | Status |
-| --- | --- | --- | --- | --- | --- | --- |
-| OQ-001 | 事件時間對齊 | Strategy A `TimeAlignmentStrategy` | TASK-020 | `policy.time_alignment.*` (TASK-006) | TASK-038, TASK-057 | RESOLVED_BY_HG-001 |
-| OQ-002 | Event2 affected_road 用途 | Strategy B `AffectedRoadStrategy` | TASK-032 | `policy.affected_road.role` | TASK-054, TASK-057 | RESOLVED_BY_HG-001 |
-| OQ-003 | ETE 受影響路段集合 | Strategy C `EteAffectedSetStrategy` | TASK-031 | `policy.ete.affected_set` | TASK-047, TASK-057 | RESOLVED_BY_HG-001 |
-| OQ-004 | 事故錨點解析 | Strategy D `IncidentAnchorResolutionStrategy` | TASK-026 | `policy.incident_anchor.mode` | TASK-043, TASK-057 | OPEN |
-| OQ-005 | SOP6 站集/時間快照 | Strategy F `MultilingualScopeStrategy` | TASK-030 | `policy.multilingual_scope.mode` | TASK-046, TASK-057 | OPEN |
-| OQ-006 | 無 segment_id 路口標籤 | PARTIALLY_DEFINED (labels order/display only) | TASK-021 | (RoadNetworkModel behavior flag) | TASK-042, TASK-057 | OPEN |
-| OQ-007 | 查無合規替代道路正式回應 | PARTIALLY_DEFINED (document + public transit) | TASK-025 | (EvacuationSelector no-candidate flag) | TASK-056 | OPEN |
-| OQ-008 | PDF 避開飽和 vs SOP 維持壅塞主疏散 | PARTIALLY_DEFINED (§11.7; Saturation never a 4th hard filter) | TASK-024, TASK-025 | (§11.7 disclosure config) | TASK-041 | OPEN |
-| OQ-009 | What-if LLM/決定性邊界 | PARTIALLY_DEFINED (Bedrock parse+explain only) | TASK-136, 137, 138, 139 | (What-if stage config) | TASK-142, TASK-143 | OPEN |
-| OQ-010 | SOP5 受影響路口範圍 | Strategy E `AffectedIntersectionScopeStrategy` | TASK-029 | `policy.affected_intersection_scope.mode` | TASK-045, TASK-057 | OPEN |
-| OQ-011 | SOP5 估計持續時間 vs SOP7 ETE | PARTIALLY_DEFINED (kept separate/non-overwriting) | TASK-029, TASK-031 | (duration/ETE separation flag) | TASK-047, TASK-055 | OPEN |
-
-Result: **OQ-001/002/003 resolved by HG-001 organizer guidance** (remain configurable); OQ-004..011 remain OPEN; each has a configurable landing task and a switch-verification test.
-
----
-
+Result: 3 resolved for implementation, 1 partially resolved, and 7 fully open. All selected and unresolved policies remain configurable. No task presents HG-001 as a unique official algorithm.
 ## Matrix 5 — REQUIRED AWS service → IaC task
 
 | REQUIRED AWS service (§4.14) | IaC task(s) | Notes |
@@ -4510,7 +4627,7 @@ Result: **every REQUIRED AWS service has ≥1 IaC task**. OPTIONAL services (Eve
 | WsPushFn/RealtimePublisher | 103,119,122,148 | packages/backend/src/realtime/* | Lambda (067) | SFN/events (068) | WsConnFnRole (083) | 073 | 103,119 | 120 | 158,163 | 167 | 169 |
 | ConnFn | 070,122 | packages/backend/src/ws/* | Lambda (067) | WS API $connect (070) | WsConnFnRole (083) | 073 | 122 | 120 | 158,163 | 167 | 169 |
 | WhatIfFn | 136,137,138,139,140 | packages/backend/src/whatif/* | Lambda (067) | API GW POST /what-if (069) | WhatIfFnRole (177) | 073 | 137,138,139,140 | 142 | 143,163 | 167 | 169,172 |
-| Ingestion process | 178 | infra/lib/constructs/kb_ingestion_custom_resource.ts | Deployment-time custom resource (NOT a Lambda) | cdk deploy step (167) | IngestionRole (083) | 073 | 178 | 167 | 178(STOP),168 | 167 | 169 (KB complete before RAG) |
+| Ingestion process | 178 | infra/lib/constructs/kb_ingestion_provider.ts; infra/lib/constructs/kb_ingestion_custom_resource.ts | Deployment-time CDK Custom Resource Provider; physical support-Lambda count is `SYNTH_DERIVED` and excluded from the 10 application runtime Lambdas | cdk deploy step (167) | IngestionRole (083) | 073 | 178 | 167 | 178(STOP),168 | 167/180 synth enumeration | 169 (KB complete before RAG) |
 | ConfigProvider | 004,005,006 | packages/config/src/* | Library (all Lambdas) | imported | per-role SSM read | 006,073 | 004,005,006 | 005 | 004,005 | 073 | 165 |
 | SopRetriever | 108,109,110 | packages/rag/src/* | RendererFn/WhatIfFn (067) | RendererFn (068)/WhatIfFn (136) | RendererFnRole (078)/WhatIfFnRole (177) KB Retrieve | 073 | 108,110 | 120 | 109,158,163 | 167 | 169 |
 | SchemaValidator | 111 | packages/backend/src/validate/* | Library (Renderer/WhatIf) (067) | renderer/what-if | (library; inherits caller role) | (n/a) | 111 | 120 | 120,163 | 167 | 169 |
@@ -4550,7 +4667,7 @@ Result: **every REQUIRED AWS service has ≥1 IaC task**. OPTIONAL services (Eve
 
 | file_path | owner_task | contributor_tasks | integration_task | dependency_enforcement | same_wave_conflict | resolution | final_status |
 |---|---|---|---|---|---|---|---|
-| `infra/lib/data_stack.ts` | TASK-059 (initial shell) | (none rewrite the shell) — TASK-060/061/062/063/064/065/066/084 build independent construct modules (`buckets.ts`,`dynamo_tables.ts`,`knowledge_base.ts`,`removal_policies.ts`) | TASK-180 (sole integration owner) | TASK-180 depends on 059,060–066,084 | none | (C) integration owner composes independent modules | resolved |
+| `infra/lib/data_stack.ts` | TASK-059 (initial shell) | (none rewrite the shell) — TASK-060/061/062/063/064/065/066/084 build independent construct modules (`buckets.ts`,`idempotency_table.ts`,`decision_core_table.ts`,`decision_narrative_table.ts`,`publish_record_table.ts`,`connections_table.ts`,`knowledge_base.ts`,`removal_policies.ts`) | TASK-180 (sole integration owner) | TASK-180 depends on 059,060–066,084 | none | (C) integration owner composes independent modules | resolved |
 | `infra/lib/compute_stack.ts` | TASK-059 (initial shell) | TASK-067 (`lambda_specs.ts`), TASK-068 (state machine), TASK-179 (`runtime_bindings.ts`) as independent modules | TASK-180 | TASK-180 depends on 059,067,068,179; 179 dep 067/068 | none | (C) integration owner composes independent modules | resolved |
 | `infra/lib/network_auth_stack.ts` | TASK-059 (initial shell) | TASK-071 (`cognito.ts`), TASK-069 (`http_api.ts`), TASK-070 (`ws_api.ts`) as independent modules | TASK-180 | TASK-180 depends on 059,069,070,071; 069 dep 071 | none | (C) integration owner composes independent modules | resolved |
 | `infra/lib/frontend_stack.ts` | TASK-059 (initial shell) | TASK-072 (`frontend_hosting.ts`) as independent module | TASK-180 | TASK-180 depends on 059,072 | none | (C) integration owner composes independent modules | resolved |
@@ -4677,7 +4794,7 @@ No coding task is POST_JUDGING_ONLY. The sole post-judging activity is the organ
 
 ## Section 7 — Parallelizable waves
 
-> Waves are recomputed by the unique formula `wave(task) = 0 if dependencies empty else 1 + max(wave(dependency))` over all 180 leaf tasks (checkpoints excluded). Tasks within a wave are mutually independent and may run in parallel; a wave N task depends only on tasks in waves 0..N-1, and every dependency sits in a strictly lower wave. TASK-177 (WhatIfFnRole; deps 066/067/071) is in wave 6; TASK-178 (deployment-time KB ingestion; deps 007/060/066/083) is in wave 8; TASK-179 (final Lambda/IAM binding; deps 067/068/076–083/177) is in wave 8; TASK-180 (shared-stack final integration; deps 059/060–084/177/178/179) is in wave 9. Shared-file ownership (Shared File Ownership Matrix) guarantees no two same-wave tasks touch the same shared file (stack shells are composed only by their single integration owner TASK-180). `wave_count = 23`; `wave_min = 0`; `wave_max = 22`; `dependency_wave_violations = 0`.
+> Waves are recomputed by the unique formula `wave(task) = 0 if dependencies empty else 1 + max(wave(dependency))` over all 180 leaf tasks (checkpoints excluded). Tasks within a wave are mutually independent and may run in parallel; every dependency sits in a strictly lower wave. TASK-177 is in wave 6; TASK-178 is in wave 8; TASK-179 is in wave 9; TASK-180 is in wave 10. Shared-file ownership guarantees that no two same-wave tasks touch the same shared file. `wave_count = 23`; `wave_min = 0`; `wave_max = 22`; `dependency_wave_violations = 0`.
 
 ```json
 {
@@ -4688,14 +4805,14 @@ No coding task is POST_JUDGING_ONLY. The sole post-judging activity is the organ
     { "id": 3, "tasks": ["TASK-008","TASK-011","TASK-018","TASK-021","TASK-032","TASK-059","TASK-085","TASK-112","TASK-122"] },
     { "id": 4, "tasks": ["TASK-019","TASK-024","TASK-026","TASK-029","TASK-036","TASK-042","TASK-060","TASK-061","TASK-062","TASK-063","TASK-064","TASK-065","TASK-071","TASK-073","TASK-074","TASK-086","TASK-089","TASK-093","TASK-095","TASK-123","TASK-124","TASK-137","TASK-157"] },
     { "id": 5, "tasks": ["TASK-020","TASK-037","TASK-043","TASK-045","TASK-066","TASK-067","TASK-090","TASK-091","TASK-094","TASK-116","TASK-125","TASK-126","TASK-138"] },
-    { "id": 6, "tasks": ["TASK-022","TASK-025","TASK-027","TASK-030","TASK-031","TASK-038","TASK-068","TASK-069","TASK-070","TASK-075","TASK-077","TASK-078","TASK-079","TASK-080","TASK-081","TASK-082","TASK-092","TASK-127","TASK-177"] },
-    { "id": 7, "tasks": ["TASK-023","TASK-028","TASK-041","TASK-046","TASK-047","TASK-050","TASK-052","TASK-056","TASK-057","TASK-072","TASK-076","TASK-083","TASK-084","TASK-087","TASK-114","TASK-144","TASK-149","TASK-153"] },
-    { "id": 8, "tasks": ["TASK-033","TASK-039","TASK-040","TASK-044","TASK-117","TASK-132","TASK-133","TASK-145","TASK-150","TASK-160","TASK-161","TASK-165","TASK-178"] },
-    { "id": 9, "tasks": ["TASK-034","TASK-110","TASK-128","TASK-129","TASK-134","TASK-139","TASK-146","TASK-147","TASK-148","TASK-151","TASK-166"] },
-    { "id": 10, "tasks": ["TASK-035","TASK-048","TASK-049","TASK-108","TASK-115","TASK-130","TASK-131","TASK-143","TASK-152","TASK-167"] },
-    { "id": 11, "tasks": ["TASK-051","TASK-053","TASK-054","TASK-055","TASK-058","TASK-099","TASK-109","TASK-113","TASK-135","TASK-140","TASK-168"] },
-    { "id": 12, "tasks": ["TASK-100","TASK-118","TASK-119","TASK-136","TASK-142","TASK-155","TASK-158"] },
-    { "id": 13, "tasks": ["TASK-101","TASK-120","TASK-141"] },
+    { "id": 6, "tasks": ["TASK-022","TASK-025","TASK-027","TASK-030","TASK-031","TASK-038","TASK-068","TASK-069","TASK-070","TASK-075","TASK-077","TASK-078","TASK-079","TASK-080","TASK-081","TASK-082","TASK-084","TASK-092","TASK-127","TASK-177"] },
+    { "id": 7, "tasks": ["TASK-023","TASK-028","TASK-041","TASK-046","TASK-047","TASK-050","TASK-052","TASK-056","TASK-057","TASK-072","TASK-076","TASK-083","TASK-087","TASK-114","TASK-144","TASK-149","TASK-153"] },
+    { "id": 8, "tasks": ["TASK-033","TASK-039","TASK-040","TASK-044","TASK-117","TASK-132","TASK-133","TASK-145","TASK-150","TASK-161","TASK-165","TASK-178"] },
+    { "id": 9, "tasks": ["TASK-034","TASK-110","TASK-128","TASK-129","TASK-134","TASK-139","TASK-146","TASK-147","TASK-148","TASK-151","TASK-179"] },
+    { "id": 10, "tasks": ["TASK-035","TASK-048","TASK-049","TASK-108","TASK-115","TASK-130","TASK-131","TASK-143","TASK-152","TASK-160","TASK-180"] },
+    { "id": 11, "tasks": ["TASK-051","TASK-053","TASK-054","TASK-055","TASK-058","TASK-099","TASK-109","TASK-113","TASK-135","TASK-140","TASK-166"] },
+    { "id": 12, "tasks": ["TASK-100","TASK-118","TASK-119","TASK-136","TASK-142","TASK-155","TASK-158","TASK-167"] },
+    { "id": 13, "tasks": ["TASK-101","TASK-120","TASK-141","TASK-168"] },
     { "id": 14, "tasks": ["TASK-096","TASK-102"] },
     { "id": 15, "tasks": ["TASK-088","TASK-097","TASK-103","TASK-159"] },
     { "id": 16, "tasks": ["TASK-098","TASK-104","TASK-106"] },
@@ -4709,7 +4826,7 @@ No coding task is POST_JUDGING_ONLY. The sole post-judging activity is the organ
 }
 ```
 
-All 180 leaf tasks appear in exactly one wave; wave IDs are contiguous 0..22; every dependency (including TASK-136→177, the deps of 177/178, and the deps of 179/180) resolves to a strictly earlier wave. `tasks_per_wave` = [1,5,12,9,23,13,20,17,13,12,10,11,8,3,2,4,3,5,3,2,2,1,1] (sum = 180); `wave_membership_duplicates = 0`; `wave_missing_tasks = 0`.
+All 180 leaf tasks appear in exactly one wave; wave IDs are contiguous 0..22; every dependency resolves to a strictly earlier wave. `tasks_per_wave` = [1, 5, 12, 9, 23, 13, 20, 17, 12, 11, 11, 11, 8, 4, 2, 4, 3, 5, 3, 2, 2, 1, 1] (sum = 180); `wave_membership_duplicates = 0`; `wave_missing_tasks = 0`.
 
 ---
 
@@ -4717,8 +4834,8 @@ All 180 leaf tasks appear in exactly one wave; wave IDs are contiguous 0..22; ev
 
 Every task carries a `delivery_class`. There is NO "skippable for a faster MVP" scope other than the two genuine `BONUS_OPTIONAL` tasks below.
 
-**Delivery-class distribution (178 tasks):**
-- `MANDATORY_IMPLEMENTATION` — 126 (core system code + IaC + SPA panels; never skippable)
+**Delivery-class distribution (180 tasks):**
+- `MANDATORY_IMPLEMENTATION` — 128 (core system code + IaC + SPA panels; never skippable)
 - `MANDATORY_ACCEPTANCE_GATE` — 43 (tests / IAM / security / latency / source-integrity / smoke; release-blocking)
 - `COMPETITION_MUST_HAVE` — 7 (TASK-167 deploy runbook, TASK-171 freeze+URL, TASK-172 demo+video, TASK-173 evidence export, TASK-174 architecture+GitHub delivery, TASK-175 organizer-gated cleanup authoring, TASK-176 residual-check authoring)
 - `BONUS_OPTIONAL` — 2 (TASK-134 Dashboard visual design REQ-030 + ja/ko UI REQ-031; TASK-162 non-essential deep X-Ray)
@@ -4732,36 +4849,46 @@ Every task carries a `delivery_class`. There is NO "skippable for a faster MVP" 
 
 ## Self-Check (plan validation)
 
-> Re-validated from disk after competition-quality remediation (task IDs, dependencies, waves, coverage recomputed; not relying on prior self-check text).
-
 | Check | Result |
 | --- | --- |
-| task_ids_unique | **true** — TASK-001..TASK-178, flat/sequential; unique=178; missing=[]; duplicate=[] |
-| total_leaf_tasks | 178 (checkpoints A–L excluded); TASK-177 WhatIfFnRole + TASK-178 deployment-time KB ingestion added in Phase 3 |
-| dependencies_exist | **true** — 178 `dependencies:` lines; all 135 distinct dep refs are within TASK-001..178; out_of_range=[] |
-| no_self_dependency | **true** — self_dependencies=[] |
-| no_dependency_cycles | **true** — every dependency resolves to a strictly earlier wave (dep_wave_violations=[]), a valid topological order ⇒ DAG |
-| topological_sort_covers_all | **true** — waves 0..22 contain all 178 tasks; wave_missing=[]; wave_duplicate=[]; each task in exactly one wave; each dependency in an earlier wave |
-| every REQ-001..032 ≥1 task | **true** — Matrix 1 (32/32); REQ_missing=[]; REQ-005 partial at requirement level via OQ-008 but has implementing tasks |
-| every R1–R17 covered | **true** — R_missing=[] (requirements_covered fields) |
-| every P1–P37 ≥1 test task | **true** — Matrix 3 (37/37 + canonical core_hash A/B/C); P_missing=[] |
-| every design component ≥1 impl task | **true** — Matrix 2 + Matrix 6 closure |
-| every REQUIRED AWS service ≥1 IaC task | **true** — Matrix 5 (15/15); Lambda = 10 runtime fns incl WhatIfFn, NO IngestionFn |
-| every IAM role has a user | **true** — Matrix 7: each role binds to a runtime handler or the deployment-time ingestion process; WhatIfFnRole→WhatIfFn; IngestionRole→TASK-178 |
-| every runtime handler has provisioning | **true** — 10 runtime Lambdas provisioned in TASK-067 (incl WhatIfFn) |
-| every provisioned runtime has an implementation | **true** — Matrix 6 (InjectFn..WhatIfFn all have impl tasks) |
-| orphans | **0** — orphan handler=0, orphan resource=0, orphan IAM role=0 (Matrix 6/7 closure invariants) |
-| no task closes an OQ | **true** — OQ-001..011 remain OPEN / AWAITING_HOST_REPLY; Matrix 4 shows configurable landings only |
-| no task requires LLM numeric/boolean compute | **true** — Bedrock text-only (SchemaValidator + IAM §9); What-if stages 1/4 Bedrock, stages 2/3 deterministic |
-| no task guesses an undefined official rule | **true** — undefined rules route to Strategy/config + manual_confirmation_required |
-| provisional policies remain configurable | **true** — TASK-006 registry + TASK-057 switch tests; `provisional_policy_notes` on touching tasks |
-| competition fields present on every task | **true** — delivery_class / judging_criteria_contribution / competition_quality_floor / demo_or_evidence_output = 178 each |
-| delivery_class distribution | MANDATORY_IMPLEMENTATION=126; MANDATORY_ACCEPTANCE_GATE=43; COMPETITION_MUST_HAVE=7; BONUS_OPTIONAL=2; POST_JUDGING_ONLY=0 (=178) |
-| no mandatory work marked skippable | **true** — optional_marker retained only on TASK-134 & TASK-162 (BONUS_OPTIONAL); tests/security/latency/source-integrity/smoke are MANDATORY_ACCEPTANCE_GATE |
-| IngestionFn removed (FIX A / Option B) | **true** — no IngestionFn runtime Lambda; ingestion is deployment-time (TASK-178); IngestionRole owned by TASK-178 (frozen §6 圖2 basis) |
-| What-if runtime (FIX B) | **true** — dedicated WhatIfFn (TASK-067) + WhatIfFnRole (TASK-177) + API integration (TASK-069) + full closure (Matrix 6/7) |
-| phase_count | 12 (Phase 0–11) |
-| wave_count | 23 (waves 0..22) |
-| trailing_analytical_artifacts | 12 (Matrix 1–5, Matrix 6 closure, Matrix 7 IAM edge, Matrix 8 shared-file, Judging Coverage, Section 6 critical path, Section 7 waves, Section 8 delivery-class) |
-| sources_unmodified | design.md, requirements.md, references/cursor_requirements_baseline.md, and the 7 official sources — **unmodified** (read-only) |
-| artifacts_created | tasks.md only — **no production code, no AWS resources, no deployment, no OQ closed** |
+| Task total | 180 |
+| Task IDs | TASK-001..TASK-180, no missing or duplicates |
+| Phase total | 12 |
+| Dependency references | 499 edges, 140 distinct refs |
+| Invalid dependencies | [] |
+| Self dependencies | [] |
+| Dependency cycles | [] |
+| Topological sort | 180 / 180 |
+| Wave count | 23, wave 0..22 |
+| Tasks per wave | [1, 5, 12, 9, 23, 13, 20, 17, 12, 11, 11, 11, 8, 4, 2, 4, 3, 5, 3, 2, 2, 1, 1] |
+| TASK-177 / 178 / 179 / 180 waves | 6 / 8 / 9 / 10 |
+| Critical path | 23 nodes / 22 direct edges |
+| Same-wave shared-file conflicts | [] |
+| Delivery classes | 128 mandatory implementation / 43 mandatory acceptance gate / 7 competition must-have / 2 bonus optional |
+| Optional markers | TASK-134, TASK-162 only |
+| OQ status | 3 resolved for implementation / 1 partially resolved / 7 fully open |
+| Application runtime Lambdas | 10 |
+| Deployment-support Lambda count | SYNTH_DERIVED |
+| Official source hashes changed | NO |
+| Application code created by this plan repair | NO |
+| AWS resources created | NO |
+| Deployment executed | NO |
+| TASK-001 executed | NO |
+| Implementation authorization | `NOT_AUTHORIZED_PENDING_READ_ONLY_REVIEW` |
+
+### Frozen Design Implementation Realization Record
+
+| Field | Value |
+| --- | --- |
+| `logical_design_capability` | POST /what-if, ScenarioParser, SchemaValidator, DomainValidator, WhatIfEngine, deterministic recomputation, SOP retrieval/citation, Bedrock explanation, no production-state mutation |
+| `deployment_realization` | Dedicated WhatIfFn Lambda |
+| `realization_class` | IMPLEMENTATION_DEPLOYMENT_UNIT |
+| `design_amendment` | NO |
+| `WhatIfFnRole classification` | IMPLEMENTATION_DERIVED_LEAST_PRIVILEGE_ENFORCEMENT_ARTIFACT |
+
+### Final Gate
+
+Requirements Status: `RECOVERED_AND_AMENDED_BY_HG-001_PENDING_READ_ONLY_REVIEW`  
+Design Status: `RECOVERED_AND_AMENDED_BY_HG-001_PENDING_READ_ONLY_REVIEW`  
+Task Plan Status: `RECOVERED_AND_AMENDED_BY_HG-001_PENDING_READ_ONLY_REVIEW`  
+Implementation Authorization: `NOT_AUTHORIZED_PENDING_READ_ONLY_REVIEW`
