@@ -57,6 +57,18 @@ export interface BedrockInvokeOptions {
    * 預設 30000 ms（30 s），符合 spec §21.2 要求。
    */
   readonly timeoutMs?: number;
+  /**
+   * 整個 `invoke()`（含所有 fallback model）的總預算（毫秒）。
+   *
+   * 沒有總預算時，`model_id_fallbacks` 有幾個 model，最壞情況就是
+   * 幾倍的單次 timeout（4 個 model × 30 s = 120 s），
+   * 足以超過 Lambda 的執行上限而被強制中斷——
+   * 那會變成沒有回應，而不是乾淨的 template fallback。
+   *
+   * 預設 60000 ms：允許主要 model 逾時後仍試得到 fallback，
+   * 同時把 `invoke()` 的耗時上限釘死在一個可預期的數字。
+   */
+  readonly totalBudgetMs?: number;
 }
 
 // ─── Adapter interface ─────────────────────────────────────────────────────
@@ -72,6 +84,9 @@ export interface BedrockInvoker {
 // ─── Default timeout ───────────────────────────────────────────────────────
 
 const DEFAULT_TIMEOUT_MS = 30_000;
+
+/** 整個 invoke()（含所有 fallback）的預設總預算 */
+const DEFAULT_TOTAL_BUDGET_MS = 60_000;
 
 // ─── BedrockAdapter implementation ────────────────────────────────────────
 
@@ -110,13 +125,32 @@ export class BedrockAdapter implements BedrockInvoker {
    * - 所有 model ID 均失敗 → 回傳 use_template
    */
   async invoke(prompt: string, opts: BedrockInvokeOptions = {}): Promise<BedrockResult> {
-    const timeoutMs = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+    const perCallTimeoutMs = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+    const totalBudgetMs = opts.totalBudgetMs ?? DEFAULT_TOTAL_BUDGET_MS;
+    const deadline = Date.now() + totalBudgetMs;
+
     const modelIds = [this.primaryModelId, ...this.fallbackModelIds];
     let lastReason: BedrockFailureReason = 'unexpected_error';
     let lastMessage = '';
+    let attempted = 0;
 
     for (const modelId of modelIds) {
-      const result = await this.tryModel(modelId, prompt, timeoutMs);
+      const remainingMs = deadline - Date.now();
+      if (remainingMs <= 0) {
+        // 總預算用盡 → 停止嘗試，交回 template fallback
+        // （繼續試下去只會讓 Lambda 被強制中斷，變成沒有回應）
+        return {
+          outcome: 'use_template',
+          reason: 'timeout',
+          message:
+            `Total budget of ${totalBudgetMs}ms exhausted after ${attempted} of ` +
+            `${modelIds.length} model ID(s). Last error: ${lastMessage}`,
+        };
+      }
+
+      attempted++;
+      // 單次呼叫不得超過剩餘總預算
+      const result = await this.tryModel(modelId, prompt, Math.min(perCallTimeoutMs, remainingMs));
       if (result.outcome === 'success') {
         return result;
       }
@@ -143,8 +177,18 @@ export class BedrockAdapter implements BedrockInvoker {
     const messages: Message[] = [{ role: 'user', content: [{ text: prompt }] }];
     const command = new ConverseCommand({ modelId, messages });
 
+    // AbortController 讓逾時真的中止底層請求。
+    // 只用 racing Promise 的話，逾時後 SDK 的請求仍在跑：
+    // 連線不會釋放，而且下一個 fallback 會與它並存，
+    // 在 Lambda 上疊成好幾條同時在飛的 Bedrock 請求。
+    const controller = new AbortController();
+
     try {
-      const response = await withTimeout(this.client.send(command), timeoutMs);
+      const response = await withTimeout(
+        this.client.send(command, { abortSignal: controller.signal }),
+        timeoutMs,
+        () => controller.abort(),
+      );
       const text = extractTextFromConverse(response);
       if (text === null) {
         return {
@@ -164,15 +208,16 @@ export class BedrockAdapter implements BedrockInvoker {
 
 /**
  * 為 Promise 加上 timeout（racing Promise 模式）。
- * AWS SDK v3 的 send() 雖支援 AbortSignal，
- * 但統一用 racing Promise 可避免 SDK 版本依賴。
+ *
+ * `onTimeout` 讓呼叫端在逾時當下中止底層請求（AbortController）——
+ * 少了這一步，逾時只會讓「我們不再等它」，請求本身還在跑。
  */
-function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+function withTimeout<T>(promise: Promise<T>, ms: number, onTimeout?: () => void): Promise<T> {
   return new Promise<T>((resolve, reject) => {
-    const timer = setTimeout(
-      () => reject(new TimeoutError(`Bedrock request timed out after ${ms}ms`)),
-      ms,
-    );
+    const timer = setTimeout(() => {
+      onTimeout?.();
+      reject(new TimeoutError(`Bedrock request timed out after ${ms}ms`));
+    }, ms);
     promise.then(
       (value) => {
         clearTimeout(timer);
