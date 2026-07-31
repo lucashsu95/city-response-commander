@@ -155,11 +155,21 @@ describe('validateScenario — DomainValidator failures', () => {
     expect(result.validation_status).toBe('clarification_required');
   });
 
-  it('Roaming_User_Pct > 1 → clarification_required', () => {
+  it('Roaming_User_Pct > 100 → clarification_required（百分比也不可能超過 100）', () => {
+    const result = validateScenario([
+      makeAssumption({ entity_id: 'BS_X', field: 'Roaming_User_Pct', value: 101 }),
+    ]);
+    expect(result.validation_status).toBe('clarification_required');
+  });
+
+  it('Roaming_User_Pct = 1.01 → 視為 1.01%，正規化為 0.0101', () => {
+    // 量綱正規化後 (1, 100] 一律當百分比；1.01 是合法的百分比輸入
     const result = validateScenario([
       makeAssumption({ entity_id: 'BS_X', field: 'Roaming_User_Pct', value: 1.01 }),
     ]);
-    expect(result.validation_status).toBe('clarification_required');
+    expect(result.validation_status).toBe('valid');
+    if (result.validation_status !== 'valid') return;
+    expect(result.validated_assumptions[0].value).toBeCloseTo(0.0101, 10);
   });
 
   it('Growth_Rate < -1 → clarification_required', () => {
@@ -293,4 +303,94 @@ describe('P35: invalid or ambiguous assumptions → clarification_required', () 
       );
     },
   );
+});
+
+// ─── 量綱正規化：百分比輸入（TASK-138）─────────────────────────────────────
+
+describe('validateScenario — Roaming_User_Pct 百分比量綱', () => {
+  function roaming(value: number): WhatIfAssumption {
+    return { entity_id: 'BS_MRT_BL17', field: 'Roaming_User_Pct', operator: '=', value };
+  }
+
+  it('35（百分比寫法）→ 正規化為 0.35 並通過', () => {
+    const result = validateScenario([roaming(35)]);
+    expect(result.validation_status).toBe('valid');
+    if (result.validation_status !== 'valid') return;
+    expect(result.validated_assumptions[0].value).toBeCloseTo(0.35, 10);
+  });
+
+  it('0.35（小數寫法）→ 原值通過，不被再次除以 100', () => {
+    const result = validateScenario([roaming(0.35)]);
+    expect(result.validation_status).toBe('valid');
+    if (result.validation_status !== 'valid') return;
+    expect(result.validated_assumptions[0].value).toBe(0.35);
+  });
+
+  it('30（REQ-010 的門檻寫法）→ 0.30，正好等於 SOP-6 門檻', () => {
+    const result = validateScenario([roaming(30)]);
+    expect(result.validation_status).toBe('valid');
+    if (result.validation_status !== 'valid') return;
+    expect(result.validated_assumptions[0].value).toBeCloseTo(0.3, 10);
+  });
+
+  it('100 → 1.0（上限）', () => {
+    const result = validateScenario([roaming(100)]);
+    expect(result.validation_status).toBe('valid');
+    if (result.validation_status !== 'valid') return;
+    expect(result.validated_assumptions[0].value).toBe(1);
+  });
+
+  it('值為 1 → 單位無法判定，回 clarification（不猜測）', () => {
+    const result = validateScenario([roaming(1)]);
+    expect(result.validation_status).toBe('clarification_required');
+    if (result.validation_status !== 'clarification_required') return;
+    expect(result.clarification_prompt).toContain('無法判定單位');
+  });
+
+  it('超過 100 → 超出範圍', () => {
+    const result = validateScenario([roaming(150)]);
+    expect(result.validation_status).toBe('clarification_required');
+  });
+
+  it('負值 → 超出範圍', () => {
+    const result = validateScenario([roaming(-5)]);
+    expect(result.validation_status).toBe('clarification_required');
+  });
+
+  it('0 → 通過（0% 與 0 小數同義）', () => {
+    const result = validateScenario([roaming(0)]);
+    expect(result.validation_status).toBe('valid');
+  });
+});
+
+describe('validateScenario — Growth_Rate 維持小數量綱', () => {
+  function growth(value: number): WhatIfAssumption {
+    return { entity_id: 'BS_MRT_BL17', field: 'Growth_Rate', operator: '=', value };
+  }
+
+  it('0.35（小數）→ 原值通過，不做百分比換算', () => {
+    const result = validateScenario([growth(0.35)]);
+    expect(result.validation_status).toBe('valid');
+    if (result.validation_status !== 'valid') return;
+    expect(result.validated_assumptions[0].value).toBe(0.35);
+  });
+
+  it('35（百分比誤寫）→ 超出範圍並提示小數寫法，不再靜默觸發 SOP-3', () => {
+    const result = validateScenario([growth(35)]);
+    expect(result.validation_status).toBe('clarification_required');
+    if (result.validation_status !== 'clarification_required') return;
+    expect(result.clarification_prompt).toContain('0.35');
+  });
+
+  it('2.0（200% 成長）仍屬合法小數輸入', () => {
+    const result = validateScenario([growth(2)]);
+    expect(result.validation_status).toBe('valid');
+    if (result.validation_status !== 'valid') return;
+    expect(result.validated_assumptions[0].value).toBe(2);
+  });
+
+  it('-0.2（SOP-4 門檻）合法', () => {
+    const result = validateScenario([growth(-0.2)]);
+    expect(result.validation_status).toBe('valid');
+  });
 });

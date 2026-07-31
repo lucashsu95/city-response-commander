@@ -98,10 +98,14 @@ describe('Stage 2 DomainValidator: type/range mismatches → clarification, stag
     ['Saturation_Score = 2', 'RD_TPE_001', 'Saturation_Score', 2],
     ['User_Count negative', 'BS_MRT_BL17', 'User_Count', -1],
     ['User_Count float', 'BS_MRT_BL17', 'User_Count', 40000.5],
-    ['Roaming_User_Pct > 1', 'BS_MRT_BL17', 'Roaming_User_Pct', 1.01],
+    // Roaming_User_Pct 接受百分比量綱（(1, 100] → /100），
+    // 因此超出範圍的門檻是 100 而非 1；1.01 現在代表 1.01%（合法）。
+    ['Roaming_User_Pct > 100', 'BS_MRT_BL17', 'Roaming_User_Pct', 100.01],
+    ['Roaming_User_Pct 單位無法判定（=1）', 'BS_MRT_BL17', 'Roaming_User_Pct', 1],
     ['Roaming_User_Pct negative', 'BS_MRT_BL17', 'Roaming_User_Pct', -0.01],
     ['Growth_Rate below -1', 'BS_MRT_BL17', 'Growth_Rate', -1.01],
-    ['Growth_Rate above 100', 'BS_MRT_BL17', 'Growth_Rate', 100.01],
+    // Growth_Rate 維持小數量綱，上限收斂到 10（原本 100 會讓「35%」靜默通過）
+    ['Growth_Rate above 10', 'BS_MRT_BL17', 'Growth_Rate', 10.01],
   ];
 
   for (const [label, entityId, field, value] of OUT_OF_RANGE) {
