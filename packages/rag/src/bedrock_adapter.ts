@@ -20,6 +20,7 @@ import {
   type Message,
 } from '@aws-sdk/client-bedrock-runtime';
 import type { ConfigProvider } from '@city-commander/config';
+import { requireString, requireStringArray } from './config_helpers.js';
 
 // ─── Public types ──────────────────────────────────────────────────────────
 
@@ -233,35 +234,4 @@ class TimeoutError extends Error {
 
 function isAwsError(err: unknown): err is { name: string; message: string } {
   return typeof err === 'object' && err !== null && 'name' in err;
-}
-
-// ─── Config helpers ────────────────────────────────────────────────────────
-
-/**
- * 從 ConfigProvider 取得 string 值。
- * 即使外部未執行 validateConfig()，也能在 runtime 確保型別正確。
- */
-function requireString(config: ConfigProvider, key: string): string {
-  const value = config.get(key);
-  if (typeof value !== 'string') {
-    throw new TypeError(
-      `Config key "${key}" must be a string, got ${typeof value}. ` +
-        'Ensure validateConfig() has been called before constructing BedrockAdapter.',
-    );
-  }
-  return value;
-}
-
-/**
- * 從 ConfigProvider 取得 string[] 值。
- */
-function requireStringArray(config: ConfigProvider, key: string): readonly string[] {
-  const value = config.get(key);
-  if (!Array.isArray(value) || !value.every((v) => typeof v === 'string')) {
-    throw new TypeError(
-      `Config key "${key}" must be a string[], got ${typeof value}. ` +
-        'Ensure validateConfig() has been called before constructing BedrockAdapter.',
-    );
-  }
-  return value as readonly string[];
 }

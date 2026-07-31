@@ -30,6 +30,24 @@ export {
   createBedrockAdapter,
 } from './mock_bedrock_adapter.js';
 
+// ─── SOP Retriever (TASK-108) ────────────────────────────
+export {
+  SopRetriever,
+  BedrockKbClient,
+  createSopRetriever,
+  type KbRetrieveClient,
+  type SopCitationResult,
+  type SopRetrieveResult,
+  type SopRetrieveSuccess,
+  type SopRetrieveBothFailed,
+} from './sop_retriever.js';
+
+// ─── SOP S3 Fallback (TASK-109) ──────────────────────────
+export {
+  SopS3Fallback,
+  type SopArticleFetchResult,
+} from './sop_s3_fallback.js';
+
 // ─── Narrative Writer (TASK-116) ──────────────────────────
 export {
   putNarrative,
