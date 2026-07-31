@@ -39,6 +39,10 @@ export {
 
 export type { DecisionCorePort } from './decision_core_repository.js';
 
+export { PublishRecordReader, PublishRecordReadError } from './publish_record_reader.js';
+
+export type { PublishRecordReadPort, PublishRecordReaderOptions } from './publish_record_reader.js';
+
 export {
   DecisionNarrativeReader,
   REQUIRED_NARRATIVE_TYPES,
