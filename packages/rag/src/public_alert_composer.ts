@@ -26,6 +26,10 @@ import {
   type DecisionCore,
   type PublicAlertPayload,
 } from '@city-commander/shared-schemas';
+import {
+  requiredAlertLanguages,
+  type SupportedLanguage,
+} from '@city-commander/domain';
 import { validateBedrockPayload } from './schema_validator.js';
 import {
   putNarrative,
@@ -42,23 +46,32 @@ import {
 // ─── Language floor logic ─────────────────────────────────────────────────────
 
 /**
- * 語言下限常數（§14.4, TASK-114 competition_quality_floor）。
+ * `domain` 的 `SupportedLanguage`（字串）→ shared-schemas 的 `Language` enum。
  *
- * - SOP-6 未觸發：僅 zh
- * - SOP-6 觸發：zh + en
- * - SOP-6 觸發且 bonus 啟用：zh + en + ja + ko
- *
- * 這些語言集合由決定性程式碼決定，LLM-prohibited。
+ * 兩者的值域相同（'zh' | 'en' | 'ja' | 'ko'），此表只做型別轉換，
+ * 不參與任何「哪些語言該出現」的判斷。
  */
-const LANGUAGES_BASE: readonly Language[] = [Language.ZH];
-const LANGUAGES_SOP6: readonly Language[] = [Language.ZH, Language.EN];
-const LANGUAGES_BONUS: readonly Language[] = [Language.ZH, Language.EN, Language.JA, Language.KO];
+const DOMAIN_LANGUAGE_TO_ENUM: Record<SupportedLanguage, Language> = {
+  zh: Language.ZH,
+  en: Language.EN,
+  ja: Language.JA,
+  ko: Language.KO,
+};
 
 /**
  * 依 sop6_triggered 與 bonus flag 決定語言集合。
  *
- * 此函式的輸出是 LLM-prohibited 的決定性真值。
- * Bedrock 只能決定文字措辭，不能決定哪些語言出現。
+ * ⚠️ 語言下限是**決定性真值**（§14.4 的下限表、LLM-prohibited），
+ * 因此一律委派 `domain` 的 `requiredAlertLanguages()`——
+ * 這裡不得再複製一份下限規則。
+ * 本模組原本自行維護 LANGUAGES_BASE / SOP6 / BONUS 三個常數，
+ * 與 `domain/content/multilingual_template_renderer.ts` 的規則一字不差，
+ * 屬於兩個 owner 各持一份真值；修改 SOP-6 下限時必然漏掉一邊。
+ *
+ * 對照表（由 domain 保證）：
+ * - SOP-6 未觸發：僅 zh
+ * - SOP-6 觸發：zh + en
+ * - SOP-6 觸發且 bonus 啟用：zh + en + ja + ko
  *
  * @internal 僅供 `composePublicAlert` 使用；匯出是為了方便測試。
  *   外部呼叫端應確保傳入的 sop6Triggered 來自 `core.multilingual_required`，
@@ -68,9 +81,9 @@ export function resolveLanguages(
   sop6Triggered: boolean,
   bonusEnabled: boolean,
 ): readonly Language[] {
-  if (!sop6Triggered) return LANGUAGES_BASE;
-  if (bonusEnabled) return LANGUAGES_BONUS;
-  return LANGUAGES_SOP6;
+  return requiredAlertLanguages(sop6Triggered, bonusEnabled).map(
+    (lang) => DOMAIN_LANGUAGE_TO_ENUM[lang],
+  );
 }
 
 // ─── Input / Output types ─────────────────────────────────────────────────────

@@ -13,6 +13,7 @@ import {
   type PublicAlertComposerInput,
 } from '../../src/public_alert_composer.js';
 import { Language, NarrativeType } from '@city-commander/shared-schemas';
+import { requiredAlertLanguages } from '@city-commander/domain';
 import type { NarrativeTableClient, NarrativeItem } from '../../src/narrative_writer.js';
 import type { BedrockInvoker, BedrockResult } from '../../src/bedrock_adapter.js';
 import type { DecisionCore } from '@city-commander/shared-schemas';
@@ -104,6 +105,25 @@ describe('resolveLanguages', () => {
     expect(langs).toContain(Language.KO);
     expect(langs).toHaveLength(4);
   });
+});
+
+// ─── 語言下限單一來源（domain）────────────────────────────────────────────
+
+describe('resolveLanguages 委派 domain 的 requiredAlertLanguages', () => {
+  it(
+    'Feature: city-response-commander, Property 36e: resolveLanguages 對所有 (sop6, bonus) 組合均等於 domain 的語言下限',
+    () => {
+      fc.assert(
+        fc.property(fc.boolean(), fc.boolean(), (sop6Triggered, bonusEnabled) => {
+          // domain 是語言下限的唯一真值來源；rag 只做 enum 型別轉換
+          expect(resolveLanguages(sop6Triggered, bonusEnabled)).toEqual(
+            requiredAlertLanguages(sop6Triggered, bonusEnabled),
+          );
+        }),
+        { numRuns: 100 },
+      );
+    },
+  );
 });
 
 // ─── P36 property test ─────────────────────────────────────────────────────
