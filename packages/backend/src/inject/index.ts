@@ -30,3 +30,11 @@ export {
 } from './recovery_transitions.js';
 
 export type { RecoveryLeaseInput, RecoveryLeaseOutcome } from './recovery_transitions.js';
+
+export { orchestrateStaleRunning, isStaleRunning } from './stale_orchestration.js';
+
+export type {
+  StaleOrchestrationPorts,
+  StaleOrchestrationInput,
+  StaleOrchestrationOutcome,
+} from './stale_orchestration.js';
