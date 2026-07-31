@@ -35,3 +35,13 @@ export {
   buildLatencyMetrics,
   LATENCY_METRIC_NAMES,
 } from './latency_emitter.js';
+
+export { CounterMetricEmitter, COUNTER_METRIC_NAMES } from './counter_emitter.js';
+
+export type {
+  IdempotencyConflictReason,
+  FencedExecutionReason,
+  FallbackReason,
+  ThrottlingSource,
+  CounterContext,
+} from './counter_emitter.js';

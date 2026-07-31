@@ -116,7 +116,16 @@ export class EmfEmitter {
   private readonly now: () => number;
   private readonly sink: EmfSink;
   private readonly onEmitError?: (error: unknown) => void;
-  private failures = 0;
+  /**
+   * Failure accounting, held by reference so emitters derived via
+   * {@link withActionType} report into the same total.
+   *
+   * Without the shared reference the count would live on a throwaway child —
+   * callers that derive an emitter per emission (which is the normal pattern for
+   * counters) would always observe zero, and a completely dead metric pipeline
+   * would look healthy.
+   */
+  private failureState: { count: number } = { count: 0 };
 
   constructor(options: EmfEmitterOptions) {
     this.namespace = options.namespace ?? DEFAULT_METRIC_NAMESPACE;
@@ -126,20 +135,30 @@ export class EmfEmitter {
     this.onEmitError = options.onEmitError;
   }
 
-  /** Number of emissions that failed. Non-zero means metrics are being lost. */
+  /**
+   * Number of emissions that failed, including those of derived emitters.
+   * Non-zero means metrics are being lost.
+   */
   get failureCount(): number {
-    return this.failures;
+    return this.failureState.count;
   }
 
-  /** Derive an emitter with a different `ActionType` dimension. */
+  /**
+   * Derive an emitter with a different `ActionType` dimension.
+   *
+   * The derived emitter shares this one's failure accounting, so losses are
+   * visible on whichever instance the caller holds.
+   */
   withActionType(actionType: string): EmfEmitter {
-    return new EmfEmitter({
+    const derived = new EmfEmitter({
       dimensions: { ...this.dimensions, ActionType: actionType },
       namespace: this.namespace,
       now: this.now,
       sink: this.sink,
       ...(this.onEmitError === undefined ? {} : { onEmitError: this.onEmitError }),
     });
+    derived.failureState = this.failureState;
+    return derived;
   }
 
   /**
@@ -177,7 +196,7 @@ export class EmfEmitter {
       this.sink.write(line);
       return line;
     } catch (error: unknown) {
-      this.failures += 1;
+      this.failureState.count += 1;
       this.onEmitError?.(error);
       return null;
     }
