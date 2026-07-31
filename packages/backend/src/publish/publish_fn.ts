@@ -426,10 +426,18 @@ export function createPublishHandler(
         failureReason: parsedBody.failure_reason,
       });
 
-      // ── 8b. published 狀態時執行 CMS/SMS 模擬通道（TASK-146）────────────
-      // dispatchChannels 只在 targetState=published 時執行；
-      // channel 結果 (succeededChannels) 寫入 PublishRecord.channels
-      if (targetState === PublishStatus.published) {
+      // ── 8b. 首次 published 時才執行 CMS/SMS 模擬通道（TASK-146, TASK-151）──
+      //
+      // 通道派送就是「把警示送出去」這個對外副作用（競賽版以 CMS/SMS mock 呈現），
+      // §15.2 要求 retry **絕不**重新觸發一鍵發布或重推 public_alert.ready，
+      // 因此這裡的閘門直接用冪等判定結果，而不是只看 targetState。
+      //
+      // `shouldEmitPublicAlertReady` 僅在 `PROCEED`（非 retry）且目標為 published 時為真；
+      // `ALREADY_PUBLISHED` / `VERSION_DRIFT` 早在步驟 5 就已回應並離開，
+      // 兩者相加確保「對外副作用最多發生一次」。
+      const shouldDispatchChannels = shouldEmitPublicAlertReady(idempotencyResult, targetState);
+
+      if (shouldDispatchChannels) {
         const cmsCoreText = await readCmsCoreText(decisionId) ?? '';
         const channelResult = dispatchChannels({
           record: newRecord,
@@ -511,10 +519,7 @@ export function createPublishHandler(
         );
       }
 
-      // ── 10. 回傳成功結果（§15.2：只有 PROCEED 才可能觸發 alert）─────────
-      // shouldEmitPublicAlertReady 確認是否為首次 published（非 retry）
-      const _shouldEmitAlert = shouldEmitPublicAlertReady(idempotencyResult, targetState);
-
+      // ── 10. 回傳成功結果 ─────────────────────────────────────────────────
       // TASK-148: 推送 publish.status_changed WebSocket 事件
       emitStatusChanged(realtimePublisher, writeResult.record, event, decisionId);
 

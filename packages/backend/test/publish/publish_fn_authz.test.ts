@@ -317,3 +317,63 @@ describe('PublishFn — 冪等', () => {
     expect(String(parseBody(result).message)).not.toContain('DynamoDB');
   });
 });
+
+// ─── 對外副作用最多一次（§15.2, TASK-151）─────────────────────────────────
+
+describe('PublishFn — retry 不重複觸發對外通道', () => {
+  function publishedRecord(version: number): PublishRecord {
+    return { ...approvedRecord(version), publish_state: PublishStatus.published };
+  }
+
+  it('首次 published → 通道派送一次（讀取 cms_core_text 作為派送證據）', async () => {
+    let cmsReads = 0;
+    const handler = createPublishHandler(
+      makeDeps({
+        readPublishRecord: async () => approvedRecord(),
+        readCmsCoreText: async () => {
+          cmsReads++;
+          return 'cms';
+        },
+      }),
+    );
+
+    const result = await handler(makeEvent({ body: { target_state: 'published' } }));
+    expect(statusOf(result)).toBe(200);
+    expect(cmsReads).toBe(1);
+  });
+
+  it('已 published 的 retry → 完全不派送通道（不重推民眾警示）', async () => {
+    let cmsReads = 0;
+    const handler = createPublishHandler(
+      makeDeps({
+        readPublishRecord: async () => publishedRecord(3),
+        readCmsCoreText: async () => {
+          cmsReads++;
+          return 'cms';
+        },
+      }),
+    );
+
+    const result = await handler(makeEvent({ body: { target_state: 'published' } }));
+    expect(statusOf(result)).toBe(200);
+    expect(parseBody(result).idempotent).toBe(true);
+    // §15.2：retry 絕不重新觸發一鍵發布
+    expect(cmsReads).toBe(0);
+  });
+
+  it('非 published 的轉移（draft/approved）不派送通道', async () => {
+    let cmsReads = 0;
+    const handler = createPublishHandler(
+      makeDeps({
+        readPublishRecord: async () => null,
+        readCmsCoreText: async () => {
+          cmsReads++;
+          return 'cms';
+        },
+      }),
+    );
+
+    await handler(makeEvent({ body: { target_state: 'draft' } }));
+    expect(cmsReads).toBe(0);
+  });
+});
