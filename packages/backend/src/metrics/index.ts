@@ -1,5 +1,5 @@
 /**
- * Metrics — latency instrumentation.
+ * Metrics — latency instrumentation and CloudWatch EMF emission.
  *
  * @module backend/metrics
  */
@@ -17,3 +17,21 @@ export type {
   LatencyTraceSnapshot,
   LatencyLogRecord,
 } from './latency_trace.js';
+
+export { EmfEmitter, stdoutEmfSink, DEFAULT_METRIC_NAMESPACE } from './emf.js';
+
+export type {
+  MetricUnit,
+  MetricDatum,
+  MetricDimensions,
+  MetricProperties,
+  EmfLogLine,
+  EmfSink,
+  EmfEmitterOptions,
+} from './emf.js';
+
+export {
+  LatencyMetricEmitter,
+  buildLatencyMetrics,
+  LATENCY_METRIC_NAMES,
+} from './latency_emitter.js';
