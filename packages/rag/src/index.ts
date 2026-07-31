@@ -29,3 +29,13 @@ export {
   MockBedrockAdapter,
   createBedrockAdapter,
 } from './mock_bedrock_adapter.js';
+
+// ─── Narrative Writer (TASK-116) ──────────────────────────
+export {
+  putNarrative,
+  type NarrativeTableClient,
+  type NarrativeItem,
+  type NarrativePutResult,
+  type NarrativePutCommitted,
+  type NarrativePutBranchAlreadyCompleted,
+} from './narrative_writer.js';
