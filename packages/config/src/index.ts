@@ -19,6 +19,7 @@ export { SsmConfigProvider, SsmConfigProviderOptions } from './ssm_config_provid
 
 export {
   createConfigProvider,
+  PROFILE_ENV_KEYS,
   ProviderFactoryOptions,
   EnvironmentProfile,
 } from './provider_factory.js';
