@@ -11,6 +11,7 @@
  * - cms_core_text 不可被 LLM 修改（不出現在 REPORT payload）
  */
 
+import * as fc from 'fast-check';
 import { describe, it, expect, vi } from 'vitest';
 import {
   composeReport,
@@ -19,7 +20,7 @@ import {
 import { NarrativeType } from '@city-commander/shared-schemas';
 import type { NarrativeTableClient, NarrativeItem } from '../../src/narrative_writer.js';
 import type { BedrockInvoker, BedrockResult } from '../../src/bedrock_adapter.js';
-import type { DecisionCore } from '@city-commander/shared-schemas';
+import type { DecisionCore, Art1Measures } from '@city-commander/shared-schemas';
 import type { SopCitationResult } from '../../src/sop_retriever.js';
 
 // ─── Stub helpers ──────────────────────────────────────────────────────────
@@ -208,4 +209,86 @@ describe('composeReport', () => {
     await composeReport(makeInput({ core }));
     expect(JSON.stringify(core)).toBe(before);
   });
+});
+
+// ─── P24 property: report completeness (TASK-048) ─────────────────────────
+
+const SAMPLE_ART1_MEASURES: Art1Measures = {
+  level: 'A',
+  trigger_segment: 'RD_TPE_001',
+  long_green_timing: true,
+  alternatives_green_plus_pct: 25,
+  police_clear_intersections: true,
+  a_level_invokes_article2_alternative_route_guidance: true,
+};
+
+async function renderTemplateReportText(core: DecisionCore): Promise<string> {
+  const client: NarrativeTableClient = { conditionalPut: vi.fn(async () => 'committed') };
+  await composeReport(
+    makeInput({ core, narrativeClient: client, bedrockInvoker: makeBedrockFailure() }),
+  );
+  const item = (client.conditionalPut as ReturnType<typeof vi.fn>).mock
+    .calls[0]?.[0] as NarrativeItem;
+  const payload = item.payload as { report_text: string };
+  return payload.report_text;
+}
+
+describe('composeReport — Property 24: template report completeness', () => {
+  it(
+    'Feature: city-response-commander, Property 24: deterministic template report includes event id, grading, routes, exclusions, signal timing, cross-system requests and ETE facts',
+    async () => {
+      await fc.assert(
+        fc.asyncProperty(
+          fc.record({
+            art3: fc.boolean(),
+            art5: fc.boolean(),
+            hasSignalMeasures: fc.boolean(),
+            delay: fc.integer({ min: 0, max: 300 }),
+          }),
+          async ({ art3, art5, hasSignalMeasures, delay }) => {
+            const core: DecisionCore = {
+              ...makeCore(),
+              triggered_articles: [1, 2, ...(art3 ? [3] : []), ...(art5 ? [5] : [])],
+              art1_measures: hasSignalMeasures ? SAMPLE_ART1_MEASURES : undefined,
+              ete: {
+                calculation_status: 'computed',
+                ete_minutes: delay,
+                base_clearance: 60,
+                congestion_penalty: 0,
+                avg_saturation: 0.5,
+                severity: 'Critical',
+              } as unknown as DecisionCore['ete'],
+            };
+
+            const text = await renderTemplateReportText(core);
+
+            // 事件辨識
+            expect(text).toContain(core.event_id);
+            // 路線建議：主/次疏散路段 + 排除理由
+            expect(text).toContain(core.primary_evacuation!);
+            for (const secondary of core.secondary_evacuation) {
+              expect(text).toContain(secondary);
+            }
+            for (const excluded of core.excluded_candidates) {
+              expect(text).toContain(excluded.exclusion_reason!);
+            }
+            // ETE 數值與依據
+            expect(text).toContain(String(delay));
+            // 號誌調整建議（僅 art1_measures 存在時）
+            if (hasSignalMeasures) {
+              expect(text).toContain('號誌調整');
+              expect(text).toContain('25');
+            }
+            // 跨系統聯動（僅觸發第 3/5 條時）
+            if (art3) expect(text).toContain('北捷');
+            if (art5) expect(text).toContain('警力');
+            if (!art3 && !art5) {
+              expect(text).not.toContain('跨系統協調');
+            }
+          },
+        ),
+        { numRuns: 100 },
+      );
+    },
+  );
 });

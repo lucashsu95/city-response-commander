@@ -196,6 +196,8 @@ function buildReportPrompt(core: DecisionCore, citations: readonly SopCitationRe
     : '（無）';
 
   const eteSection = formatEteForPrompt(core);
+  const signalTimingLine = buildSignalTimingLine(core);
+  const crossSystemLine = buildCrossSystemLine(core);
 
   const citationLines = citations
     .map((c) => `  - 第 ${c.article_no} 條（來源：${c.source_location}）：${c.content.slice(0, 120)}`)
@@ -218,7 +220,7 @@ function buildReportPrompt(core: DecisionCore, citations: readonly SopCitationRe
 - 主疏散路段：${primaryRoute}
 - 次疏散路段：${secondaryRoutes}
 - ${eteSection}
-
+${signalTimingLine ? `- ${signalTimingLine}\n` : ''}${crossSystemLine ? `- ${crossSystemLine}\n` : ''}
 ## 排除路段
 ${excludedRoutes || '  （無排除路段）'}
 
@@ -281,6 +283,11 @@ function buildFallbackReportText(
     : '無';
   const triggeredArticles = core.triggered_articles.join('、');
   const eteText = formatEteForReport(core);
+  const signalTimingLine = buildSignalTimingLine(core);
+  const crossSystemLine = buildCrossSystemLine(core);
+  const exclusionLines = core.excluded_candidates.map(
+    (r) => `  - ${r.segment_id}：${r.exclusion_reason ?? '未提供理由'}`,
+  );
 
   const articleList = citations.length > 0
     ? citations.map((c) => `第 ${c.article_no} 條`).join('、')
@@ -295,10 +302,51 @@ function buildFallbackReportText(
     `觸發 SOP：${articleList}`,
     `主疏散路段：${primaryRoute}`,
     `次疏散路段：${secondaryRoutes}`,
+    ...(exclusionLines.length > 0 ? [`排除路段：`, ...exclusionLines] : []),
     ...(eteText ? [eteText] : []),
+    ...(signalTimingLine ? [signalTimingLine] : []),
+    ...(crossSystemLine ? [crossSystemLine] : []),
     ``,
     `（本報告由決定性模板產生，Bedrock 不可用）`,
   ].join('\n');
+}
+
+// ─── Signal timing / cross-system helpers ─────────────────────────────────────
+
+/**
+ * 組裝號誌調整建議文字（REQ-021）。
+ *
+ * 只插入 `core.art1_measures`（SOP-1 決定性測量結果，LLM-prohibited）；
+ * 無 art1_measures 時回傳 null，呼叫端省略整行。
+ */
+function buildSignalTimingLine(core: DecisionCore): string | null {
+  const measures = core.art1_measures;
+  if (!measures) return null;
+
+  const parts = [`號誌調整：${measures.trigger_segment} 替代路口綠燈時間 +${measures.alternatives_green_plus_pct}%`];
+  if (measures.long_green_timing) parts.push('啟動長綠燈時制');
+  if (measures.police_clear_intersections) parts.push('派遣警力協助路口疏導');
+  return parts.join('，');
+}
+
+/**
+ * 組裝跨系統聯動文字（REQ-021）。
+ *
+ * 只依 `core.triggered_articles`（決定性，LLM-prohibited）判斷：
+ * - 觸發第 3 條（捷運與接駁分流）→ 請求北捷／公車處支援
+ * - 觸發第 5 條（號誌故障）→ 請求警力支援
+ * 兩者皆未觸發時回傳 null，呼叫端省略整行。
+ */
+function buildCrossSystemLine(core: DecisionCore): string | null {
+  const requests: string[] = [];
+  if (core.triggered_articles.includes(3)) {
+    requests.push('請求北捷「過站不停」與公車處調度接駁專車');
+  }
+  if (core.triggered_articles.includes(5)) {
+    requests.push('請求警力支援路口人工指揮');
+  }
+  if (requests.length === 0) return null;
+  return `跨系統協調：${requests.join('；')}`;
 }
 
 // ─── ETE formatting helpers ───────────────────────────────────────────────────

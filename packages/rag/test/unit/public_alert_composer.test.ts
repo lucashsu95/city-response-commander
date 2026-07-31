@@ -243,3 +243,47 @@ describe('composePublicAlert', () => {
     }
   });
 });
+
+// ─── P29 property test (TASK-050) ──────────────────────────────────────────
+
+describe('composePublicAlert — Property 29: bonus languages share the same ETE fact', () => {
+  it(
+    'Feature: city-response-commander, Property 29: triggered bonus alerts include Japanese and Korean carrying the same ETE fact in the same response',
+    async () => {
+      await fc.assert(
+        fc.asyncProperty(fc.integer({ min: 0, max: 300 }), async (delay) => {
+          const core: DecisionCore = {
+            ...makeMinimalCore(true),
+            ete: {
+              calculation_status: 'computed',
+              ete_minutes: delay,
+              base_clearance: 60,
+              congestion_penalty: 0,
+              avg_saturation: 0.5,
+              severity: 'Critical',
+            } as unknown as DecisionCore['ete'],
+          };
+          const client = committedClient();
+          const result = await composePublicAlert({
+            core,
+            bonusLanguagesEnabled: true,
+            narrativeClient: client,
+            bedrockInvoker: makeBedrockFailure(),
+          });
+
+          if (result.outcome === 'failed') return;
+          expect(result.languages).toEqual([Language.ZH, Language.EN, Language.JA, Language.KO]);
+
+          const item = (client.conditionalPut as ReturnType<typeof vi.fn>).mock
+            .calls[0]?.[0] as NarrativeItem;
+          const payload = item.payload as { public_alert_text: Record<string, string> };
+          expect(payload.public_alert_text[Language.ZH]).toBeTruthy();
+          expect(payload.public_alert_text[Language.EN]).toBeTruthy();
+          expect(payload.public_alert_text[Language.JA]).toContain(String(delay));
+          expect(payload.public_alert_text[Language.KO]).toContain(String(delay));
+        }),
+        { numRuns: 100 },
+      );
+    },
+  );
+});

@@ -9,6 +9,7 @@
  * - 通過時只回傳白名單欄位（strip 多餘 key）
  */
 
+import * as fc from 'fast-check';
 import { describe, it, expect } from 'vitest';
 import { validateBedrockPayload } from '../../src/schema_validator.js';
 import { NarrativeType } from '@city-commander/shared-schemas';
@@ -199,4 +200,33 @@ describe('validateBedrockPayload — PUBLIC_ALERT', () => {
       expect(result.reason).toBe('prohibited_field_overwrite');
     }
   });
+});
+
+// ─── P37 property: CMS permission split (TASK-048) ─────────────────────────
+
+describe('validateBedrockPayload — Property 37: renderer may write CMS explanation but never deterministic CMS core', () => {
+  it(
+    'Feature: city-response-commander, Property 37: REPORT payload may set cms_explanation_text but a cms_core_text overwrite is always rejected',
+    () => {
+      fc.assert(
+        fc.property(fc.string(), (text) => {
+          const explanationResult = validateBedrockPayload(NarrativeType.REPORT, {
+            cms_explanation_text: text,
+          });
+          expect(explanationResult.outcome).toBe('accepted');
+
+          const coreOverwriteResult = validateBedrockPayload(NarrativeType.REPORT, {
+            report_text: 'ok',
+            cms_core_text: text,
+          });
+          expect(coreOverwriteResult.outcome).toBe('use_template');
+          if (coreOverwriteResult.outcome === 'use_template') {
+            expect(coreOverwriteResult.reason).toBe('prohibited_field_overwrite');
+            expect(coreOverwriteResult.offendingFields).toContain('cms_core_text');
+          }
+        }),
+        { numRuns: 100 },
+      );
+    },
+  );
 });

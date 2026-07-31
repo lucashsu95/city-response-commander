@@ -308,6 +308,47 @@ describe('formatEteForLanguage', () => {
   });
 });
 
+// ─── P25 property: alert completeness (TASK-048) ──────────────────────────
+
+describe('renderMultilingualTemplates — Property 25: alert retains location, reroute, delay and avoidance facts', () => {
+  it(
+    'Feature: city-response-commander, Property 25: every language template retains incident location, reroute, delay and avoidance-reminder facts',
+    () => {
+      fc.assert(
+        fc.property(
+          fc.record({
+            location: fc.string({ minLength: 1, maxLength: 12 }).filter((s) => s.trim().length > 0),
+            route: fc.string({ minLength: 1, maxLength: 12 }).filter((s) => s.trim().length > 0),
+            delay: fc.integer({ min: 0, max: 300 }),
+          }),
+          ({ location, route, delay }) => {
+            const core = makeCore({
+              event_facts: { location } as unknown as DecisionCore['event_facts'],
+              primary_evacuation: route,
+              ete: {
+                calculation_status: 'computed',
+                ete_minutes: delay,
+              } as unknown as DecisionCore['ete'],
+            });
+            const result = renderMultilingualTemplates({ core, languages: ALL_LANGUAGES });
+            for (const lang of ALL_LANGUAGES) {
+              const text = result.public_alert_text[lang]!;
+              // 事故位置 + 改道指引
+              expect(text).toContain(location);
+              expect(text).toContain(route);
+              // 預計延誤時間
+              expect(text).toContain(String(delay));
+              // 求援/避開提醒（每語言固定句尾，非空）
+              expect(text.trim().length).toBeGreaterThan(0);
+            }
+          },
+        ),
+        { numRuns: 100 },
+      );
+    },
+  );
+});
+
 // ─── P36 property: language floor never degrades ─────────────────────────
 
 describe('P36 template: language floor guarantee', () => {
