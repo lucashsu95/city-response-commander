@@ -117,10 +117,12 @@ export function checkPublishIdempotency(
  * 用於防止在 `published` 之後重新觸發發布或重推 `public_alert.ready`。
  *
  * 終端狀態：
- * - `published`：成功發布（不可再轉移）
- * - `publish_failed`：發布失敗（可重試，但需明確指定 `target_state`）
+ * - `published`：成功發布（唯一的終端狀態，不可再轉移）
+ * - `publish_failed`：發布失敗，**非**終端
  *
- * 注意：`publish_failed` 不視為終端，允許從 `approved` 重試至 `published`。
+ * `publish_failed` 的復原路徑為 `publish_failed → approved → published`
+ * （見 `PUBLISH_TRANSITIONS`）：必須由指揮官明確帶 `target_state` 重新核准，
+ * `inferNextPublishState` 不會自動推進。
  *
  * @returns true 表示已成功發布，不應觸發任何重複副作用
  */

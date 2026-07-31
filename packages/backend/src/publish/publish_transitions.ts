@@ -9,6 +9,15 @@
  * - draft → approved
  * - approved → published
  * - approved → publish_failed
+ * - publish_failed → approved（失敗復原；需指揮官重新核准後才能再次發布）
+ *
+ * 終端狀態只有 `published`。`publish_failed` **不是**終端：
+ * 發布通道失敗後若無復原路徑，該 decision 將永遠無法發布
+ * （Demo 當天第一次失敗就沒有救回的機會）。
+ * 復原刻意繞回 `approved` 而非直接跳 `published`，理由：
+ * - 失敗後重發需要指揮官重新核准，該動作會留下 audit_trail entry（§19）
+ * - `approved → published` 維持為進入 published 的唯一路徑，
+ *   channel 派送與 channels 欄位寫入的邏輯只有一個入口
  *
  * @module backend/publish/publish_transitions
  */
@@ -28,6 +37,9 @@ export const PUBLISH_TRANSITIONS: ReadonlyMap<
   [null, new Set([PublishStatus.draft])],
   [PublishStatus.draft, new Set([PublishStatus.approved])],
   [PublishStatus.approved, new Set([PublishStatus.published, PublishStatus.publish_failed])],
+  // 失敗復原：回到 approved 重新核准後才能再次嘗試發布。
+  // 需由呼叫端明確指定 target_state（見 inferNextPublishState）。
+  [PublishStatus.publish_failed, new Set([PublishStatus.approved])],
 ]);
 
 /**
@@ -50,13 +62,22 @@ export function isLegalPublishTransition(
  * - null → draft（首次建立）
  * - draft → approved
  * - approved → published（approved 有兩個出口，無 target 時預設 published）
- * - published / publish_failed → null（終端狀態，無法推斷）
+ * - publish_failed → null（**復原不自動發生**，見下）
+ * - published → null（終端狀態，無法推斷）
+ *
+ * `publish_failed` 雖然有合法後繼（approved），但刻意**不**自動推斷：
+ * 發布失敗後的重試必須是指揮官的明確決定，
+ * 呼叫端必須在 body 指定 `"target_state": "approved"`。
+ * 否則一次誤觸的重送就會把失敗的發布悄悄推回核准狀態。
  *
  * @returns PublishStatus 或 null（需明確指定 target_state）
  */
 export function inferNextPublishState(
   currentState: PublishStatus | null,
 ): PublishStatus | null {
+  // 失敗復原必須明確指定，不自動推斷
+  if (currentState === PublishStatus.publish_failed) return null;
+
   const allowed = PUBLISH_TRANSITIONS.get(currentState);
   if (!allowed || allowed.size === 0) return null;
   if (allowed.size === 1) return [...allowed][0];
