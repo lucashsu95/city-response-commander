@@ -23,6 +23,7 @@ import {
 import { IdempotencyStatus, RecoveryMode, RecoveryStage } from '@city-commander/shared-schemas';
 import {
   MAX_EXECUTION_NAME_LENGTH,
+  NoopTelemetry,
   STATE_MACHINE_ARN_KEY,
   SfnLauncher,
   SfnLauncherUsageError,
@@ -33,6 +34,7 @@ import {
   type ConfigReader,
   type ConditionalUpdateStateInput,
   type IdempotencyRepository,
+  type Telemetry,
   type WorkflowLaunchInput,
 } from '../../src/index.js';
 
@@ -122,6 +124,7 @@ function newLauncher(
     readonly sfn?: FakeSfn;
     readonly repo?: FakeRepository;
     readonly onStatusWriteError?: (error: unknown) => void;
+    readonly telemetry?: Telemetry;
   } = {},
 ): { launcher: SfnLauncher; sfn: FakeSfn; repo: FakeRepository } {
   const sfn = overrides.sfn ?? fakeSfn();
@@ -135,6 +138,7 @@ function newLauncher(
     ...(overrides.onStatusWriteError === undefined
       ? {}
       : { onStatusWriteError: overrides.onStatusWriteError }),
+    ...(overrides.telemetry === undefined ? {} : { telemetry: overrides.telemetry }),
   });
   return { launcher, sfn, repo };
 }
@@ -381,6 +385,25 @@ describe('launch — ExecutionAlreadyExistsException', () => {
     expect(repo.updates).toEqual([]);
   });
 
+  it('records the 202 path as an in-flight re-request (TASK-158)', async () => {
+    const sfn = fakeSfn();
+    sfn.throwWith = alreadyExists();
+    const conflicts: unknown[][] = [];
+    const { launcher } = newLauncher({
+      sfn,
+      telemetry: {
+        ...new NoopTelemetry(),
+        recordConflict: (...args: unknown[]) => void conflicts.push(args),
+      } as unknown as Telemetry,
+    });
+
+    await launcher.launch(launchInput());
+
+    expect(conflicts).toEqual([
+      ['IN_FLIGHT_REQUEST', { decisionId: DECISION, idempotencyKey: KEY, attemptCount: 1 }],
+    ]);
+  });
+
   it('returns a null ARN rather than inventing one', async () => {
     const sfn = fakeSfn();
     sfn.throwWith = alreadyExists();
@@ -490,6 +513,60 @@ describe('launch — StartExecution failure', () => {
     await launcher.launch(launchInput()).catch(() => undefined);
 
     expect(repo.updates[0]?.mutation.set).toMatchObject({ retryable: true });
+  });
+
+  it('records a throttled start as a ThrottlingEvent (TASK-158)', async () => {
+    const sfn = fakeSfn();
+    sfn.throwWith = Object.assign(new Error('Rate exceeded'), { name: 'ThrottlingException' });
+    const throttles: unknown[][] = [];
+    const { launcher } = newLauncher({
+      sfn,
+      telemetry: {
+        ...new NoopTelemetry(),
+        recordThrottling: (...args: unknown[]) => void throttles.push(args),
+      } as unknown as Telemetry,
+    });
+
+    await launcher.launch(launchInput()).catch(() => undefined);
+
+    expect(throttles).toEqual([
+      ['STEP_FUNCTIONS', { decisionId: DECISION, idempotencyKey: KEY, attemptNumber: 1 }],
+    ]);
+  });
+
+  it('does not record throttling for a bad ARN', async () => {
+    const sfn = fakeSfn();
+    sfn.throwWith = new InvalidArn({ $metadata: {}, message: 'Invalid ARN' });
+    const throttles: unknown[][] = [];
+    const { launcher } = newLauncher({
+      sfn,
+      telemetry: {
+        ...new NoopTelemetry(),
+        recordThrottling: (...args: unknown[]) => void throttles.push(args),
+      } as unknown as Telemetry,
+    });
+
+    await launcher.launch(launchInput()).catch(() => undefined);
+
+    // A configuration fault is not a capacity problem.
+    expect(throttles).toEqual([]);
+  });
+
+  it('does not fail the launch when telemetry throws', async () => {
+    const sfn = fakeSfn();
+    sfn.throwWith = Object.assign(new Error('Rate exceeded'), { name: 'ThrottlingException' });
+    const { launcher } = newLauncher({
+      sfn,
+      telemetry: {
+        ...new NoopTelemetry(),
+        recordThrottling: () => {
+          throw new Error('metric pipeline down');
+        },
+      } as unknown as Telemetry,
+    });
+
+    // The caller must still learn why the start failed.
+    await expect(launcher.launch(launchInput())).rejects.toBeInstanceOf(WorkflowStartFailedError);
   });
 
   it('marks a bad ARN as non-retryable', async () => {

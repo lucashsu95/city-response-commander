@@ -47,6 +47,9 @@ import { ExecutionAlreadyExists, SFNClient, StartExecutionCommand } from '@aws-s
 import { IdempotencyStatus, RecoveryMode, RecoveryStage } from '@city-commander/shared-schemas';
 import { WorkflowStartFailedError } from '../errors/domain_error.js';
 import { isTransientError } from '../errors/transient.js';
+import { NoopTelemetry } from '../metrics/telemetry_facade.js';
+import { observeIfThrottled, observeInFlightRerequest } from '../metrics/telemetry_observers.js';
+import type { Telemetry } from '../metrics/telemetry_facade.js';
 import type { IdempotencyRepository } from '../repository/idempotency_repository.js';
 
 /** Config key holding the workflow ARN, supplied by CDK output (TASK-066). */
@@ -127,6 +130,11 @@ export interface SfnLauncherOptions {
   readonly nowEpochMs: number;
   /** Reported when the `start_failed` write itself fails. Never throws. */
   readonly onStatusWriteError?: (error: unknown) => void;
+  /**
+   * Telemetry sink (TASK-158). Defaults to {@link NoopTelemetry}, so tests and
+   * `LOCAL_MOCK` need no EMF plumbing and the call sites below stay unconditional.
+   */
+  readonly telemetry?: Telemetry;
 }
 
 /** Thrown for programming errors, never for AWS or configuration faults. */
@@ -240,7 +248,11 @@ export function resolveStateMachineArn(config: ConfigReader): string | null {
  * ```
  */
 export class SfnLauncher {
-  constructor(private readonly options: SfnLauncherOptions) {}
+  private readonly telemetry: Telemetry;
+
+  constructor(private readonly options: SfnLauncherOptions) {
+    this.telemetry = options.telemetry ?? new NoopTelemetry();
+  }
 
   /**
    * Start one execution for this attempt.
@@ -292,9 +304,22 @@ export class SfnLauncher {
         // Same key AND same attempt: a retried InjectFn invocation. The workflow
         // is already running, so this is success, not a conflict. Marking
         // start_failed here would sabotage a healthy execution.
+        observeInFlightRerequest(this.telemetry, {
+          decisionId: input.decisionId,
+          idempotencyKey: input.idempotencyKey,
+          attemptCount: input.attemptCount,
+        });
         return { outcome: 'ALREADY_STARTED', executionName, executionArn: null };
       }
       if (error instanceof WorkflowStartFailedError) throw error;
+
+      // Only genuine throttling increments ThrottlingEventCount; a bad ARN must
+      // not read as a capacity problem.
+      observeIfThrottled(this.telemetry, error, 'STEP_FUNCTIONS', {
+        decisionId: input.decisionId,
+        idempotencyKey: input.idempotencyKey,
+        attemptNumber: input.attemptCount,
+      });
 
       const retryable = isTransientError(error);
       await this.markStartFailed(input, describeStartFailure(error), retryable);

@@ -38,6 +38,18 @@ export {
 
 export { CounterMetricEmitter, COUNTER_METRIC_NAMES } from './counter_emitter.js';
 
+export { EmfTelemetry, NoopTelemetry } from './telemetry_facade.js';
+
+export type { Telemetry, EmfTelemetryOptions } from './telemetry_facade.js';
+
+export {
+  observeStatusOutcome,
+  observeCoreWriteOutcome,
+  observeInFlightRerequest,
+  observeIfThrottled,
+  toFencedMetricReason,
+} from './telemetry_observers.js';
+
 export type {
   IdempotencyConflictReason,
   FencedExecutionReason,
