@@ -2,6 +2,7 @@
 
 export * from './decision/index.js';
 export * from './errors/index.js';
+export * from './events/index.js';
 export * from './handlers/index.js';
 export * from './inject/index.js';
 export * from './metrics/index.js';
