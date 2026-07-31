@@ -50,3 +50,21 @@ export type {
   StaleOrchestrationInput,
   StaleOrchestrationOutcome,
 } from './stale_orchestration.js';
+
+export {
+  SfnLauncher,
+  SfnLauncherUsageError,
+  deriveExecutionName,
+  buildExecutionPayload,
+  resolveStateMachineArn,
+  STATE_MACHINE_ARN_KEY,
+  MAX_EXECUTION_NAME_LENGTH,
+} from './sfn_launcher.js';
+
+export type {
+  ConfigReader,
+  WorkflowLaunchInput,
+  WorkflowExecutionPayload,
+  SfnLaunchResult,
+  SfnLauncherOptions,
+} from './sfn_launcher.js';

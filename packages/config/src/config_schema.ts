@@ -251,6 +251,22 @@ export const CONFIG_SCHEMA: readonly ConfigKeyDefinition[] = [
     description: 'Orchestration engine (deployment-time choice)',
     isProvisionalPolicy: false,
   },
+  {
+    key: 'orchestration.state_machine_arn',
+    type: 'string',
+    // Optional by design: only `orchestration.mode=stepfunctions` needs it, and
+    // LOCAL_MOCK runs `lambda_direct`. Marking it required would fail validation
+    // in every local environment.
+    required: false,
+    // Deliberately NO provisionalDefault. A placeholder ARN would pass validation
+    // and then fail at StartExecution with an opaque AWS error; an absent value
+    // fails fast and explicitly as WORKFLOW_START_FAILED (503) instead (§21 —
+    // never fabricate an infrastructure identifier).
+    description:
+      'Decision workflow State Machine ARN, supplied by CDK output (TASK-066). ' +
+      'Required only when orchestration.mode=stepfunctions.',
+    isProvisionalPolicy: false,
+  },
 
   // ── Enrichment ──
   {
