@@ -3,46 +3,41 @@
  *
  * 職責（§14.5 stage 3, §10.15, §22.1 P28）：
  * - 接收 stage 2 驗證通過的假設條件（`WhatIfAssumption[]`）
- * - 以假設值直接套用 SOP 觸發規則（決定性，不呼叫 LLM）
+ * - **以假設值重跑決定性 Rule Engine**（`@city-commander/domain`），不呼叫 LLM
  * - 回傳 `RecomputeResult`（triggered_articles / applied_formula_articles /
  *   expected_actions / ete_preview / does_not_mutate_state）
  * - `does_not_mutate_state: true` 為靜態型別保證——此函式**零寫入**任何狀態表
  *
- * 設計說明：
- * - 直接內聯 SOP 觸發規則（閾值來自官方 SOP 文件），不依賴外部套件
- * - 避免跨套件依賴造成的 vitest ESM 解析問題
- * - 規則與 packages/domain/src/rule_engine/ 完全一致，但獨立實作以確保可測試性
+ * 邊界（§9，成員 4 紅線）：
+ * - 本模組**不得**自行定義任何 SOP 門檻或分級規則。
+ *   所有布林與數值真值一律來自 `@city-commander/domain` 的 Rule Engine：
+ *     `classifySegments`（A/B 分級門檻 0.95 / 0.85）
+ *     `evaluateArticle1` （art.1 觸發路段與措施）
+ *     `evaluateArticle3` （art.3 BL17 門檻 > 25000 / > 0.30）
+ *     `evaluateArticle6` （art.6 漫遊率門檻 >= 0.30）
+ *     `aggregateArticles`（triggered / applied_formula 分離與排序）
+ * - 本模組只負責兩件事：
+ *   (1) 把 `WhatIfAssumption[]` 轉成 Rule Engine 的輸入形狀
+ *   (2) 把 Rule Engine 的結構化輸出轉成給指揮官看的 `expected_actions` 文字
+ *   —— 文字措辭屬於呈現層，門檻與觸發結果一律由 domain 決定。
  *
- * 支援的假設條件欄位（與 TASK-138 DomainValidator 的 FIELD_SPECS 對齊）：
- * - `Saturation_Score`（路段）→ SOP-1 分級（A/B）
- * - `User_Count`（基地台）→ SOP-3 觸發條件
- * - `Growth_Rate`（基地台）→ SOP-3 觸發條件
- * - `Roaming_User_Pct`（基地台）→ SOP-6 多語觸發
+ * P28（§22.1）要求「重算結果須等同以相同假設值直接跑 Rule Engine 的結果」，
+ * 因此唯一能保證這件事的實作方式就是**真的去跑 Rule Engine**，而非複製其規則。
  *
  * @module backend/whatif/recompute
  */
 
+import {
+  classifySegments,
+  evaluateArticle1,
+  evaluateArticle3,
+  evaluateArticle6,
+  aggregateArticles,
+  ARTICLE3_STATION_ID,
+  type SegmentSnapshot,
+  type CurrentStationSnapshot,
+} from '@city-commander/domain';
 import type { WhatIfAssumption, RecomputeResult } from './whatif_types.js';
-
-// ─── SOP thresholds（來自 emergency_traffic_sop.txt）──────────────────────────
-
-/** SOP-1：A 級 Saturation_Score >= 0.95 */
-const A_LEVEL_THRESHOLD = 0.95;
-
-/** SOP-1：B 級 0.85 <= Saturation_Score < 0.95 */
-const B_LEVEL_THRESHOLD = 0.85;
-
-/** SOP-3：BL17 User_Count strictly > 25000 */
-const BL17_USER_COUNT_THRESHOLD = 25000;
-
-/** SOP-3：BL17 Growth_Rate strictly > 0.30 */
-const BL17_GROWTH_RATE_THRESHOLD = 0.30;
-
-/** SOP-6：Roaming_User_Pct >= 0.30 */
-const ROAMING_THRESHOLD = 0.30;
-
-/** SOP-3 的目標基地台 */
-const BL17_STATION_ID = 'BS_MRT_BL17';
 
 // ─── Input type ────────────────────────────────────────────────────────────
 
@@ -59,10 +54,8 @@ export interface RecomputeInput {
 /**
  * What-if stage 3 決定性重算。
  *
- * 以 `assumptions` 直接套用 SOP 觸發規則，回傳假設情境下的決策摘要。
+ * 以 `assumptions` 為輸入重跑 Rule Engine，回傳假設情境下的決策摘要。
  * `does_not_mutate_state: true`（靜態型別保證），零寫入任何狀態表。
- *
- * P28（§22.1）：重算結果須等同以相同假設值直接跑 Rule Engine 的結果。
  *
  * @param input - RecomputeInput（validated_assumptions）
  * @returns RecomputeResult（does_not_mutate_state: true）
@@ -70,111 +63,153 @@ export interface RecomputeInput {
 export function recompute(input: RecomputeInput): RecomputeResult {
   const { assumptions } = input;
 
-  // ── 1. 解析假設快照 ────────────────────────────────────────────────────────
-  const hypothetical = buildHypotheticalValues(assumptions);
+  // ── 1. 假設條件 → Rule Engine 輸入形狀 ────────────────────────────────────
+  const hypothetical = buildHypotheticalInputs(assumptions);
 
-  const triggeredArticles: number[] = [];
-  const appliedFormulaArticles: number[] = [];
-  const expectedActions: string[] = [];
+  // ── 2. art.1：分級 + 觸發路段措施（門檻由 domain 決定）───────────────────
+  const classifications = classifySegments(hypothetical.segmentSnapshots);
+  const article1 = evaluateArticle1(classifications);
 
-  // ── 2. SOP-1：Saturation_Score → A/B 分級 ─────────────────────────────────
-  let hasALevel = false;
-  let hasBLevel = false;
-  for (const [, sat] of hypothetical.saturationBySegment) {
-    if (sat >= A_LEVEL_THRESHOLD) hasALevel = true;
-    else if (sat >= B_LEVEL_THRESHOLD) hasBLevel = true;
-  }
+  // ── 3. art.3：BL17 人流門檻（門檻由 domain 決定）─────────────────────────
+  const article3 = evaluateArticle3({
+    bs_id: ARTICLE3_STATION_ID,
+    user_count: hypothetical.bl17UserCount,
+    growth_rate: hypothetical.bl17GrowthRate,
+  });
 
-  if (hasALevel || hasBLevel) {
-    if (!triggeredArticles.includes(1)) triggeredArticles.push(1);
-    expectedActions.push('SOP-1：啟動長綠燈時制');
-    if (hasALevel) {
-      expectedActions.push('SOP-1：啟動替代路徑引導（A 級）');
-    }
-  }
+  // ── 4. art.6：漫遊率多語觸發（門檻由 domain 決定）────────────────────────
+  // What-if 的站集即「使用者明確假設的站」，對應 Strategy F 的 explicit 模式語意。
+  const article6 = evaluateArticle6({
+    mode: 'explicit_host_policy',
+    stations_in_scope: hypothetical.roamingStations,
+  });
 
-  // ── 3. SOP-3：BL17 User_Count / Growth_Rate ────────────────────────────────
-  const bl17CountTriggered =
-    hypothetical.bl17UserCount !== null &&
-    hypothetical.bl17UserCount > BL17_USER_COUNT_THRESHOLD;
-  const bl17GrowthTriggered =
-    hypothetical.bl17GrowthRate !== null &&
-    hypothetical.bl17GrowthRate > BL17_GROWTH_RATE_THRESHOLD;
+  // ── 5. 條款聚合（triggered / applied_formula 分離，由 domain 決定）───────
+  const aggregation = aggregateArticles({
+    evaluations: [
+      { article: 1, triggered: article1.triggered, invoked_procedures: article1.invoked_procedures },
+      { article: 3, triggered: article3.triggered },
+      { article: 6, triggered: article6.triggered },
+    ],
+    applied_formula_articles: [],
+  });
 
-  if (bl17CountTriggered || bl17GrowthTriggered) {
-    if (!triggeredArticles.includes(3)) triggeredArticles.push(3);
-    expectedActions.push('SOP-3：建議北捷「過站不停」');
-    expectedActions.push('SOP-3：通知公車處調度接駁專車');
-    expectedActions.push('SOP-3：引導群眾步行至 BS_MRT_BL18');
-  }
+  // ── 6. 呈現層：把決定性結果轉成指揮官可讀的動作說明 ──────────────────────
+  const expectedActions = buildExpectedActions(article1, article3, article6);
 
-  // ── 4. SOP-6：Roaming_User_Pct ────────────────────────────────────────────
-  const sop6Triggered = hypothetical.roamingStations.some(([, pct]) => pct >= ROAMING_THRESHOLD);
-  if (sop6Triggered) {
-    if (!triggeredArticles.includes(6)) triggeredArticles.push(6);
-    expectedActions.push('SOP-6：產出多語化警示');
-  }
-
-  // ── 5. ETE 預覽（Saturation_Score 假設時提供粗略估計）────────────────────
-  const etePreview = buildEtePreview(hypothetical.saturationBySegment);
-
-  // 排序 triggered_articles（與 domain aggregateArticles 一致）
-  triggeredArticles.sort((a, b) => a - b);
+  // ── 7. ETE 預覽（Saturation_Score 假設時提供粗略估計）────────────────────
+  const etePreview = buildEtePreview(hypothetical.segmentSnapshots);
 
   return {
-    triggered_articles: triggeredArticles,
-    applied_formula_articles: appliedFormulaArticles,
+    triggered_articles: aggregation.triggered_articles,
+    applied_formula_articles: aggregation.applied_formula_articles,
     expected_actions: expectedActions,
     ete_preview: etePreview,
     does_not_mutate_state: true,
   };
 }
 
-// ─── Internal helpers ─────────────────────────────────────────────────────────
+// ─── Assumption → Rule Engine input ───────────────────────────────────────────
 
-interface HypotheticalValues {
-  readonly saturationBySegment: readonly [string, number][];
+interface HypotheticalInputs {
+  /** art.1 分級輸入（每個被假設的路段一筆） */
+  readonly segmentSnapshots: readonly SegmentSnapshot[];
+  /** art.3 BL17 人數；null 表示本次假設未指定 */
   readonly bl17UserCount: number | null;
+  /** art.3 BL17 成長率；null 表示本次假設未指定 */
   readonly bl17GrowthRate: number | null;
-  readonly roamingStations: readonly [string, number][];
+  /** art.6 站集（每個被假設漫遊率的基地台一筆） */
+  readonly roamingStations: readonly CurrentStationSnapshot[];
 }
 
-function buildHypotheticalValues(assumptions: readonly WhatIfAssumption[]): HypotheticalValues {
-  const saturationBySegment: [string, number][] = [];
+/**
+ * 將驗證後的假設條件攤平成 Rule Engine 各條款所需的輸入。
+ *
+ * 只做資料搬運，不做任何門檻判斷。
+ * 未被假設到的欄位一律為 `null`（Rule Engine 會據此回報 `insufficient_data`，
+ * 而非猜測），符合「不猜測」原則。
+ */
+function buildHypotheticalInputs(
+  assumptions: readonly WhatIfAssumption[],
+): HypotheticalInputs {
+  const segmentSnapshots: SegmentSnapshot[] = [];
+  const roamingStations: CurrentStationSnapshot[] = [];
   let bl17UserCount: number | null = null;
   let bl17GrowthRate: number | null = null;
-  const roamingStations: [string, number][] = [];
 
   for (const a of assumptions) {
     switch (a.field) {
       case 'Saturation_Score':
-        saturationBySegment.push([a.entity_id, a.value]);
+        segmentSnapshots.push({ segment_id: a.entity_id, saturation_score: a.value });
         break;
       case 'User_Count':
-        if (a.entity_id === BL17_STATION_ID) bl17UserCount = a.value;
+        if (a.entity_id === ARTICLE3_STATION_ID) bl17UserCount = a.value;
         break;
       case 'Growth_Rate':
-        if (a.entity_id === BL17_STATION_ID) bl17GrowthRate = a.value;
+        if (a.entity_id === ARTICLE3_STATION_ID) bl17GrowthRate = a.value;
         break;
       case 'Roaming_User_Pct':
-        roamingStations.push([a.entity_id, a.value]);
+        roamingStations.push({ bs_id: a.entity_id, roaming_pct_value: a.value });
         break;
     }
   }
 
-  return { saturationBySegment, bl17UserCount, bl17GrowthRate, roamingStations };
+  return { segmentSnapshots, bl17UserCount, bl17GrowthRate, roamingStations };
 }
+
+// ─── Rule Engine output → expected_actions（呈現層）───────────────────────────
+
+/**
+ * 依 Rule Engine 的觸發結果組裝 `expected_actions` 文字。
+ *
+ * 這裡只做「布林 → 文字」的呈現轉換：
+ * 是否觸發、觸發哪些條款，全部由 domain 的評估結果決定，本函式不做任何判斷。
+ * art.3 的動作文字直接沿用 domain 回傳的 `actions`（官方 SOP 條文措辭），
+ * art.1 的措施則由結構化 `art1_measures` 渲染，數值（+25% 綠燈）來自 domain。
+ */
+function buildExpectedActions(
+  article1: ReturnType<typeof evaluateArticle1>,
+  article3: ReturnType<typeof evaluateArticle3>,
+  article6: ReturnType<typeof evaluateArticle6>,
+): readonly string[] {
+  const actions: string[] = [];
+
+  for (const measure of article1.art1_measures) {
+    actions.push(
+      `SOP-1（${measure.trigger_segment}，${measure.level} 級）：啟動長綠燈時制、` +
+        `替代路徑綠燈 +${measure.alternatives_green_plus_pct}%、派遣警力淨空路口`,
+    );
+    if (measure.a_level_invokes_article2_alternative_route_guidance) {
+      actions.push(`SOP-1（${measure.trigger_segment}，A 級）：啟動第 2 條替代路徑引導程序`);
+    }
+  }
+
+  for (const action of article3.actions) {
+    actions.push(`SOP-3：${action}`);
+  }
+
+  if (article6.triggered) {
+    const stations = article6.triggering_station_ids.join('、');
+    actions.push(`SOP-6：產出多語化警示（觸發站台：${stations}）`);
+  }
+
+  return actions;
+}
+
+// ─── ETE preview ──────────────────────────────────────────────────────────────
 
 /**
  * 若有 Saturation_Score 假設，計算粗略 ETE 預覽（僅供 What-if 參考）。
  * 使用 SOP-7 公式（base=40/High, penalty=(avg_sat-0.5)*60, ≥0）。
  */
 function buildEtePreview(
-  saturationBySegment: readonly [string, number][],
+  segmentSnapshots: readonly SegmentSnapshot[],
 ): { readonly ete_minutes: number } | undefined {
-  if (saturationBySegment.length === 0) return undefined;
+  const saturations = segmentSnapshots
+    .map((s) => s.saturation_score)
+    .filter((s): s is number => s !== null);
+  if (saturations.length === 0) return undefined;
 
-  const saturations = saturationBySegment.map(([, s]) => s);
   const avg = saturations.reduce((sum, s) => sum + s, 0) / saturations.length;
   const base = 40; // High severity base（What-if 預覽保守值）
   const penalty = Math.max(0, (avg - 0.5) * 60);

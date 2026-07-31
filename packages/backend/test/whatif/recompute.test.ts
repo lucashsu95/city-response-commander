@@ -19,6 +19,14 @@
 
 import * as fc from 'fast-check';
 import { describe, it, expect } from 'vitest';
+import {
+  classifySegments,
+  evaluateArticle1,
+  evaluateArticle3,
+  evaluateArticle6,
+  aggregateArticles,
+  ARTICLE3_STATION_ID,
+} from '@city-commander/domain';
 import { recompute } from '../../src/whatif/recompute.js';
 import type { WhatIfAssumption } from '../../src/whatif/whatif_types.js';
 
@@ -170,7 +178,91 @@ describe('recompute - empty assumptions', () => {
   });
 });
 
+// ─── Rule Engine 委派（art.1 觸發路段語意）────────────────────────────────
+
+describe('recompute - delegates SOP-1 trigger scope to the Rule Engine', () => {
+  it('non-trigger segment at A level -> article 1 NOT triggered (evaluateArticle1 semantics)', () => {
+    // art.1 的措施只適用於 RD_TPE_001 / RD_TPE_002（ARTICLE1_TRIGGER_SEGMENTS）。
+    // 其他路段即使達 A 級也不會把 1 加入 triggered_articles。
+    const result = recompute({ assumptions: [makeSaturation('RD_TPE_009', 0.99)] });
+    expect(result.triggered_articles).not.toContain(1);
+  });
+
+  it('non-BL17 station User_Count -> article 3 NOT triggered', () => {
+    const result = recompute({
+      assumptions: [{ entity_id: 'BS_MRT_BL18', field: 'User_Count', operator: '=', value: 99_999 }],
+    });
+    expect(result.triggered_articles).not.toContain(3);
+  });
+});
+
 // ─── P28 property test ────────────────────────────────────────────────────
+
+/**
+ * P28 的核心命題：stage 3 的結果必須等於「以相同假設值直接跑 Rule Engine」。
+ * 這裡把 domain 的 Rule Engine 以相同輸入獨立跑一次做為 oracle 比對，
+ * 而不是拿 recompute 跟自己比（那是恆真命題，證明不了任何事）。
+ */
+function ruleEngineOracle(
+  segmentId: string,
+  saturation: number,
+  userCount: number,
+  roamingStationId: string,
+  roamingPct: number,
+): readonly number[] {
+  const article1 = evaluateArticle1(
+    classifySegments([{ segment_id: segmentId, saturation_score: saturation }]),
+  );
+  const article3 = evaluateArticle3({
+    bs_id: ARTICLE3_STATION_ID,
+    user_count: userCount,
+    growth_rate: null,
+  });
+  const article6 = evaluateArticle6({
+    mode: 'explicit_host_policy',
+    stations_in_scope: [{ bs_id: roamingStationId, roaming_pct_value: roamingPct }],
+  });
+  return aggregateArticles({
+    evaluations: [
+      { article: 1, triggered: article1.triggered },
+      { article: 3, triggered: article3.triggered },
+      { article: 6, triggered: article6.triggered },
+    ],
+    applied_formula_articles: [],
+  }).triggered_articles;
+}
+
+describe('P28: recompute equals a direct Rule Engine rerun', () => {
+  it(
+    'Feature: city-response-commander, Property 28: recompute triggered_articles equals a direct deterministic Rule Engine run',
+    () => {
+      fc.assert(
+        fc.property(
+          fc.constantFrom('RD_TPE_001', 'RD_TPE_002', 'RD_TPE_007'),
+          fc.double({ min: 0, max: 1, noNaN: true }),
+          fc.integer({ min: 0, max: 100_000 }),
+          fc.double({ min: 0, max: 1, noNaN: true }),
+          (segmentId, saturation, userCount, roamingPct) => {
+            const roamingStationId = 'BS_MRT_BL18';
+            const result = recompute({
+              assumptions: [
+                makeSaturation(segmentId, saturation),
+                makeBL17Count(userCount),
+                makeRoaming(roamingStationId, roamingPct),
+              ],
+            });
+
+            expect(result.triggered_articles).toEqual(
+              ruleEngineOracle(segmentId, saturation, userCount, roamingStationId, roamingPct),
+            );
+            expect(result.does_not_mutate_state).toBe(true);
+          },
+        ),
+        { numRuns: 100 },
+      );
+    },
+  );
+});
 
 describe('P28: recompute never mutates state', () => {
   it(
