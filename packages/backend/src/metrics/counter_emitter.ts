@@ -39,8 +39,49 @@
 
 import type { EmfEmitter, EmfLogLine, MetricDatum, MetricProperties } from './emf.js';
 
-/** Counter names. Stable: alarms and dashboards bind to these strings. */
+/**
+ * The five counters design §19 names, and TASK-155's stated objective.
+ *
+ * These are the contract: `infra/lib/constructs/observability.ts` declares the
+ * identical literals in `METRIC_NAMES`, and its alarms bind to them.
+ *
+ * ## Why these could not be expressed as dimensions on a generic counter
+ *
+ * An earlier revision of this module emitted `FallbackTriggeredCount` carrying
+ * `ActionType=NARRATIVE_UNAVAILABLE` / `KB_LOOKUP_FAILED`, on the reasoning that
+ * one counter with a low-cardinality label is cheaper than five metrics. That
+ * reasoning was wrong for the thing that matters: a CloudWatch alarm binds to a
+ * (namespace, metric NAME, dimensions) triple, so an alarm on
+ * `BedrockFailureCount` can never be satisfied by a different metric name no
+ * matter what its dimensions say. Member 3's alarms would have sat at
+ * `INSUFFICIENT_DATA` forever while the counters looked healthy in Insights.
+ *
+ * `SUPPLEMENTARY_COUNTER_METRIC_NAMES` keeps the earlier four, which cover
+ * fencing and lease behaviour that §19 does not enumerate.
+ */
 export const COUNTER_METRIC_NAMES = {
+  /** Bedrock invocation failed (any branch). Alarmed by TASK-075. */
+  BEDROCK_FAILURE: 'BedrockFailureCount',
+  /** Knowledge Base lookup failed and the S3 article fallback was used. */
+  KB_FALLBACK: 'KbFallbackCount',
+  /** A generated payload failed schema validation and was rejected. */
+  SCHEMA_VALIDATION_REJECT: 'SchemaValidationRejectCount',
+  /** A client fell back from the WebSocket push to HTTP polling. */
+  WS_TO_POLLING_FALLBACK: 'WsToPollingFallbackCount',
+  /** A `200` carrying `data_status=insufficient_data` was served (§21). */
+  INSUFFICIENT_DATA: 'InsufficientDataCount',
+} as const;
+
+/**
+ * Counters this project adds beyond §19.
+ *
+ * Fencing, lease contention and dependency throttling are load-bearing for the
+ * §10.11e concurrency design but are not in the §19 list, so they are emitted
+ * under their own names and kept separate from the contract above. Member 3's
+ * alarms do not reference these; they exist for Insights and for the
+ * failure-injection suite.
+ */
+export const SUPPLEMENTARY_COUNTER_METRIC_NAMES = {
   IDEMPOTENCY_CONFLICT: 'IdempotencyConflictCount',
   FENCED_EXECUTION: 'FencedExecutionCount',
   FALLBACK_TRIGGERED: 'FallbackTriggeredCount',
@@ -147,7 +188,7 @@ export class CounterMetricEmitter {
     return this.emitter
       .withActionType(reason)
       .emit(
-        countOf(COUNTER_METRIC_NAMES.IDEMPOTENCY_CONFLICT, 1),
+        countOf(SUPPLEMENTARY_COUNTER_METRIC_NAMES.IDEMPOTENCY_CONFLICT, 1),
         toProperties(context, { conflict_reason: reason }),
       );
   }
@@ -166,7 +207,7 @@ export class CounterMetricEmitter {
     return this.emitter
       .withActionType(action)
       .emit(
-        countOf(COUNTER_METRIC_NAMES.FENCED_EXECUTION, 1),
+        countOf(SUPPLEMENTARY_COUNTER_METRIC_NAMES.FENCED_EXECUTION, 1),
         toProperties(context, { fenced_reason: reason, action }),
       );
   }
@@ -181,7 +222,7 @@ export class CounterMetricEmitter {
     return this.emitter
       .withActionType(reason)
       .emit(
-        countOf(COUNTER_METRIC_NAMES.FALLBACK_TRIGGERED, 1),
+        countOf(SUPPLEMENTARY_COUNTER_METRIC_NAMES.FALLBACK_TRIGGERED, 1),
         toProperties(context, { fallback_reason: reason }),
       );
   }
@@ -197,11 +238,104 @@ export class CounterMetricEmitter {
     context: CounterContext & { readonly attemptNumber?: number } = {},
   ): EmfLogLine | null {
     return this.emitter.withActionType(source).emit(
-      countOf(COUNTER_METRIC_NAMES.THROTTLING_EVENT, 1),
+      countOf(SUPPLEMENTARY_COUNTER_METRIC_NAMES.THROTTLING_EVENT, 1),
       toProperties(context, {
         throttling_source: source,
         attempt_number: context.attemptNumber ?? null,
       }),
     );
+  }
+
+  // ─── The five §19 contract counters ──────────────────────
+
+  /**
+   * Bedrock invocation failed (§19).
+   *
+   * Alarmed by TASK-075 with a threshold, so the metric must be emitted under
+   * this exact name — a fallback counter carrying a Bedrock-shaped dimension
+   * value would leave that alarm permanently at `INSUFFICIENT_DATA`.
+   *
+   * @param branch which narrative branch failed, e.g. `REPORT`. Low cardinality.
+   */
+  recordBedrockFailure(branch: string, context: CounterContext = {}): EmfLogLine | null {
+    return this.emitter
+      .withActionType(branch)
+      .emit(
+        countOf(COUNTER_METRIC_NAMES.BEDROCK_FAILURE, 1),
+        toProperties(context, { failed_branch: branch }),
+      );
+  }
+
+  /**
+   * Knowledge Base lookup failed and the S3 article fallback served the citations
+   * (§19, TASK-113).
+   *
+   * A non-zero rate means citations are coming from the fallback path. The
+   * citations are still official, so this is degradation rather than failure.
+   */
+  recordKbFallback(reason: string, context: CounterContext = {}): EmfLogLine | null {
+    return this.emitter
+      .withActionType('KB_FALLBACK')
+      .emit(
+        countOf(COUNTER_METRIC_NAMES.KB_FALLBACK, 1),
+        toProperties(context, { kb_fallback_reason: reason }),
+      );
+  }
+
+  /**
+   * A generated payload was rejected by schema validation (§19, §21.2).
+   *
+   * This is the LLM guardrail firing: the model produced something that did not
+   * match the schema and was refused rather than persisted. Worth watching
+   * closely, because a rising rate means prompts or the model changed under us.
+   */
+  recordSchemaValidationReject(
+    schemaName: string,
+    context: CounterContext = {},
+  ): EmfLogLine | null {
+    return this.emitter
+      .withActionType(schemaName)
+      .emit(
+        countOf(COUNTER_METRIC_NAMES.SCHEMA_VALIDATION_REJECT, 1),
+        toProperties(context, { rejected_schema: schemaName }),
+      );
+  }
+
+  /**
+   * A client fell back from the WebSocket push to HTTP polling (§13, §16.4, §19).
+   *
+   * The push is explicitly NOT the authoritative channel, so this is a supported
+   * degradation. The rate matters because it is what the demo would show as a
+   * delayed dashboard update.
+   */
+  recordWsToPollingFallback(reason: string, context: CounterContext = {}): EmfLogLine | null {
+    return this.emitter
+      .withActionType('WS_TO_POLLING')
+      .emit(
+        countOf(COUNTER_METRIC_NAMES.WS_TO_POLLING_FALLBACK, 1),
+        toProperties(context, { ws_fallback_reason: reason }),
+      );
+  }
+
+  /**
+   * A `200` carrying `data_status=insufficient_data` was served (§19, §21).
+   *
+   * Not an error metric: this counts the system correctly REFUSING to fabricate.
+   * A spike means the official data has a hole, which is exactly what §21 wants
+   * surfaced rather than filled in.
+   *
+   * @param stopReasonCode a stable code, never the free-form `stop_reason` prose,
+   *   which would be unbounded as a dimension value
+   */
+  recordInsufficientData(
+    stopReasonCode: string,
+    context: CounterContext = {},
+  ): EmfLogLine | null {
+    return this.emitter
+      .withActionType(stopReasonCode)
+      .emit(
+        countOf(COUNTER_METRIC_NAMES.INSUFFICIENT_DATA, 1),
+        toProperties(context, { stop_reason_code: stopReasonCode }),
+      );
   }
 }

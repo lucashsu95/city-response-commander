@@ -19,6 +19,7 @@ import {
   CounterMetricEmitter,
   EmfEmitter,
   COUNTER_METRIC_NAMES,
+  SUPPLEMENTARY_COUNTER_METRIC_NAMES,
   DEFAULT_METRIC_NAMESPACE,
   StructuredLogger,
   type EmfLogLine,
@@ -71,15 +72,174 @@ function dimensionKeys(line: EmfLogLine | undefined): readonly string[] {
 }
 
 describe('counter names', () => {
-  it('pins the four names alarms and dashboards bind to', () => {
-    // A published contract with member 3's Metric Filters (TASK-075). Renaming
-    // one here silently stops an alarm from ever firing.
+  /**
+   * The regression this guards against actually happened.
+   *
+   * TASK-155's objective names five counters (§19). An earlier revision emitted
+   * four DIFFERENT ones and expressed the §19 distinctions as `ActionType`
+   * dimension values instead, reasoning that one counter with a low-cardinality
+   * label is cheaper than five metrics.
+   *
+   * That reasoning is wrong for the only thing that matters here: a CloudWatch
+   * alarm binds to a (namespace, metric NAME, dimensions) triple. Member 3's
+   * alarm on `BedrockFailureCount` can never be satisfied by a metric called
+   * `FallbackTriggeredCount`, whatever its dimensions say — the five alarms
+   * would have sat at INSUFFICIENT_DATA while Insights looked healthy.
+   */
+
+  it('pins the five §19 contract names', () => {
     expect(COUNTER_METRIC_NAMES).toEqual({
+      BEDROCK_FAILURE: 'BedrockFailureCount',
+      KB_FALLBACK: 'KbFallbackCount',
+      SCHEMA_VALIDATION_REJECT: 'SchemaValidationRejectCount',
+      WS_TO_POLLING_FALLBACK: 'WsToPollingFallbackCount',
+      INSUFFICIENT_DATA: 'InsufficientDataCount',
+    });
+  });
+
+  it('matches infra/lib/constructs/observability.ts literal for literal', () => {
+    // Copied from METRIC_NAMES in member 3's construct, which is what the alarms
+    // bind to. `packages/backend` may not import from `infra/` (§ dependency
+    // layers), so the alignment is asserted here instead of shared.
+    const observabilityContract = [
+      'BedrockFailureCount',
+      'KbFallbackCount',
+      'SchemaValidationRejectCount',
+      'WsToPollingFallbackCount',
+      'InsufficientDataCount',
+    ];
+
+    expect(Object.values(COUNTER_METRIC_NAMES).sort()).toEqual(
+      [...observabilityContract].sort(),
+    );
+  });
+
+  it('keeps the fencing and lease counters separate from the contract', () => {
+    // Load-bearing for the §10.11e concurrency design but not enumerated by §19,
+    // so they are emitted under their own names and no alarm references them.
+    expect(SUPPLEMENTARY_COUNTER_METRIC_NAMES).toEqual({
       IDEMPOTENCY_CONFLICT: 'IdempotencyConflictCount',
       FENCED_EXECUTION: 'FencedExecutionCount',
       FALLBACK_TRIGGERED: 'FallbackTriggeredCount',
       THROTTLING_EVENT: 'ThrottlingEventCount',
     });
+  });
+
+  it('never reuses a name across the two sets', () => {
+    const contract = new Set<string>(Object.values(COUNTER_METRIC_NAMES));
+    const overlap = Object.values(SUPPLEMENTARY_COUNTER_METRIC_NAMES).filter((name) =>
+      contract.has(name),
+    );
+
+    // A shared name would make an alarm fire on supplementary traffic.
+    expect(overlap).toEqual([]);
+  });
+});
+
+// ─── The five §19 contract counters ────────────────────────
+
+describe('§19 contract counters', () => {
+  it('emits BedrockFailureCount under its exact contract name', () => {
+    const { sink, lines } = recordingSink();
+
+    newCounters(sink).recordBedrockFailure('REPORT', CONTEXT);
+
+    expect(metricNames(lines[0])).toEqual(['BedrockFailureCount']);
+    expect(lines[0]?.BedrockFailureCount).toBe(1);
+    expect(lines[0]?.ActionType).toBe('REPORT');
+    expect(lines[0]?.failed_branch).toBe('REPORT');
+  });
+
+  it('emits KbFallbackCount', () => {
+    const { sink, lines } = recordingSink();
+
+    newCounters(sink).recordKbFallback('KB_TIMEOUT', CONTEXT);
+
+    expect(metricNames(lines[0])).toEqual(['KbFallbackCount']);
+    expect(lines[0]?.kb_fallback_reason).toBe('KB_TIMEOUT');
+  });
+
+  it('emits SchemaValidationRejectCount', () => {
+    const { sink, lines } = recordingSink();
+
+    newCounters(sink).recordSchemaValidationReject('CommandCenterReport', CONTEXT);
+
+    expect(metricNames(lines[0])).toEqual(['SchemaValidationRejectCount']);
+    expect(lines[0]?.rejected_schema).toBe('CommandCenterReport');
+  });
+
+  it('emits WsToPollingFallbackCount', () => {
+    const { sink, lines } = recordingSink();
+
+    newCounters(sink).recordWsToPollingFallback('CONNECTION_GONE', CONTEXT);
+
+    expect(metricNames(lines[0])).toEqual(['WsToPollingFallbackCount']);
+    expect(lines[0]?.ws_fallback_reason).toBe('CONNECTION_GONE');
+  });
+
+  it('emits InsufficientDataCount', () => {
+    const { sink, lines } = recordingSink();
+
+    newCounters(sink).recordInsufficientData('SOURCE_HASH_MISMATCH', CONTEXT);
+
+    // Counts the system correctly REFUSING to fabricate (§21), not an error.
+    expect(metricNames(lines[0])).toEqual(['InsufficientDataCount']);
+    expect(lines[0]?.stop_reason_code).toBe('SOURCE_HASH_MISMATCH');
+  });
+
+  it('uses a stable code for InsufficientDataCount, not the free-form prose', () => {
+    const { sink, lines } = recordingSink();
+
+    newCounters(sink).recordInsufficientData('SOURCE_HASH_MISMATCH', CONTEXT);
+
+    // `stop_reason` prose is unbounded; as a dimension it would create one metric
+    // stream per distinct message.
+    expect(String(lines[0]?.ActionType).length).toBeLessThan(64);
+    expect(lines[0]?.ActionType).toBe('SOURCE_HASH_MISMATCH');
+  });
+
+  it('applies the shared dimensions to every contract counter', () => {
+    const { sink, lines } = recordingSink();
+    const counters = newCounters(sink);
+
+    counters.recordBedrockFailure('REPORT', CONTEXT);
+    counters.recordKbFallback('KB_TIMEOUT', CONTEXT);
+    counters.recordSchemaValidationReject('PublicAlert', CONTEXT);
+    counters.recordWsToPollingFallback('CONNECTION_GONE', CONTEXT);
+    counters.recordInsufficientData('NO_LEGAL_SNAPSHOT', CONTEXT);
+
+    expect(lines).toHaveLength(5);
+    for (const line of lines) {
+      expect(dimensionKeys(line)).toEqual(['Environment', 'ActionType']);
+      expect(line.decision_id).toBe(DECISION);
+      expect(line.trace_id).toBe(TRACE);
+    }
+  });
+
+  it('emits all five as Count', () => {
+    const { sink, lines } = recordingSink();
+    const counters = newCounters(sink);
+
+    counters.recordBedrockFailure('REPORT');
+    counters.recordKbFallback('KB_TIMEOUT');
+    counters.recordSchemaValidationReject('PublicAlert');
+    counters.recordWsToPollingFallback('CONNECTION_GONE');
+    counters.recordInsufficientData('NO_LEGAL_SNAPSHOT');
+
+    const units = lines.flatMap(
+      (line) => line._aws.CloudWatchMetrics[0]?.Metrics.map((metric) => metric.Unit) ?? [],
+    );
+    expect(units).toEqual(['Count', 'Count', 'Count', 'Count', 'Count']);
+  });
+
+  it('stays fail-safe: a broken sink never throws', () => {
+    const counters = new CounterMetricEmitter(newEmitter({ sink: throwingSink() }));
+
+    expect(() => counters.recordBedrockFailure('REPORT')).not.toThrow();
+    expect(() => counters.recordKbFallback('KB_TIMEOUT')).not.toThrow();
+    expect(() => counters.recordSchemaValidationReject('PublicAlert')).not.toThrow();
+    expect(() => counters.recordWsToPollingFallback('CONNECTION_GONE')).not.toThrow();
+    expect(() => counters.recordInsufficientData('NO_LEGAL_SNAPSHOT')).not.toThrow();
   });
 });
 

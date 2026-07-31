@@ -36,7 +36,11 @@ export {
   LATENCY_METRIC_NAMES,
 } from './latency_emitter.js';
 
-export { CounterMetricEmitter, COUNTER_METRIC_NAMES } from './counter_emitter.js';
+export {
+  CounterMetricEmitter,
+  COUNTER_METRIC_NAMES,
+  SUPPLEMENTARY_COUNTER_METRIC_NAMES,
+} from './counter_emitter.js';
 
 export { EmfTelemetry, NoopTelemetry } from './telemetry_facade.js';
 
