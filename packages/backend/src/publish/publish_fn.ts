@@ -30,6 +30,7 @@ import {
 } from './publish_transitions.js';
 import { appendAuditEntry } from './audit_trail.js';
 import { checkPublishIdempotency, shouldEmitPublicAlertReady } from './publish_idempotency.js';
+import { dispatchChannels, evaluateChannelOutcome } from './channels.js';
 
 // ─── Publish result type ──────────────────────────────────────────────────────
 
@@ -58,6 +59,14 @@ export interface PublishFnDependencies {
    * @returns PublishRecord 或 null（尚未建立 publish record）
    */
   readonly readPublishRecord: (decisionId: string) => Promise<PublishRecord | null>;
+
+  /**
+   * 讀取 DecisionCore 的 CMS 核心文字（唯讀）。
+   * 用於組裝 channels payload，**不**修改 DecisionCore。
+   *
+   * @returns cms_core_text 字串，或 null（item 不存在）
+   */
+  readonly readCmsCoreText: (decisionId: string) => Promise<string | null>;
 
   /**
    * 寫入（新建或更新）PublishRecord。
@@ -245,7 +254,7 @@ function parsePublishBody(body: string | null | undefined): ParsedPublishBody {
 export function createPublishHandler(
   deps: PublishFnDependencies,
 ): (event: APIGatewayProxyEventV2) => Promise<APIGatewayProxyResultV2> {
-  const { readDecisionCoreStatus, readPublishRecord, writePublishRecord } = deps;
+  const { readDecisionCoreStatus, readPublishRecord, readCmsCoreText, writePublishRecord } = deps;
 
   return async function publishHandler(
     event: APIGatewayProxyEventV2,
@@ -359,13 +368,47 @@ export function createPublishHandler(
       // ── 8. 組裝新的 PublishRecord（含 append-only audit trail）─────────
       // audit_trail entry 建立與 approved_by/published_by/failure_reason 填寫
       // 集中在 audit_trail.ts（TASK-147 SINGLE SOURCE OF TRUTH）
-      const newRecord: PublishRecord = appendAuditEntry({
+      let newRecord: PublishRecord = appendAuditEntry({
         decisionId,
         actor,
         existing,
         targetState,
         failureReason: parsedBody.failure_reason,
       });
+
+      // ── 8b. published 狀態時執行 CMS/SMS 模擬通道（TASK-146）────────────
+      // dispatchChannels 只在 targetState=published 時執行；
+      // channel 結果 (succeededChannels) 寫入 PublishRecord.channels
+      if (targetState === PublishStatus.published) {
+        const cmsCoreText = await readCmsCoreText(decisionId) ?? '';
+        const channelResult = dispatchChannels({
+          record: newRecord,
+          cmsCoreText,
+        });
+
+        const outcome = evaluateChannelOutcome(channelResult);
+        if (outcome.failed) {
+          // channel 整體失敗 → 執行 published → publish_failed 狀態轉移（spec §10.17）
+          // 組裝 publish_failed record（含 failure_reason）
+          const failedRecord: PublishRecord = appendAuditEntry({
+            decisionId,
+            actor,
+            existing: newRecord,          // 從 published record 繼續轉移
+            targetState: PublishStatus.publish_failed,
+            failureReason: outcome.reason,
+          });
+          // 寫入 publish_failed（不回 500，而是正確轉移狀態）
+          await writePublishRecord(failedRecord, newRecord.version);
+          return errorResponse(
+            500,
+            'CHANNEL_DISPATCH_FAILED',
+            `發布通道執行失敗，已記錄為 publish_failed：${outcome.reason}`,
+          );
+        }
+
+        // 將成功通道記錄更新回 newRecord.channels（immutable spread）
+        newRecord = { ...newRecord, channels: channelResult.succeededChannels };
+      }
 
       // ── 9. 委派狀態機寫入（TASK-145）────────────────────────────────────
       const writeResult = await writePublishRecord(newRecord, currentVersion);
