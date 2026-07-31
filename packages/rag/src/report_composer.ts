@@ -198,14 +198,13 @@ function buildReportPrompt(core: DecisionCore, citations: readonly SopCitationRe
   const eteSection = formatEteForPrompt(core);
   const signalTimingLine = buildSignalTimingLine(core);
   const crossSystemLine = buildCrossSystemLine(core);
+  const classificationLine = buildClassificationLine(core);
 
   const citationLines = citations
     .map((c) => `  - 第 ${c.article_no} 條（來源：${c.source_location}）：${c.content.slice(0, 120)}`)
     .join('\n');
 
-  const excludedRoutes = core.excluded_candidates
-    .map((r) => `  - ${r.segment_id}：${r.exclusion_reason ?? '未提供理由'}`)
-    .join('\n');
+  const excludedRoutes = buildExclusionLines(core).join('\n');
 
   return `你是城市交通應變 AI 指揮台的報告生成模組。請依下列已決定的事實，產生一份給交控中心的建議書摘要。
 
@@ -217,7 +216,7 @@ function buildReportPrompt(core: DecisionCore, citations: readonly SopCitationRe
 ## SOP 觸發結果（決定性，不可改動）
 - 觸發條款：第 ${triggeredArticles} 條
 - 啟動程序：${invokedProcedures}
-- 主疏散路段：${primaryRoute}
+${classificationLine ? `- ${classificationLine}\n` : ''}- 主疏散路段：${primaryRoute}
 - 次疏散路段：${secondaryRoutes}
 - ${eteSection}
 ${signalTimingLine ? `- ${signalTimingLine}\n` : ''}${crossSystemLine ? `- ${crossSystemLine}\n` : ''}
@@ -285,9 +284,8 @@ function buildFallbackReportText(
   const eteText = formatEteForReport(core);
   const signalTimingLine = buildSignalTimingLine(core);
   const crossSystemLine = buildCrossSystemLine(core);
-  const exclusionLines = core.excluded_candidates.map(
-    (r) => `  - ${r.segment_id}：${r.exclusion_reason ?? '未提供理由'}`,
-  );
+  const classificationLine = buildClassificationLine(core);
+  const exclusionLines = buildExclusionLines(core);
 
   const articleList = citations.length > 0
     ? citations.map((c) => `第 ${c.article_no} 條`).join('、')
@@ -300,6 +298,7 @@ function buildFallbackReportText(
     `CMS 訊息：${core.cms_core_text}`,
     ``,
     `觸發 SOP：${articleList}`,
+    ...(classificationLine ? [classificationLine] : []),
     `主疏散路段：${primaryRoute}`,
     `次疏散路段：${secondaryRoutes}`,
     ...(exclusionLines.length > 0 ? [`排除路段：`, ...exclusionLines] : []),
@@ -347,6 +346,30 @@ function buildCrossSystemLine(core: DecisionCore): string | null {
   }
   if (requests.length === 0) return null;
   return `跨系統協調：${requests.join('；')}`;
+}
+
+/**
+ * 組裝交通分級判定文字（REQ-021：「說明該事件被判定為 A 級 / B 級之依據」）。
+ *
+ * 只插入 `core.classifications`（決定性分級結果，LLM-prohibited）；
+ * 未分級（level 為 null）之路段不列入；全數未分級時回傳 null。
+ */
+function buildClassificationLine(core: DecisionCore): string | null {
+  const graded = core.classifications.filter((c) => c.level !== null);
+  if (graded.length === 0) return null;
+  return `交通分級判定：${graded.map((c) => `${c.segment_id} = ${c.level} 級`).join('、')}`;
+}
+
+/**
+ * 組裝排除路段清單（REQ-021：「說明排除其他候選路段之理由」）。
+ *
+ * 供 prompt 與決定性 template 共用，避免同一份 `excluded_candidates` 映射邏輯
+ * 兩處各自維護、未來措辭調整時漏改一邊。
+ */
+function buildExclusionLines(core: DecisionCore): readonly string[] {
+  return core.excluded_candidates.map(
+    (r) => `  - ${r.segment_id}：${r.exclusion_reason ?? '未提供理由'}`,
+  );
 }
 
 // ─── ETE formatting helpers ───────────────────────────────────────────────────

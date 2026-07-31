@@ -274,10 +274,18 @@ describe('composeReport — Property 24: template report completeness', () => {
             }
             // ETE 數值與依據
             expect(text).toContain(String(delay));
-            // 號誌調整建議（僅 art1_measures 存在時）
+            // 交通分級判定（來自固定的 makeCore() classifications）
+            for (const classification of core.classifications) {
+              if (classification.level !== null) {
+                expect(text).toContain(`${classification.segment_id} = ${classification.level} 級`);
+              }
+            }
+            // 號誌調整建議（僅 art1_measures 存在時；不存在時不得出現該段落）
             if (hasSignalMeasures) {
               expect(text).toContain('號誌調整');
               expect(text).toContain('25');
+            } else {
+              expect(text).not.toContain('號誌調整');
             }
             // 跨系統聯動（僅觸發第 3/5 條時）
             if (art3) expect(text).toContain('北捷');
