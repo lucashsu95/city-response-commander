@@ -27,6 +27,14 @@ import { NarrativeType } from '@city-commander/shared-schemas';
 //     長期修復方向：由 @city-commander/shared-schemas 匯出 canonical list，
 //     讓 eslint-local-rules.cjs 和此檔案共同引用同一份來源。
 //
+//     ⚠️  BOUNDARY NOTE：不能由本檔案直接 import eslint-local-rules.cjs 來源代替——
+//     該檔案是 repo 根目錄的 lint-time CJS 設定，不屬於任何 package 的
+//     build/rootDir，執行期 import 會有 dist 佈局與 Lambda 打包風險。
+//     正確做法是把 canonical list 遷移進 packages/shared-schemas/，但該目錄
+//     依 docs/team-roles.md 的 CODEOWNERS 為成員 1 專屬區域，「修改共用
+//     Schema：成員 1 必須核准」——此遷移待與成員 1 協調後再執行，
+//     本檔案暫不單方面遷移。
+//
 // 來源：eslint-local-rules.cjs → LLM_PROHIBITED_FIELDS（§9 boundary）
 const LLM_PROHIBITED_FIELDS = new Set<string>([
   'decision_id',
