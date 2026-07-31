@@ -1,0 +1,28 @@
+# Normalize line endings for every text file.
+#
+# The index already stores LF (`git ls-files --eol` reports `i/lf`), but Windows
+# checkouts get CRLF in the working tree. Prettier is configured with
+# `endOfLine: "lf"`, so `prettier --check` reports false positives on Windows for
+# files that are byte-correct in git — which made `format:check` unreliable
+# locally and hid real formatting drift behind noise.
+#
+# `eol=lf` makes the working tree match the index on every platform, so a local
+# `format:check` result means the same thing as CI's.
+#
+# NOTE: taking effect on an existing clone requires a one-off
+# `git add --renormalize .` followed by a checkout. Since the index is already
+# LF, that should produce no content diff.
+* text=auto eol=lf
+
+# Binary files must never be normalized.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.pdf binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+*.zip binary
+*.gz binary
