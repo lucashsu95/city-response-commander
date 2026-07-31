@@ -263,6 +263,8 @@ invalid:
       expect(provider.get('policy.time_alignment.mode')).toBe('exact_or_latest_prior_per_entity');
       expect(provider.get('policy.affected_road.role')).toBe('display_only');
       expect(provider.get('policy.ete.affected_set')).toBe('incident_primary_and_selected_secondary');
+      expect(provider.get('auth.app_client_id')).toBe('local-mock-client');
+      expect(provider.get('policy.ete.snapshot_mode')).toBe('COMMON_EXACT_TIMESTAMP');
       expect(provider.get('policy.incident_anchor.mode')).toBe('incident_anchor_from_location_text');
       expect(provider.get('policy.affected_intersection_scope.mode')).toBe('unresolved_manual_confirmation');
       expect(provider.get('policy.multilingual_scope.mode')).toBe('current_snapshot_all_available_stations');
