@@ -75,11 +75,16 @@ export type { IdempotencyRecord } from './idempotency.js';
 // ─── Route Candidate (§10.8) ───────────────────────────────
 export type { RouteCandidate } from './route_candidate.js';
 
+// ─── HG-001 Shared Literal Types ───────────────────────────
+export type { SelectionMode, GuidanceId } from './hg001_literals.js';
+
 // ─── Selected Snapshot (§10.5, Strategy A) ─────────────────
 export type { SelectedSnapshot } from './selected_snapshot.js';
+export { createSelectedSnapshot } from './selected_snapshot.js';
 
 // ─── Affected Road Context (§11.2, Strategy B) ─────────────
 export type { AffectedRoadContext } from './affected_road_context.js';
+export { displayAndContextOnlyAffectedRoadContext } from './affected_road_context.js';
 
 // ─── ETE Result (§10.9) ────────────────────────────────────
 export type {
