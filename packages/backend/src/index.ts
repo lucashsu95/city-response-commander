@@ -4,4 +4,5 @@ export * from './errors/index.js';
 export * from './inject/index.js';
 export * from './recovery/index.js';
 export * from './repository/index.js';
+export * from './resilience/index.js';
 export * from './workflow/index.js';

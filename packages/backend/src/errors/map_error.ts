@@ -19,42 +19,7 @@ import {
   IdempotencyUsageError,
 } from '../repository/idempotency_repository.js';
 import { DomainError, InternalError, ThrottledError, isDomainError } from './domain_error.js';
-
-/**
- * AWS error names that mean "transient throttling, retry with backoff" (§21.2).
- * Matched by name so it works for both real SDK errors and test doubles.
- */
-const THROTTLING_ERROR_NAMES: ReadonlySet<string> = new Set([
-  'ThrottlingException',
-  'ThrottledException',
-  'ProvisionedThroughputExceededException',
-  'RequestLimitExceeded',
-  'TooManyRequestsException',
-  'LimitExceededException',
-]);
-
-function nameOf(error: unknown): string {
-  if (typeof error !== 'object' || error === null) return '';
-  const name = (error as { name?: unknown }).name;
-  return typeof name === 'string' ? name : '';
-}
-
-/** True when the error, or the cause it wraps, is AWS throttling. */
-function isThrottling(error: unknown): boolean {
-  if (typeof error !== 'object' || error === null) return false;
-
-  if (THROTTLING_ERROR_NAMES.has(nameOf(error))) return true;
-
-  // AWS SDK v3 marks retryable throttling on the error itself.
-  const retryable = (error as { $retryable?: { throttling?: unknown } }).$retryable;
-  if (retryable && retryable.throttling === true) return true;
-
-  // Repository errors wrap the SDK error as `cause`.
-  const cause = (error as { cause?: unknown }).cause;
-  if (cause !== undefined && cause !== error) return isThrottling(cause);
-
-  return false;
-}
+import { isThrottlingError } from './transient.js';
 
 function messageOf(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
@@ -88,7 +53,7 @@ export function mapToDomainError(error: unknown, options: { traceId?: string } =
 
   const { traceId } = options;
 
-  if (isThrottling(error)) {
+  if (isThrottlingError(error)) {
     return new ThrottledError(`Downstream throttling: ${messageOf(error)}`, {
       traceId,
       cause: error,
