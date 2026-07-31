@@ -22,6 +22,7 @@ import {
   TimeAlignmentModes,
   AffectedRoadRoles,
   EteAffectedSets,
+  EteSnapshotModes,
   IncidentAnchorModes,
   AffectedIntersectionScopeModes,
   MultilingualScopeModes,
@@ -52,6 +53,7 @@ const EXPECTED_SECTION_23_1_KEYS = [
   'api.endpoint',
   'ws.endpoint',
   'auth.user_pool_id',
+  'auth.app_client_id',
   'observability.xray_enabled',
   'orchestration.mode',
   'enrichment.fanout',
@@ -62,6 +64,7 @@ const EXPECTED_SECTION_23_1_KEYS = [
   'policy.time_alignment.max_staleness_minutes',
   'policy.affected_road.role',
   'policy.ete.affected_set',
+  'policy.ete.snapshot_mode',
   'policy.incident_anchor.mode',
   'policy.affected_intersection_scope.mode',
   'policy.multilingual_scope.mode',
@@ -119,6 +122,13 @@ describe('Strategy A-F Mode Keys (≥2 allowed values each)', () => {
   it('Strategy C (ete.affected_set) has >=2 allowed values', () => {
     expect(EteAffectedSets.length).toBeGreaterThanOrEqual(2);
     const def = getKeyDefinition('policy.ete.affected_set');
+    expect(def).toBeDefined();
+    expect(def!.allowedValues!.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('Strategy C (ete.snapshot_mode) has >=2 allowed values', () => {
+    expect(EteSnapshotModes.length).toBeGreaterThanOrEqual(2);
+    const def = getKeyDefinition('policy.ete.snapshot_mode');
     expect(def).toBeDefined();
     expect(def!.allowedValues!.length).toBeGreaterThanOrEqual(2);
   });
@@ -264,6 +274,14 @@ describe('validateConfig — Enum Bounds Validation', () => {
     expect(result.errors.some((e) => e.key === 'policy.ete.affected_set')).toBe(true);
   });
 
+  it('should reject out-of-enum value for policy.ete.snapshot_mode (Strategy C)', () => {
+    const defaults = getProvisionalDefaults() as Record<string, unknown>;
+    const config = { ...defaults, 'policy.ete.snapshot_mode': 'RANDOM_TIMESTAMP' };
+    const result = validateConfig(config);
+    expect(result.valid).toBe(false);
+    expect(result.errors.some((e) => e.key === 'policy.ete.snapshot_mode')).toBe(true);
+  });
+
   it('should reject out-of-enum value for policy.incident_anchor.mode (Strategy D)', () => {
     const defaults = getProvisionalDefaults() as Record<string, unknown>;
     const config = { ...defaults, 'policy.incident_anchor.mode': 'guess' };
@@ -309,6 +327,10 @@ describe('validateConfig — Enum Bounds Validation', () => {
     }
     for (const set of EteAffectedSets) {
       const config = { ...defaults, 'policy.ete.affected_set': set };
+      expect(validateConfig(config).valid).toBe(true);
+    }
+    for (const mode of EteSnapshotModes) {
+      const config = { ...defaults, 'policy.ete.snapshot_mode': mode };
       expect(validateConfig(config).valid).toBe(true);
     }
     for (const mode of IncidentAnchorModes) {

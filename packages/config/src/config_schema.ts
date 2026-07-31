@@ -45,6 +45,16 @@ export const EteAffectedSets = [
 export type EteAffectedSet = (typeof EteAffectedSets)[number];
 
 /**
+ * Strategy C: ETE snapshot mode — how the common exact timestamp
+ * for ETE Saturation_Score inputs is selected (§11.3 Common Exact
+ * Timestamp Requirement). PROVISIONAL / configurable; HG-001 active
+ * value is COMMON_EXACT_TIMESTAMP but this remains a switchable
+ * policy knob, never the sole official rule.
+ */
+export const EteSnapshotModes = ['COMMON_EXACT_TIMESTAMP', 'PER_ROAD_LATEST_PRIOR'] as const;
+export type EteSnapshotMode = (typeof EteSnapshotModes)[number];
+
+/**
  * Strategy D: Incident anchor mode (OQ-004)
  */
 export const IncidentAnchorModes = [
@@ -230,6 +240,14 @@ export const CONFIG_SCHEMA: readonly ConfigKeyDefinition[] = [
     description: 'Cognito user pool ID',
     isProvisionalPolicy: false,
   },
+  {
+    key: 'auth.app_client_id',
+    type: 'string',
+    required: true,
+    provisionalDefault: 'local-mock-client',
+    description: 'Cognito App Client ID / API Gateway JWT audience',
+    isProvisionalPolicy: false,
+  },
 
   // ── Observability ──
   {
@@ -331,6 +349,16 @@ export const CONFIG_SCHEMA: readonly ConfigKeyDefinition[] = [
     provisionalDefault: 'incident_primary_and_selected_secondary',
     description:
       'Strategy C: incident plus selected primary and secondary roads for ETE (HG-001 organizer guidance)',
+    isProvisionalPolicy: true,
+  },
+  {
+    key: 'policy.ete.snapshot_mode',
+    type: 'string',
+    required: true,
+    allowedValues: [...EteSnapshotModes],
+    provisionalDefault: 'COMMON_EXACT_TIMESTAMP',
+    description:
+      'Strategy C: how the common exact timestamp for ETE Saturation_Score inputs is selected (§11.3, HG-001 organizer guidance, remains configurable)',
     isProvisionalPolicy: true,
   },
 
