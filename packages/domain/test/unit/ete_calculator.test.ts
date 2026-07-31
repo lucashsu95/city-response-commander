@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { IncidentStatus, IncidentType, Severity } from '@city-commander/shared-schemas';
 import { aggregateArticles } from '../../src/rule_engine/article_aggregation.js';
-import { calculateEte } from '../../src/rule_engine/ete_calculator.js';
+import { calculateEte } from '../../src/ete/ete_calculator.js';
 import {
   incidentPrimaryAndSelectedSecondary,
   selectLatestCommonExactSnapshot,

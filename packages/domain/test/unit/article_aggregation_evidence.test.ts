@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { RouteCandidateRole, UpstreamDownstream } from '@city-commander/shared-schemas';
 import { aggregateArticles } from '../../src/rule_engine/article_aggregation.js';
-import { buildEvidenceTrace } from '../../src/rule_engine/evidence_trace_builder.js';
+import { buildEvidenceTrace } from '../../src/evidence/evidence_trace_builder.js';
 
 describe('Article aggregation and EvidenceTraceBuilder', () => {
   it('separates triggers, applied formulas, invoked procedures, and citation union', () => {
