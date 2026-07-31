@@ -7,14 +7,18 @@
   "types": "dist/index.d.ts",
   "scripts": {
     "build": "tsc",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
   },
   "dependencies": {
     "@city-commander/shared-schemas": "*",
     "@city-commander/domain": "*",
-    "@city-commander/config": "*"
+    "@city-commander/config": "*",
+    "@city-commander/rag": "*"
   },
   "devDependencies": {
-    "typescript": "^5.4.0"
+    "fast-check": "^3.19.0",
+    "typescript": "^5.4.0",
+    "vitest": "^1.6.0"
   }
 }

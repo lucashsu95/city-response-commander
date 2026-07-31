@@ -4,10 +4,11 @@
     "outDir": "./dist",
     "rootDir": "./src"
   },
-  "include": ["src/**/*.ts"],
+  "include": ["src/**/*.ts", "test/**/*.ts"],
   "references": [
     { "path": "../shared-schemas" },
     { "path": "../domain" },
-    { "path": "../config" }
+    { "path": "../config" },
+    { "path": "../rag" }
   ]
 }
