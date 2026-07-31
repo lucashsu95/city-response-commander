@@ -94,9 +94,9 @@ export class BedrockAdapter implements BedrockInvoker {
   private readonly client: BedrockRuntimeClient;
 
   constructor(config: ConfigProvider) {
-    const region = config.get('bedrock.region') as string;
-    this.primaryModelId = config.get('bedrock.model_id') as string;
-    this.fallbackModelIds = config.get('bedrock.model_id_fallbacks') as readonly string[];
+    const region = requireString(config, 'bedrock.region');
+    this.primaryModelId = requireString(config, 'bedrock.model_id');
+    this.fallbackModelIds = requireStringArray(config, 'bedrock.model_id_fallbacks');
     this.client = new BedrockRuntimeClient({ region });
   }
 
@@ -233,4 +233,35 @@ class TimeoutError extends Error {
 
 function isAwsError(err: unknown): err is { name: string; message: string } {
   return typeof err === 'object' && err !== null && 'name' in err;
+}
+
+// ─── Config helpers ────────────────────────────────────────────────────────
+
+/**
+ * ConfigProvider から string 値を取得する。
+ * validateConfig でスキーマが保護されていない場合でも runtime で型を保証する。
+ */
+function requireString(config: ConfigProvider, key: string): string {
+  const value = config.get(key);
+  if (typeof value !== 'string') {
+    throw new TypeError(
+      `Config key "${key}" must be a string, got ${typeof value}. ` +
+        'Ensure validateConfig() has been called before constructing BedrockAdapter.',
+    );
+  }
+  return value;
+}
+
+/**
+ * ConfigProvider から string[] 値を取得する。
+ */
+function requireStringArray(config: ConfigProvider, key: string): readonly string[] {
+  const value = config.get(key);
+  if (!Array.isArray(value) || !value.every((v) => typeof v === 'string')) {
+    throw new TypeError(
+      `Config key "${key}" must be a string[], got ${typeof value}. ` +
+        'Ensure validateConfig() has been called before constructing BedrockAdapter.',
+    );
+  }
+  return value as readonly string[];
 }
