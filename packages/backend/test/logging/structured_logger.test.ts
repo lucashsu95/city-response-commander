@@ -408,7 +408,7 @@ describe('reserved fields cannot be overwritten from context', () => {
 
     const record = logger.log('INFO', 'diagnostic', 'msg', {
       level: 'DEBUG',
-      aws_secret_access_key: 'AKIAIOSFODNN7EXAMPLE',
+      aws_secret_access_key: 'EXAMPLE_AKIA_PLACEHOLDER_0000000000',
     });
 
     // Reserved-key filtering must not bypass §17 redaction.
