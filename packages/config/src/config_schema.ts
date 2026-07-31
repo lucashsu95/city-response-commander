@@ -277,9 +277,10 @@ export const CONFIG_SCHEMA: readonly ConfigKeyDefinition[] = [
     type: 'string',
     required: false,
     description:
-      'Step Functions state machine ARN backing the orchestrator (TASK-083/TASK-180 wiring). ' +
-      'Optional: when absent, the runtime returns a controlled 503. No placeholder ARN ' +
-      'is shipped from the schema and the value is not hard-coded to any region/account/name.',
+      'Step Functions state machine ARN backing the orchestrator (built by TASK-068, ' +
+      'consumed by runtime via TASK-179/TASK-180 wiring). Required only when ' +
+      'orchestration.mode=stepfunctions; no provisionalDefault so an absent value ' +
+      'fails fast at StartExecution instead of fabricating an infrastructure identifier.',
     isProvisionalPolicy: false,
   },
 
