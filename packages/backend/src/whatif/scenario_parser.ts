@@ -19,7 +19,11 @@ import type {
   ParseScenarioResult,
   WhatIfAssumption,
 } from './whatif_types.js';
-import { wrapUntrustedQuestion } from './untrusted_input.js';
+import {
+  wrapUntrustedQuestion,
+  sanitizeEchoedText,
+  MAX_CLARIFICATION_REASON_LENGTH,
+} from './untrusted_input.js';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -31,20 +35,15 @@ const PARSE_FAILED_PROMPT =
 const NON_JSON_PROMPT =
   '系統無法解析您的問題。請以更明確的格式描述假設條件，例如：「若 BL17 的 User_Count = 40000」。';
 
-/** Bedrock clarification reason 的最大長度（§17 防護：截斷 LLM 輸出） */
-const MAX_REASON_LENGTH = 200;
-
 /**
- * 清潔 Bedrock 回傳的 reason 字串（§17 boundary）：
- * - 截斷超過 MAX_REASON_LENGTH 的字元
- * - 移除控制字元（防止 prompt injection 透過 reason 出口）
- * - 若清潔後為空，回傳預設 prompt
+ * 清潔 Bedrock 回傳的 reason 字串（§17 boundary）。
+ *
+ * 清潔規則委派 `sanitizeEchoedText`（與 stage 2 的驗證訊息共用同一套規則）：
+ * 移除控制字元、壓縮空白、截斷至 `MAX_CLARIFICATION_REASON_LENGTH`。
+ * 清潔後為空時回傳預設 prompt，不讓空白訊息送到 Dashboard。
  */
 function sanitizeReason(reason: string): string {
-  const cleaned = reason
-    .replace(/[\x00-\x1F\x7F]/g, '') // 移除控制字元
-    .slice(0, MAX_REASON_LENGTH)
-    .trim();
+  const cleaned = sanitizeEchoedText(reason, MAX_CLARIFICATION_REASON_LENGTH);
   return cleaned.length > 0 ? cleaned : PARSE_FAILED_PROMPT;
 }
 

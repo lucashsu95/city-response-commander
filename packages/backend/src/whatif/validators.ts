@@ -18,6 +18,23 @@
 
 import type { WhatIfAssumption, ValidateScenarioResult } from './whatif_types.js';
 import { ROAD_SEGMENT_PREFIX, BASE_STATION_PREFIX } from '@city-commander/shared-schemas';
+import { sanitizeEchoedText } from './untrusted_input.js';
+
+// ─── 回顯清潔 ─────────────────────────────────────────────────────────────────
+
+/**
+ * 清潔要回顯進 `clarification_prompt` 的不可信片段。
+ *
+ * `entity_id` 與 `field` 由 Bedrock 從 `raw_question`（UNTRUSTED_USER_INPUT）
+ * 解析而來，stage 1 只確認它們是非空字串——沒有長度上限，也沒有字元限制。
+ * 直接串進錯誤訊息會讓 What-if 的回應變成一條回顯通道。
+ *
+ * 數值真值不受影響（那是本模組其餘驗證的工作）；
+ * 這裡處理的是「送回 Dashboard 的文字」。
+ */
+function echo(value: string): string {
+  return sanitizeEchoedText(value);
+}
 
 // ─── Entity type classification ───────────────────────────────────────────────
 
@@ -37,8 +54,9 @@ function classifyEntity(entityId: string): EntityType | null {
  *
  * - Saturation_Score：RawTrafficRecord，範圍 [0, 1]
  * - User_Count：RawCrowdRecord，非負整數（下限 0）
- * - Growth_Rate：RawCrowdRecord，無硬性上限，但通常 [-1, 100]
- * - Roaming_User_Pct：RawCrowdRecord（normalized 0–1），由 stage 1 解析後為小數或百分比值
+ * - Growth_Rate：RawCrowdRecord，小數量綱 [-1, 10]（SOP-3/SOP-4 門檻本身即小數）
+ * - Roaming_User_Pct：RawCrowdRecord（normalized 0–1）；
+ *   接受百分比量綱輸入，由 `normalizePercentScale` 轉為小數
  */
 interface FieldSpec {
   readonly allowedEntities: readonly EntityType[];
@@ -121,7 +139,7 @@ function normalizePercentScale(assumption: WhatIfAssumption): NormalizeResult {
     return {
       kind: 'ambiguous',
       message:
-        `欄位「${assumption.field}」的值 1 無法判定單位：` +
+        `欄位「${echo(assumption.field)}」的值 1 無法判定單位：` +
         '可能是 1（即 100%）或 1%。請改用明確寫法，例如 1.0（100%）或 0.01（1%）。',
     };
   }
@@ -139,7 +157,7 @@ function normalizePercentScale(assumption: WhatIfAssumption): NormalizeResult {
 function validateEntityPrefix(assumption: WhatIfAssumption): string | null {
   const type = classifyEntity(assumption.entity_id);
   if (type === null) {
-    return `無法識別實體「${assumption.entity_id}」。實體 ID 必須以 ${ROAD_SEGMENT_PREFIX}（路段）或 ${BASE_STATION_PREFIX}（基地台）開頭。`;
+    return `無法識別實體「${echo(assumption.entity_id)}」。實體 ID 必須以 ${ROAD_SEGMENT_PREFIX}（路段）或 ${BASE_STATION_PREFIX}（基地台）開頭。`;
   }
   return null;
 }
@@ -148,7 +166,7 @@ function validateEntityPrefix(assumption: WhatIfAssumption): string | null {
 function validateFieldWhitelist(assumption: WhatIfAssumption): string | null {
   if (!(assumption.field in FIELD_SPECS)) {
     const valid = Object.keys(FIELD_SPECS).join('、');
-    return `欄位「${assumption.field}」不在支援的欄位清單中。有效欄位：${valid}。`;
+    return `欄位「${echo(assumption.field)}」不在支援的欄位清單中。有效欄位：${valid}。`;
   }
   return null;
 }
@@ -165,7 +183,7 @@ function validateEntityFieldMatch(assumption: WhatIfAssumption): string | null {
     const allowed = spec.allowedEntities.map((t) =>
       t === 'road_segment' ? `路段（${ROAD_SEGMENT_PREFIX}*）` : `基地台（${BASE_STATION_PREFIX}*）`,
     ).join('或');
-    return `欄位「${assumption.field}」只適用於 ${allowed}，無法用於「${assumption.entity_id}」。`;
+    return `欄位「${echo(assumption.field)}」只適用於 ${allowed}，無法用於「${echo(assumption.entity_id)}」。`;
   }
   return null;
 }
@@ -178,16 +196,16 @@ function validateValueRange(assumption: WhatIfAssumption): string | null {
   const { value } = assumption;
 
   if (!isFinite(value)) {
-    return `欄位「${assumption.field}」的值必須是有限數字。`;
+    return `欄位「${echo(assumption.field)}」的值必須是有限數字。`;
   }
 
   if (value < spec.minValue || value > spec.maxValue) {
     const hint = spec.scaleHint !== undefined ? ` ${spec.scaleHint}` : '';
-    return `欄位「${assumption.field}」的值 ${value} 超出合理範圍（${spec.minValue}–${spec.maxValue}）。${hint}`;
+    return `欄位「${echo(assumption.field)}」的值 ${value} 超出合理範圍（${spec.minValue}–${spec.maxValue}）。${hint}`;
   }
 
   if (spec.mustBeInteger && !Number.isInteger(value)) {
-    return `欄位「${assumption.field}」的值必須是整數（如 40000），收到 ${value}。`;
+    return `欄位「${echo(assumption.field)}」的值必須是整數（如 40000），收到 ${value}。`;
   }
 
   return null;
@@ -199,7 +217,7 @@ function detectAmbiguity(assumptions: readonly WhatIfAssumption[]): string | nul
   for (const a of assumptions) {
     const key = `${a.entity_id}::${a.field}`;
     if (seen.has(key)) {
-      return `假設條件中，實體「${a.entity_id}」的欄位「${a.field}」出現超過一次，造成歧義。請只指定一個值。`;
+      return `假設條件中，實體「${echo(a.entity_id)}」的欄位「${echo(a.field)}」出現超過一次，造成歧義。請只指定一個值。`;
     }
     seen.add(key);
   }

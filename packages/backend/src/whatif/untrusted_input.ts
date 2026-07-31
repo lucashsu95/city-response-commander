@@ -6,6 +6,9 @@
  * 兩處必須用**同一套**跳脫規則——否則防護會不對稱，
  * 而不對稱的那一邊就是攻擊者會挑的那一邊。
  *
+ * 本模組同時負責**回顯出口**的清潔（`clarification_prompt`），
+ * 見 `sanitizeEchoedText`。
+ *
  * @module backend/whatif/untrusted_input
  */
 
@@ -46,4 +49,54 @@ export function escapeXmlEntities(text: string): string {
  */
 export function wrapUntrustedQuestion(rawQuestion: string): string {
   return `<${USER_QUESTION_TAG}>\n${escapeXmlEntities(rawQuestion)}\n</${USER_QUESTION_TAG}>`;
+}
+
+// ─── 回顯清潔（clarification_prompt 出口）────────────────────────────────────
+
+/** 回顯到 clarification_prompt 的單一片段（entity_id / field）長度上限 */
+export const MAX_ECHOED_FRAGMENT_LENGTH = 80;
+
+/** Bedrock 回傳的 clarification reason 長度上限 */
+export const MAX_CLARIFICATION_REASON_LENGTH = 200;
+
+/**
+ * C0 與 C1 控制字元。
+ *
+ * 以 `new RegExp` + 跳脫字串建構，避免在原始碼中寫入實體控制字元
+ * （實體控制字元會讓檔案難以 diff、grep 與 code review）。
+ */
+// eslint-disable-next-line no-control-regex -- 比對控制字元正是本 regex 的目的（用於移除）
+const CONTROL_CHARS = new RegExp('[\\u0000-\\u001F\\u007F-\\u009F]', 'g');
+
+/**
+ * 清潔要「回顯給使用者」的不可信文字。
+ *
+ * `clarification_prompt` 是 What-if 唯一會把使用者／LLM 內容原樣送回 Dashboard
+ * 的出口。`entity_id`、`field` 這些值最終源自 `raw_question`（經 Bedrock 解析），
+ * 未經清潔就串進錯誤訊息等於開了一條回顯通道：
+ * 可塞控制字元干擾終端與日誌，也可塞長文把真正的錯誤原因洗掉。
+ *
+ * 清潔規則：
+ * 1. 移除 C0/C1 控制字元（含 CR/LF/TAB，避免偽造多行訊息與日誌注入）
+ * 2. 壓縮連續空白
+ * 3. 超過 `maxLength` 截斷並補「…」
+ *
+ * ⚠️ 這只負責「送回 Dashboard 的文字」；防止數值被竄改的是 stage 2 的
+ * Schema/DomainValidator，兩者職責不同，不可互相取代。
+ *
+ * @param value - 不可信文字
+ * @param maxLength - 截斷長度上限
+ * @returns 清潔後的字串（可能為空字串，由呼叫端決定備援文字）
+ */
+export function sanitizeEchoedText(
+  value: string,
+  maxLength: number = MAX_ECHOED_FRAGMENT_LENGTH,
+): string {
+  const stripped = value
+    .replace(CONTROL_CHARS, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  if (stripped.length <= maxLength) return stripped;
+  return `${stripped.slice(0, maxLength)}…`;
 }

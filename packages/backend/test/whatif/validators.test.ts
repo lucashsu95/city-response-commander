@@ -394,3 +394,41 @@ describe('validateScenario — Growth_Rate 維持小數量綱', () => {
     expect(result.validation_status).toBe('valid');
   });
 });
+
+// ─── 回顯清潔：clarification_prompt 出口（§17）─────────────────────────────
+
+describe('validateScenario — clarification_prompt 不得成為回顯通道', () => {
+  it('entity_id 中的控制字元被移除', () => {
+    const result = validateScenario([
+      { entity_id: 'XX_BAD\u0000\u001b[31m\r\nFAKE', field: 'User_Count', operator: '=', value: 1 },
+    ]);
+    expect(result.validation_status).toBe('clarification_required');
+    if (result.validation_status !== 'clarification_required') return;
+    expect(result.clarification_prompt).not.toMatch(/[\u0000-\u001F]/);
+    // 換行被壓成空白，無法偽造多行訊息
+    expect(result.clarification_prompt.split('\n')).toHaveLength(1);
+  });
+
+  it('超長 field 名稱被截斷，不會洗掉真正的錯誤原因', () => {
+    const longField = 'F'.repeat(5000);
+    const result = validateScenario([
+      { entity_id: 'BS_MRT_BL17', field: longField, operator: '=', value: 1 },
+    ]);
+    expect(result.validation_status).toBe('clarification_required');
+    if (result.validation_status !== 'clarification_required') return;
+    // 回顯片段受長度上限約束（80 + 省略號），整體訊息不會被灌爆
+    expect(result.clarification_prompt.length).toBeLessThan(400);
+    expect(result.clarification_prompt).toContain('…');
+    expect(result.clarification_prompt).toContain('不在支援的欄位清單中');
+  });
+
+  it('合法輸入的訊息內容不受清潔影響', () => {
+    const result = validateScenario([
+      { entity_id: 'BS_MRT_BL17', field: 'Saturation_Score', operator: '=', value: 0.5 },
+    ]);
+    expect(result.validation_status).toBe('clarification_required');
+    if (result.validation_status !== 'clarification_required') return;
+    expect(result.clarification_prompt).toContain('Saturation_Score');
+    expect(result.clarification_prompt).toContain('BS_MRT_BL17');
+  });
+});
