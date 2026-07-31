@@ -17,6 +17,7 @@
     "@city-commander/rag": "*"
   },
   "devDependencies": {
+    "@types/aws-lambda": "8.10.147",
     "fast-check": "^3.19.0",
     "typescript": "^5.4.0",
     "vitest": "^1.6.0"

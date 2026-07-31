@@ -145,7 +145,11 @@ const OPERATOR_GROUP = 'operators';
  * 此處 Cognito group check 是應用層防線。
  */
 function isAuthorizedOperator(event: APIGatewayProxyEventV2): boolean {
-  const claims = event.requestContext?.authorizer?.jwt?.claims;
+  // HTTP API Gateway JWT authorizer 型別用 unknown 轉型後嚴格提取
+  const ctx = event.requestContext as unknown as {
+    authorizer?: { jwt?: { claims?: Record<string, unknown> } };
+  };
+  const claims = ctx.authorizer?.jwt?.claims;
   if (!claims) return false;
 
   // 確認 sub（Cognito user ID）非空

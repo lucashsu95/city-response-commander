@@ -31,6 +31,8 @@ import {
 import { appendAuditEntry } from './audit_trail.js';
 import { checkPublishIdempotency, shouldEmitPublicAlertReady } from './publish_idempotency.js';
 import { dispatchChannels, evaluateChannelOutcome } from './channels.js';
+import type { PublishStatusConnectionPublisher } from '../realtime/publish_status_changed.js';
+import { emitPublishStatusChanged } from '../realtime/publish_status_changed.js';
 
 // ─── Publish result type ──────────────────────────────────────────────────────
 
@@ -82,6 +84,15 @@ export interface PublishFnDependencies {
     record: PublishRecord,
     expectedVersion: number,
   ) => Promise<WritePublishRecordResult>;
+
+  /**
+   * WebSocket realtime publisher（選配，TASK-148）。
+   *
+   * 若注入此依賴，publish 狀態轉移後會推送 `publish.status_changed` 事件。
+   * 未注入時 handler 正常運作但不推送（本地 mock / 測試環境可省略）。
+   * 推送失敗永遠不影響 HTTP 回應（polling 為授權 fallback，§13/§16.4）。
+   */
+  readonly realtimePublisher?: PublishStatusConnectionPublisher;
 }
 
 /** writePublishRecord 的回傳結果 */
@@ -130,7 +141,13 @@ const COMMANDER_GROUP = 'commanders';
 function authorizeCommander(event: APIGatewayProxyEventV2):
   | { readonly authorized: true; readonly actor: string }
   | { readonly authorized: false } {
-  const claims = event.requestContext?.authorizer?.jwt?.claims;
+  // HTTP API Gateway JWT authorizer 在 requestContext.authorizer.jwt.claims 下
+  // 型別套件 @types/aws-lambda 尚未包含 HTTP API JWT authorizer 型別，
+  // 以 unknown 轉型後再嚴格提取（不假設結構）
+  const ctx = event.requestContext as unknown as {
+    authorizer?: { jwt?: { claims?: Record<string, unknown> } };
+  };
+  const claims = ctx.authorizer?.jwt?.claims;
   if (!claims) return { authorized: false };
 
   const sub = typeof claims['sub'] === 'string' ? claims['sub'].trim() : '';
@@ -254,7 +271,7 @@ function parsePublishBody(body: string | null | undefined): ParsedPublishBody {
 export function createPublishHandler(
   deps: PublishFnDependencies,
 ): (event: APIGatewayProxyEventV2) => Promise<APIGatewayProxyResultV2> {
-  const { readDecisionCoreStatus, readPublishRecord, readCmsCoreText, writePublishRecord } = deps;
+  const { readDecisionCoreStatus, readPublishRecord, readCmsCoreText, writePublishRecord, realtimePublisher } = deps;
 
   return async function publishHandler(
     event: APIGatewayProxyEventV2,
@@ -436,10 +453,24 @@ export function createPublishHandler(
       }
 
       // ── 10. 回傳成功結果（§15.2：只有 PROCEED 才可能觸發 alert）─────────
-      // shouldEmitPublicAlertReady 為 TASK-148 的觸發點（WebSocket 推送）
-      // 實際推送邏輯在 publish_status_changed.ts，此處僅計算 flag
+      // shouldEmitPublicAlertReady 確認是否為首次 published（非 retry）
       const _shouldEmitAlert = shouldEmitPublicAlertReady(idempotencyResult, targetState);
-      // TODO(TASK-148): if (_shouldEmitAlert) await realtimePublisher.emitPublishStatusChanged(...)
+
+      // TASK-148: 推送 publish.status_changed WebSocket 事件
+      // 推送失敗不影響 HTTP 回應（polling 為授權 fallback，§13/§16.4）
+      if (realtimePublisher !== undefined) {
+        emitPublishStatusChanged(realtimePublisher, {
+          record: writeResult.record,
+          traceId: event.requestContext?.requestId ?? 'unknown',
+          policyVersion: 'v1',
+        }).catch((err) => {
+          // 推送失敗不拋出——publish 狀態已持久化，polling 是授權的 fallback
+          console.error('[PublishFn] publish.status_changed 推送失敗（非阻斷）', {
+            decision_id: decisionId,
+            error: err instanceof Error ? err.message : String(err),
+          });
+        });
+      }
 
       return jsonResponse(200, {
         schema_version: SCHEMA_VERSION,

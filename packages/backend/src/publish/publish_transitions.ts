@@ -24,7 +24,7 @@ import { PublishStatus } from '@city-commander/shared-schemas';
 export const PUBLISH_TRANSITIONS: ReadonlyMap<
   PublishStatus | null,
   ReadonlySet<PublishStatus>
-> = new Map([
+> = new Map<PublishStatus | null, ReadonlySet<PublishStatus>>([
   [null, new Set([PublishStatus.draft])],
   [PublishStatus.draft, new Set([PublishStatus.approved])],
   [PublishStatus.approved, new Set([PublishStatus.published, PublishStatus.publish_failed])],
