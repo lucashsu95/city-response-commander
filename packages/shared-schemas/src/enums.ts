@@ -101,36 +101,46 @@ export enum IdempotencyStatus {
 
 // ─── Recovery (§10.11e, §15.2) ─────────────────────────────
 
-/** Recovery stage — determines what to re-run on recovery */
+/**
+ * Recovery stage — how much has to run again, written by WorkflowStatusFn.
+ *
+ * Set from RecoveryGateFn's `effective_core_committed` (§15.2):
+ * - NONE on MARK_COMPLETED, and on the terminal CORE_IDENTITY_CONFLICT variant
+ * - FULL_WORKFLOW when no core is committed
+ * - ENRICHMENT_ONLY when a core is already committed (never re-run DecisionFn)
+ */
 export enum RecoveryStage {
-  /** No recovery needed (completed or terminal conflict) */
-  detect = 'detect',
-  /** Recovery gate phase */
-  gate = 'gate',
-  /** Reconciliation phase */
-  reconcile = 'reconcile',
-  /** Restart phase */
-  restart = 'restart',
+  /** No recovery needed (completed, or terminal non-recoverable conflict) */
+  NONE = 'NONE',
+  /** No core committed: re-run DecisionFn and the whole workflow */
+  FULL_WORKFLOW = 'FULL_WORKFLOW',
+  /** Core already committed: regenerate only the missing narrative items */
+  ENRICHMENT_ONLY = 'ENRICHMENT_ONLY',
 }
 
-/** Recovery mode — passed as workflow INPUT */
+/**
+ * Recovery mode — passed as Step Functions workflow INPUT and fenced on by
+ * MARK_RUNNING (§10.11e).
+ */
 export enum RecoveryMode {
-  /** First execution (no recovery) */
-  FIRST_RUN = 'FIRST_RUN',
-  /** Stale recovery detected */
-  STALE_RECOVERY = 'STALE_RECOVERY',
-  /** Start failed, retry */
-  START_FAILED_RETRY = 'START_FAILED_RETRY',
+  /** First injection; not a recovery */
+  NORMAL = 'NORMAL',
+  /** Recovery that must re-run DecisionFn */
+  FULL_WORKFLOW = 'FULL_WORKFLOW',
+  /** Recovery that must NOT re-run DecisionFn (core already committed) */
+  ENRICHMENT_ONLY = 'ENRICHMENT_ONLY',
 }
 
 // ─── Evidence Source (§10.11e) ─────────────────────────────
 
-/** Evidence source for core_committed flag */
+/**
+ * Evidence backing `core_committed`, written only by MARK_CORE_COMMITTED.
+ */
 export enum EvidenceSource {
-  /** DecisionFn successfully committed the core */
+  /** DecisionFn committed the core (normal path or safe same-task retry) */
   DECISIONFN_COMMITTED = 'DECISIONFN_COMMITTED',
-  /** RecoveryGateFn confirmed core_exists during ENRICHMENT_ONLY */
-  ENRICHMENT_COMMITTED = 'ENRICHMENT_COMMITTED',
+  /** ENRICHMENT_ONLY recovery: RecoveryGateFn confirmed core_exists=true */
+  RECOVERY_GATE_CORE_EXISTS = 'RECOVERY_GATE_CORE_EXISTS',
 }
 
 // ─── Core Write Status (§6, §15.2) ────────────────────────

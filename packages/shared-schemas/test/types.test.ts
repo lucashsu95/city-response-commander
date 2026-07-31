@@ -34,12 +34,7 @@ import type {
   DecisionFastPathReadyEvent,
   ProcessingFailedEvent,
 } from '../src/index.js';
-import {
-  NarrativeType,
-  IdempotencyStatus,
-  PublishStatus,
-  SCHEMA_VERSION,
-} from '../src/index.js';
+import { NarrativeType, IdempotencyStatus, PublishStatus, SCHEMA_VERSION } from '../src/index.js';
 
 /**
  * Compile-time type assertion helper.
@@ -80,7 +75,11 @@ describe('shared-schemas type-level assertions', () => {
           classification: 'PROVISIONAL_TEAM_POLICY',
           status: 'AWAITING_HOST_REPLY',
           is_official: false,
-          time_alignment: { mode: 'exact_or_latest_prior_per_entity', max_staleness_minutes: 30, on_insufficient: 'insufficient_data' },
+          time_alignment: {
+            mode: 'exact_or_latest_prior_per_entity',
+            max_staleness_minutes: 30,
+            on_insufficient: 'insufficient_data',
+          },
           affected_road: { role: 'display_only' },
           ete: { affected_set: 'directly_affected_roads_at_event_snapshot' },
           incident_anchor: { mode: 'incident_anchor_from_location_text' },
@@ -177,9 +176,21 @@ describe('shared-schemas type-level assertions', () => {
           event_timestamp: '2026-05-20 22:10',
           common_snapshot_timestamp: '2026-05-20 22:00',
           readings: [
-            { road_id: 'RD_TPE_002', observation_timestamp: '2026-05-20 22:00', saturation_score: 1 },
-            { road_id: 'RD_TPE_004', observation_timestamp: '2026-05-20 22:00', saturation_score: 0.78 },
-            { road_id: 'RD_TPE_005', observation_timestamp: '2026-05-20 22:00', saturation_score: 0.65 },
+            {
+              road_id: 'RD_TPE_002',
+              observation_timestamp: '2026-05-20 22:00',
+              saturation_score: 1,
+            },
+            {
+              road_id: 'RD_TPE_004',
+              observation_timestamp: '2026-05-20 22:00',
+              saturation_score: 0.78,
+            },
+            {
+              road_id: 'RD_TPE_005',
+              observation_timestamp: '2026-05-20 22:00',
+              saturation_score: 0.65,
+            },
           ],
         },
         manual_confirmation_required: false,
@@ -192,10 +203,19 @@ describe('shared-schemas type-level assertions', () => {
     it('EvidenceTrace type exists', () => {
       const evidence: EvidenceTrace = {
         decision_id: 'dec-001',
-        classification_reasoning: [{ segment_id: 'RD_TPE_002', value: 1.0, threshold: '>=0.95', conclusion: 'A' }],
+        classification_reasoning: [
+          { segment_id: 'RD_TPE_002', value: 1.0, threshold: '>=0.95', conclusion: 'A' },
+        ],
         excluded_routes: [{ segment_id: 'RD_TPE_008', reason: 'capacity_vph 600 < 1000' }],
         sop_citations: [{ article_no: 1, source_location: 's3://sop/art1.txt', content: 'A級' }],
-        data_points: [{ source: 'city_traffic_flow.csv', field: 'Saturation_Score', value: 1.0, timestamp: '2026-05-20 22:10' }],
+        data_points: [
+          {
+            source: 'city_traffic_flow.csv',
+            field: 'Saturation_Score',
+            value: 1.0,
+            timestamp: '2026-05-20 22:10',
+          },
+        ],
       };
       expect(evidence.excluded_routes[0].reason).toBeTruthy();
     });
@@ -205,7 +225,11 @@ describe('shared-schemas type-level assertions', () => {
         classification: 'PROVISIONAL_TEAM_POLICY',
         status: 'AWAITING_HOST_REPLY',
         is_official: false,
-        time_alignment: { mode: 'exact_or_latest_prior_per_entity', max_staleness_minutes: 30, on_insufficient: 'error' },
+        time_alignment: {
+          mode: 'exact_or_latest_prior_per_entity',
+          max_staleness_minutes: 30,
+          on_insufficient: 'error',
+        },
         affected_road: { role: 'display_only' },
         ete: { affected_set: 'directly_affected_roads_at_event_snapshot' },
         incident_anchor: { mode: 'incident_anchor_from_location_text' },
@@ -263,7 +287,7 @@ describe('shared-schemas type-level assertions', () => {
         policy_version: 'prov-2026a',
         decision_id: 'dec-001',
         ready_event_id: 'dec-001|decision.fast_path_ready|1',
-        source_timestamps: { 'RD_TPE_002': '2026-05-20 22:10' },
+        source_timestamps: { RD_TPE_002: '2026-05-20 22:10' },
         idempotency_key: 'TPE_2026_ACC_001|2026-05-20 22:10|prov-2026a',
         summary: {
           triggered_articles: [1, 2],
