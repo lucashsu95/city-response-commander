@@ -16,7 +16,6 @@ import {
   PUBLISH_STATUS_CHANGED_EVENT,
   buildPublishStatusChangedReadyEventId,
   buildPublishStatusChangedPayload,
-  publishStatusPollingFallback,
   isStalePublishConnection,
   emitPublishStatusChanged,
   type PublishStatusConnectionPublisher,
@@ -89,7 +88,7 @@ describe('buildPublishStatusChangedReadyEventId', () => {
 // ─── payload ──────────────────────────────────────────────────────────────────
 
 describe('buildPublishStatusChangedPayload', () => {
-  it('只攜帶 shared schema 定義的 publish_state 與 audit_trail', () => {
+  it('攜帶 publish_state、audit_trail 與 polling fallback 路徑', () => {
     const payload = buildPublishStatusChangedPayload({
       record: record(),
       traceId: 'trace-1',
@@ -102,10 +101,9 @@ describe('buildPublishStatusChangedPayload', () => {
     expect(payload.publish_state).toBe(PublishStatus.published);
     expect(payload.audit_trail).toHaveLength(1);
     // §16.4：斷線時 Dashboard 改用 polling
-    expect(payload).not.toHaveProperty('polling_fallback_path');
+    expect(payload.polling_fallback_path).toBe(`/decisions/${DECISION_ID}`);
     expect(payload.trace_id).toBe('trace-1');
     expect(payload.occurred_at).toBe('2026-05-20 22:15');
-    expect(publishStatusPollingFallback(DECISION_ID)).toBe(`/decisions/${DECISION_ID}`);
   });
 
   it('publish_failed 同樣可組裝（失敗也是一次狀態轉移）', () => {
@@ -115,7 +113,7 @@ describe('buildPublishStatusChangedPayload', () => {
       policyVersion: 'v1',
     });
     expect(payload.publish_state).toBe(PublishStatus.publish_failed);
-    expect(payload).not.toHaveProperty('ready_event_id');
+    expect(payload.ready_event_id).toContain('publish_failed');
   });
 });
 
@@ -221,7 +219,7 @@ describe('emitPublishStatusChanged', () => {
     expect(post).not.toHaveBeenCalled();
   });
 
-  it('送出的字串可還原為 shared-schema payload', async () => {
+  it('送出的字串可還原為 payload（Dashboard 以 ready_event_id 去重）', async () => {
     let captured = '';
     await emitPublishStatusChanged(
       {
@@ -232,9 +230,9 @@ describe('emitPublishStatusChanged', () => {
       },
       { record: record(), traceId: 't', policyVersion: 'v1' },
     );
-    const parsed = JSON.parse(captured) as { event_type: string };
+    const parsed = JSON.parse(captured) as { ready_event_id: string; event_type: string };
     expect(parsed.event_type).toBe(PUBLISH_STATUS_CHANGED_EVENT);
-    expect(parsed).not.toHaveProperty('ready_event_id');
+    expect(parsed.ready_event_id).toBe(`${DECISION_ID}|publish.status_changed|published|3`);
   });
 });
 
@@ -279,7 +277,7 @@ describe('payload 符合 shared-schemas 的 PublishStatusChangedEvent 契約', (
     });
     // 這兩個欄位需請成員 1 納入 PublishStatusChangedEvent，
     // 在那之前前端讀取它們是 untyped access
-    expect(payload).not.toHaveProperty('ready_event_id');
-    expect(payload).not.toHaveProperty('polling_fallback_path');
+    expect(typeof payload.ready_event_id).toBe('string');
+    expect(typeof payload.polling_fallback_path).toBe('string');
   });
 });
