@@ -51,10 +51,7 @@ export type EteAffectedSet = (typeof EteAffectedSets)[number];
  * value is COMMON_EXACT_TIMESTAMP but this remains a switchable
  * policy knob, never the sole official rule.
  */
-export const EteSnapshotModes = [
-  'COMMON_EXACT_TIMESTAMP',
-  'PER_ROAD_LATEST_PRIOR',
-] as const;
+export const EteSnapshotModes = ['COMMON_EXACT_TIMESTAMP', 'PER_ROAD_LATEST_PRIOR'] as const;
 export type EteSnapshotMode = (typeof EteSnapshotModes)[number];
 
 /**
