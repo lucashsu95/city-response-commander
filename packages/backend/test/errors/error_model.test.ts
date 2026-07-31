@@ -1,4 +1,4 @@
-/**
+﻿/**
  * TASK-156 — unified structured error model unit tests.
  *
  * Locks the design §12 contract: one `{error_code, message, trace_id, retryable}`

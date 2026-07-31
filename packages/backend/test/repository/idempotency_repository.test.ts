@@ -1,4 +1,4 @@
-/**
+﻿/**
  * TASK-085 — IdempotencyRepository unit tests (mocked DynamoDB DocumentClient).
  *
  * Covers the three primitives plus the guard/mutation expression contract that
@@ -67,8 +67,8 @@ function startingRecord(overrides: Partial<IdempotencyRecord> = {}): Idempotency
     last_transition_attempt_count: null,
     evidence_source: null,
     core_committed: false,
-    recovery_stage: RecoveryStage.detect,
-    recovery_mode: RecoveryMode.FIRST_RUN,
+    recovery_stage: RecoveryStage.NONE,
+    recovery_mode: RecoveryMode.NORMAL,
     previous_last_error: null,
     created_at: '2026-05-20 22:10',
     updated_at: '2026-05-20 22:10',
@@ -239,7 +239,7 @@ describe('IdempotencyRepository', () => {
           status: IdempotencyStatus.starting,
           lease_owner: 'req-aaa',
           attempt_count: 1,
-          recovery_mode: RecoveryMode.FIRST_RUN,
+          recovery_mode: RecoveryMode.NORMAL,
         },
         mutation: {
           set: {

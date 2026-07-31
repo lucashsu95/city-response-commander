@@ -24,6 +24,7 @@
  * @module backend/recovery/recovery_gate
  */
 
+import { RecoveryMode } from '@city-commander/shared-schemas';
 import type { NarrativeType } from '@city-commander/shared-schemas';
 import type { IdempotencyReader } from '../repository/idempotency_repository.js';
 import type { DecisionCoreReadPort } from '../repository/decision_core_reader.js';
@@ -41,19 +42,10 @@ import { ReaderUsageError } from '../repository/read_errors.js';
  *   would attempt to rewrite an immutable record. Only the missing narrative
  *   items are regenerated, and `fast_path_ready` is not re-emitted.
  *
- * Declared locally on purpose: `shared-schemas`' `RecoveryMode` currently holds
- * a different member set (`FIRST_RUN` / `STALE_RECOVERY` / `START_FAILED_RETRY`)
- * than design §10.11e requires (`NORMAL` / `FULL_WORKFLOW` / `ENRICHMENT_ONLY`).
- * Once that enum is corrected by its owner (TASK-003), this alias should be
- * replaced by the shared enum; the string values here already match the design,
- * so the migration is type-only.
+ * A strict subset of the shared `RecoveryMode`: the gate can never recommend
+ * `NORMAL`, because `NORMAL` means "not a recovery at all".
  */
-export type RecommendedRecoveryMode = 'FULL_WORKFLOW' | 'ENRICHMENT_ONLY';
-
-export const RecommendedRecoveryMode = {
-  FULL_WORKFLOW: 'FULL_WORKFLOW',
-  ENRICHMENT_ONLY: 'ENRICHMENT_ONLY',
-} as const satisfies Record<string, RecommendedRecoveryMode>;
+export type RecommendedRecoveryMode = RecoveryMode.FULL_WORKFLOW | RecoveryMode.ENRICHMENT_ONLY;
 
 // ─── Result ────────────────────────────────────────────────
 
@@ -154,7 +146,7 @@ function unresolvableResult(idempotencyKey: string): RecoveryGateResult {
     // to run the whole workflow. The caller still decides what to do with it —
     // for the ENRICHMENT_ONLY branch, `core_exists=false` means
     // MARK_PROCESSING_FAILED with RECOVERY_CORE_MISSING (§15.2), not an enrich.
-    recommended_recovery_mode: RecommendedRecoveryMode.FULL_WORKFLOW,
+    recommended_recovery_mode: RecoveryMode.FULL_WORKFLOW,
     expected_stale_execution_arn: null,
     expected_attempt: null,
     observed_running_deadline_at: null,
@@ -221,8 +213,8 @@ export async function evaluateRecoveryGate(
     existing_narrative_types: existing,
     missing_narrative_types: missing,
     recommended_recovery_mode: effectiveCoreCommitted
-      ? RecommendedRecoveryMode.ENRICHMENT_ONLY
-      : RecommendedRecoveryMode.FULL_WORKFLOW,
+      ? RecoveryMode.ENRICHMENT_ONLY
+      : RecoveryMode.FULL_WORKFLOW,
     expected_stale_execution_arn: record?.workflow_execution_arn ?? null,
     expected_attempt: record?.attempt_count ?? null,
     observed_running_deadline_at: record?.running_deadline_at ?? null,

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * TASK-095 — applyOrConfirm unit tests.
  *
  * Verifies the three-way classification every fenced status action depends on:
@@ -69,8 +69,8 @@ function runningRecord(overrides: Partial<IdempotencyRecord> = {}): IdempotencyR
     // shared-schemas currently defines different members (pending member 1's fix),
     // so the fixture uses the values that exist today. applyOrConfirm never reads
     // these fields, so the classification logic is unaffected either way.
-    recovery_stage: RecoveryStage.detect,
-    recovery_mode: RecoveryMode.FIRST_RUN,
+    recovery_stage: RecoveryStage.NONE,
+    recovery_mode: RecoveryMode.NORMAL,
     previous_last_error: null,
     created_at: '2026-05-20 22:10',
     updated_at: '2026-05-20 22:10',

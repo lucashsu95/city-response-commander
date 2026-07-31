@@ -5,4 +5,5 @@ export * from './inject/index.js';
 export * from './recovery/index.js';
 export * from './repository/index.js';
 export * from './resilience/index.js';
+export * from './time/index.js';
 export * from './workflow/index.js';

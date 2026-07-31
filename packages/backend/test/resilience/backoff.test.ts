@@ -1,4 +1,4 @@
-/**
+﻿/**
  * TASK-157 — throttling / exponential backoff unit tests.
  *
  * Time is injected, so nothing here waits in real time. The properties under

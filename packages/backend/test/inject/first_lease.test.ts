@@ -1,4 +1,4 @@
-/**
+﻿/**
  * TASK-086 — idempotency key derivation + first lease acquisition unit tests.
  *
  * Locks the §10.11e / §15.2 contract: the key is
@@ -46,8 +46,8 @@ function leaseInput(overrides: Partial<AcquireFirstLeaseInput> = {}): AcquireFir
     clock: { nowEpochMs: NOW_MS, nowDisplay: NOW_DISPLAY },
     durations: { leaseTtlMs: LEASE_TTL_MS, recordTtlMs: RECORD_TTL_MS },
     // shared-schemas has no NORMAL / NONE member yet; design §15.2 expects those.
-    recoveryMode: RecoveryMode.FIRST_RUN,
-    recoveryStage: RecoveryStage.detect,
+    recoveryMode: RecoveryMode.NORMAL,
+    recoveryStage: RecoveryStage.NONE,
     ...overrides,
   };
 }

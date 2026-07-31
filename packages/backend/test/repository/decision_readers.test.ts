@@ -1,4 +1,4 @@
-/**
+﻿/**
  * TASK-093 support — DecisionCoreReader / DecisionNarrativeReader unit tests.
  *
  * The two properties these readers exist to guarantee:

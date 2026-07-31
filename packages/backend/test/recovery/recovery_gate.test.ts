@@ -1,4 +1,4 @@
-/**
+﻿/**
  * TASK-093 — RecoveryGateFn unit tests.
  *
  * Covers both recovery paths (FULL_WORKFLOW / ENRICHMENT_ONLY), the table-miss
@@ -20,7 +20,6 @@ import type {
 } from '@city-commander/shared-schemas';
 import {
   evaluateRecoveryGate,
-  RecommendedRecoveryMode,
   RecoveryGate,
   ReaderUsageError,
   TableReadError,
@@ -57,8 +56,8 @@ function record(overrides: Partial<IdempotencyRecord> = {}): IdempotencyRecord {
     core_committed: false,
     // shared-schemas currently exposes a different member set than design
     // §10.11e; the gate never reads these fields.
-    recovery_stage: RecoveryStage.detect,
-    recovery_mode: RecoveryMode.FIRST_RUN,
+    recovery_stage: RecoveryStage.NONE,
+    recovery_mode: RecoveryMode.NORMAL,
     previous_last_error: null,
     created_at: '2026-05-20 22:10',
     updated_at: '2026-05-20 22:10',
@@ -115,7 +114,7 @@ describe('RecoveryGate — FULL_WORKFLOW', () => {
     expect(result.core_exists).toBe(false);
     expect(result.idempotency_core_committed).toBe(false);
     expect(result.effective_core_committed).toBe(false);
-    expect(result.recommended_recovery_mode).toBe(RecommendedRecoveryMode.FULL_WORKFLOW);
+    expect(result.recommended_recovery_mode).toBe(RecoveryMode.FULL_WORKFLOW);
   });
 
   it('reports all three narrative types as missing when none exist', async () => {
@@ -142,7 +141,7 @@ describe('RecoveryGate — FULL_WORKFLOW', () => {
 
     const result = await evaluateRecoveryGate(ports, { idempotencyKey: KEY });
 
-    expect(result.recommended_recovery_mode).toBe(RecommendedRecoveryMode.FULL_WORKFLOW);
+    expect(result.recommended_recovery_mode).toBe(RecoveryMode.FULL_WORKFLOW);
   });
 });
 
@@ -156,7 +155,7 @@ describe('RecoveryGate — ENRICHMENT_ONLY', () => {
 
     expect(result.core_exists).toBe(true);
     expect(result.effective_core_committed).toBe(true);
-    expect(result.recommended_recovery_mode).toBe(RecommendedRecoveryMode.ENRICHMENT_ONLY);
+    expect(result.recommended_recovery_mode).toBe(RecoveryMode.ENRICHMENT_ONLY);
   });
 
   it('recommends ENRICHMENT_ONLY when only the checkpoint flag is set', async () => {
@@ -169,7 +168,7 @@ describe('RecoveryGate — ENRICHMENT_ONLY', () => {
     expect(result.idempotency_core_committed).toBe(true);
     expect(result.core_exists).toBe(false);
     expect(result.effective_core_committed).toBe(true);
-    expect(result.recommended_recovery_mode).toBe(RecommendedRecoveryMode.ENRICHMENT_ONLY);
+    expect(result.recommended_recovery_mode).toBe(RecoveryMode.ENRICHMENT_ONLY);
   });
 
   it('computes effective_core_committed as a strict OR', async () => {
@@ -269,7 +268,7 @@ describe('RecoveryGate — table-miss boundaries', () => {
     expect(result.idempotency_record_exists).toBe(false);
     expect(result.decision_id).toBe(DECISION);
     expect(result.core_exists).toBe(true);
-    expect(result.recommended_recovery_mode).toBe(RecommendedRecoveryMode.ENRICHMENT_ONLY);
+    expect(result.recommended_recovery_mode).toBe(RecoveryMode.ENRICHMENT_ONLY);
     expect(result.expected_stale_execution_arn).toBeNull();
     expect(result.expected_attempt).toBeNull();
   });
@@ -295,7 +294,7 @@ describe('RecoveryGate — table-miss boundaries', () => {
     expect(result.decision_id).toBe('');
     expect(result.core_exists).toBe(false);
     expect(result.effective_core_committed).toBe(false);
-    expect(result.recommended_recovery_mode).toBe(RecommendedRecoveryMode.FULL_WORKFLOW);
+    expect(result.recommended_recovery_mode).toBe(RecoveryMode.FULL_WORKFLOW);
     expect(result.missing_narrative_types).toEqual([]);
     // Nothing to look up: no core / narrative read is attempted.
     expect(ports.readCore).not.toHaveBeenCalled();
@@ -383,7 +382,7 @@ describe('RecoveryGate class', () => {
 
     const result = await gate.evaluate({ idempotencyKey: KEY });
 
-    expect(result.recommended_recovery_mode).toBe(RecommendedRecoveryMode.ENRICHMENT_ONLY);
+    expect(result.recommended_recovery_mode).toBe(RecoveryMode.ENRICHMENT_ONLY);
   });
 });
 
