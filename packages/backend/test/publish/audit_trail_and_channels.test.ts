@@ -317,6 +317,23 @@ describe('dispatchChannels — 模擬通道', () => {
     expect(smsText).toHaveLength(160);
   });
 
+  it('SMS 優先發布多語 PublicAlert 的繁中內容', () => {
+    const logs: string[] = [];
+    dispatchChannels({
+      record: publishedRecord,
+      cmsCoreText: 'CMS 核心文字',
+      publicAlertText: {
+        zh: '多語 PublicAlert 繁中通報',
+        en: 'English public alert',
+      },
+      logger: (m) => logs.push(m),
+    });
+    const smsLog = logs.find((m) => m.includes('[SMS_MOCK]'))!;
+
+    expect(smsLog).toContain('多語 PublicAlert 繁中通報');
+    expect(smsLog).not.toContain('CMS 核心文字');
+  });
+
   it('非 published 狀態 → 防禦性拒絕，不執行任何通道', () => {
     const result = dispatchChannels({
       record: { ...publishedRecord, publish_state: PublishStatus.approved },

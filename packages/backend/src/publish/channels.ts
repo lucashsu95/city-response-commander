@@ -208,8 +208,9 @@ function simulateSmsChannel(
   logger: (msg: string) => void = console.log,
 ): ChannelResult {
   try {
-    // SMS 通常比 CMS 更短，取前 160 字元
-    const smsText = payload.cms_core_text.slice(0, 160);
+    // SMS 優先發布繁中 PublicAlert；沒有警示文字時才回退 CMS 核心文字
+    const alertText = payload.public_alert_text?.zh ?? Object.values(payload.public_alert_text ?? {})[0];
+    const smsText = (alertText ?? payload.cms_core_text).slice(0, 160);
     logger(
       `[SMS_MOCK] 發布簡訊 | decision_id=${payload.decision_id} | ` +
         `sms_text="${smsText}" | at=${payload.published_at}`,
