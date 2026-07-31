@@ -30,3 +30,6 @@ export type { MarkProcessingFailedContext } from './mark_processing_failed.js';
 
 export { reconcileStaleRunning } from './reconcile_stale_running.js';
 export type { ReconcileStaleRunningInput } from './reconcile_stale_running.js';
+
+export { markCoreCommitted } from './mark_core_committed.js';
+export type { MarkCoreCommittedContext } from './mark_core_committed.js';
