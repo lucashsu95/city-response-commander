@@ -272,6 +272,16 @@ export const CONFIG_SCHEMA: readonly ConfigKeyDefinition[] = [
     description: 'Orchestration engine (deployment-time choice)',
     isProvisionalPolicy: false,
   },
+  {
+    key: 'orchestration.state_machine_arn',
+    type: 'string',
+    required: false,
+    description:
+      'Step Functions state machine ARN backing the orchestrator (TASK-083/TASK-180 wiring). ' +
+      'Optional: when absent, the runtime returns a controlled 503. No placeholder ARN ' +
+      'is shipped from the schema and the value is not hard-coded to any region/account/name.',
+    isProvisionalPolicy: false,
+  },
 
   // ── Enrichment ──
   {

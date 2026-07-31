@@ -8,7 +8,7 @@ import { aggregateArticles } from '../../src/rule_engine/article_aggregation.js'
 import { incidentAnchorFromLocationText } from '../../src/strategies/incident_anchor_resolution_strategy.js';
 import { displayOnlyAffectedRoadStrategy } from '../../src/strategies/affected_road_strategy.js';
 import { incidentPrimaryAndSelectedSecondary, selectLatestCommonExactSnapshot } from '../../src/strategies/ete_affected_set_strategy.js';
-import { calculateEte } from '../../src/rule_engine/ete_calculator.js';
+import { calculateEte } from '../../src/ete/ete_calculator.js';
 import { buildDecisionCore } from '../../src/decision/decision_core_builder.js';
 import { baseCoreInput, makeIncident, roadNetwork } from '../helpers/domain-fixtures.js';
 

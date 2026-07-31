@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { IncidentStatus, IncidentType, Severity } from '@city-commander/shared-schemas';
 import { evaluateArticle5 } from '../../src/rule_engine/article5.js';
-import { calculateEte } from '../../src/rule_engine/ete_calculator.js';
+import { calculateEte } from '../../src/ete/ete_calculator.js';
 import { incidentPrimaryAndSelectedSecondary, selectLatestCommonExactSnapshot } from '../../src/strategies/ete_affected_set_strategy.js';
 import { displayOnlyAffectedRoadStrategy } from '../../src/strategies/affected_road_strategy.js';
 import { unresolvedManualConfirmation } from '../../src/strategies/affected_intersection_scope_strategy.js';
