@@ -687,6 +687,16 @@
         "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
         "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
         "timestamp": 1784892271585
+      },
+      {
+        "executionId": "e4aec766-1745-4486-a0f0-3cbdab41bd16",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1785464058673
+      },
+      {
+        "executionId": "e4aec766-1745-4486-a0f0-3cbdab41bd16",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1785464495259
       }
     ],
     "TASK-060 DataStack: S3 buckets (raw, sop_source, artifact)": [
@@ -694,6 +704,16 @@
         "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
         "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
         "timestamp": 1784892271592
+      },
+      {
+        "executionId": "e4aec766-1745-4486-a0f0-3cbdab41bd16",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1785464510537
+      },
+      {
+        "executionId": "e4aec766-1745-4486-a0f0-3cbdab41bd16",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1785464739324
       }
     ],
     "TASK-061 DataStack: IdempotencyTable (DynamoDB) with TTL": [
@@ -701,6 +721,16 @@
         "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
         "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
         "timestamp": 1784892271599
+      },
+      {
+        "executionId": "e4aec766-1745-4486-a0f0-3cbdab41bd16",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1785464753537
+      },
+      {
+        "executionId": "e4aec766-1745-4486-a0f0-3cbdab41bd16",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1785465013531
       }
     ],
     "TASK-062 DataStack: DecisionCoreTable (immutable) DynamoDB": [
@@ -708,6 +738,16 @@
         "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
         "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
         "timestamp": 1784892271607
+      },
+      {
+        "executionId": "e4aec766-1745-4486-a0f0-3cbdab41bd16",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1785465018176
+      },
+      {
+        "executionId": "e4aec766-1745-4486-a0f0-3cbdab41bd16",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1785465023063
       }
     ],
     "TASK-063 DataStack: DecisionNarrativeTable (PK decision_id + SK narrative_type)": [
@@ -715,6 +755,16 @@
         "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
         "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
         "timestamp": 1784892271613
+      },
+      {
+        "executionId": "e4aec766-1745-4486-a0f0-3cbdab41bd16",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1785465027895
+      },
+      {
+        "executionId": "e4aec766-1745-4486-a0f0-3cbdab41bd16",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1785465033380
       }
     ],
     "TASK-064 DataStack: PublishRecordTable (DynamoDB)": [
@@ -722,6 +772,16 @@
         "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
         "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
         "timestamp": 1784892271620
+      },
+      {
+        "executionId": "e4aec766-1745-4486-a0f0-3cbdab41bd16",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1785465038025
+      },
+      {
+        "executionId": "e4aec766-1745-4486-a0f0-3cbdab41bd16",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1785465040571
       }
     ],
     "TASK-065 DataStack: connections table (WebSocket)": [
@@ -729,6 +789,16 @@
         "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
         "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
         "timestamp": 1784892271627
+      },
+      {
+        "executionId": "e4aec766-1745-4486-a0f0-3cbdab41bd16",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1785465045254
+      },
+      {
+        "executionId": "e4aec766-1745-4486-a0f0-3cbdab41bd16",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1785465053138
       }
     ],
     "TASK-066 DataStack: Bedrock Knowledge Base, data source, and vector store config": [
@@ -736,6 +806,11 @@
         "executionId": "bec2f210-e3eb-48b8-a8e0-c126b861475b",
         "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
         "timestamp": 1784892271634
+      },
+      {
+        "executionId": "e4aec766-1745-4486-a0f0-3cbdab41bd16",
+        "chatSessionId": "sess_25da9f67-74b6-4855-b477-0b01c3c92a47",
+        "timestamp": 1785465063562
       }
     ],
     "TASK-067 ComputeStack: Lambda function definitions (all 10 runtime handlers)": [

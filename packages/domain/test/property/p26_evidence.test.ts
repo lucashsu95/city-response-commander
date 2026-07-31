@@ -1,7 +1,7 @@
 import * as fc from 'fast-check';
 import { describe, expect } from 'vitest';
 import type { RouteCandidate } from '@city-commander/shared-schemas';
-import { buildEvidenceTrace } from '../../src/rule_engine/evidence_trace_builder.js';
+import { buildEvidenceTrace } from '../../src/evidence/evidence_trace_builder.js';
 import { propertyTest } from '../helpers/pbt-helper.js';
 
 describe('Evidence-chain properties', () => {

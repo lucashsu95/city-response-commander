@@ -1,7 +1,7 @@
 import * as fc from 'fast-check';
 import { describe, expect } from 'vitest';
 import { Severity } from '@city-commander/shared-schemas';
-import { calculateEte } from '../../src/rule_engine/ete_calculator.js';
+import { calculateEte } from '../../src/ete/ete_calculator.js';
 import { propertyTest } from '../helpers/pbt-helper.js';
 
 describe('ETE penalty properties', () => {
