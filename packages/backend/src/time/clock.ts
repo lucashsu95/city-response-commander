@@ -60,6 +60,29 @@ export function formatTaipeiDisplay(epochMs: number): string {
 }
 
 /**
+ * Format an epoch timestamp as ISO-8601 with an explicit `+08:00` offset.
+ *
+ * Used for structured logs, which need sub-minute precision that the SOP art.6
+ * display format (`YYYY-MM-DD HH:MM`) does not carry. The offset is written out
+ * rather than using `Z`, so a log line read on any machine is unambiguous about
+ * which wall clock it refers to.
+ *
+ * @example
+ * ```ts
+ * formatTaipeiIso(Date.UTC(2026, 4, 20, 14, 10, 30, 123)); // '2026-05-20T22:10:30.123+08:00'
+ * ```
+ */
+export function formatTaipeiIso(epochMs: number): string {
+  if (!Number.isFinite(epochMs)) {
+    throw new RangeError(`formatTaipeiIso requires a finite epoch, got ${String(epochMs)}.`);
+  }
+
+  const shifted = new Date(epochMs + TAIPEI_OFFSET_MS);
+  const date = shifted.toISOString().slice(0, 23);
+  return `${date}+08:00`;
+}
+
+/**
  * Parse a `YYYY-MM-DD HH:MM` Asia/Taipei display string back to epoch ms.
  *
  * The inverse of {@link formatTaipeiDisplay} at minute precision. Used where an

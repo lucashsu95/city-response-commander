@@ -6,6 +6,7 @@
 
 export {
   formatTaipeiDisplay,
+  formatTaipeiIso,
   parseTaipeiDisplay,
   taipeiClockAt,
   systemInjectionClock,

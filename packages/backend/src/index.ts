@@ -5,6 +5,7 @@ export * from './errors/index.js';
 export * from './events/index.js';
 export * from './handlers/index.js';
 export * from './inject/index.js';
+export * from './logging/index.js';
 export * from './metrics/index.js';
 export * from './read_model/index.js';
 export * from './recovery/index.js';
