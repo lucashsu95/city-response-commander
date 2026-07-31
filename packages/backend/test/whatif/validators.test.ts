@@ -22,7 +22,7 @@
 
 import * as fc from 'fast-check';
 import { describe, it, expect } from 'vitest';
-import { validateScenario } from '../../src/whatif/validators.js';
+import { validateScenario } from './loaded_entities.js';
 import type { WhatIfAssumption } from '../../src/whatif/whatif_types.js';
 
 // ─── Fixture helpers ──────────────────────────────────────────────────────
@@ -97,6 +97,14 @@ describe('validateScenario — happy path', () => {
 // ─── Schema validation failures ───────────────────────────────────────────
 
 describe('validateScenario — SchemaValidator failures', () => {
+  it('prefix-valid but unloaded entity → clarification_required', () => {
+    const result = validateScenario([makeAssumption({ entity_id: 'BS_FAKE_999' })]);
+    expect(result.validation_status).toBe('clarification_required');
+    if (result.validation_status === 'clarification_required') {
+      expect(result.clarification_prompt).toContain('不存在於目前載入');
+    }
+  });
+
   it('empty entity_id prefix → clarification_required', () => {
     const result = validateScenario([makeAssumption({ entity_id: 'UNKNOWN_123' })]);
     expect(result.validation_status).toBe('clarification_required');

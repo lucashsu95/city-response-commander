@@ -37,7 +37,7 @@ import { SCHEMA_VERSION } from '@city-commander/shared-schemas';
 import type { BedrockInvoker, SopRetriever } from '@city-commander/rag';
 import { parseScenario } from './scenario_parser.js';
 import { validateScenario } from './validators.js';
-import { recompute } from './recompute.js';
+import { recompute, type RuleEngineWhatIfFacade } from './recompute.js';
 import { explainWhatIf } from './explanation.js';
 
 // ─── Handler dependencies (injected for testability) ─────────────────────────
@@ -55,6 +55,8 @@ export interface WhatIfFnDependencies {
   readonly bedrockInvoker: BedrockInvoker;
   /** SopRetriever（生產: createSopRetriever()；測試: stub） */
   readonly sopRetriever: SopRetriever;
+  /** Member-1-owned single facade for baseline loading and full deterministic reruns. */
+  readonly ruleEngineFacade: RuleEngineWhatIfFacade;
 }
 
 // ─── HTTP helpers ─────────────────────────────────────────────────────────────
@@ -227,7 +229,7 @@ function extractRequestId(event: APIGatewayProxyEventV2): string {
 export function createWhatIfHandler(
   deps: WhatIfFnDependencies,
 ): (event: APIGatewayProxyEventV2) => Promise<APIGatewayProxyResultV2> {
-  const { bedrockInvoker, sopRetriever } = deps;
+  const { bedrockInvoker, sopRetriever, ruleEngineFacade } = deps;
 
   return async function whatIfHandler(
     event: APIGatewayProxyEventV2,
@@ -276,8 +278,15 @@ export function createWhatIfHandler(
         return jsonResponse(200, clarificationResponse);
       }
 
+      // Load once, then use the same immutable baseline for entity validation
+      // and the complete Rule Engine rerun. No production state is modified.
+      const baseline = await ruleEngineFacade.loadBaseline(event);
+
       // ── Stage 2: SchemaValidator + DomainValidator ────────────────────────
-      const validateResult = validateScenario(parseResult.assumptions);
+      const validateResult = validateScenario(
+        parseResult.assumptions,
+        baseline.loadedEntities,
+      );
 
       if (validateResult.validation_status === 'clarification_required') {
         // stage 2 驗證失敗 → 立即回應，不進入 stage 3/4
@@ -299,6 +308,8 @@ export function createWhatIfHandler(
 
       // ── Stage 3: deterministic recompute（Rule Engine，零寫入）───────────
       const recomputeResult = recompute({
+        facade: ruleEngineFacade,
+        baseline,
         assumptions: validateResult.validated_assumptions,
       });
 

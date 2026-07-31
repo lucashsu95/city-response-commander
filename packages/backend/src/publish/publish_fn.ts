@@ -78,6 +78,17 @@ export interface PublishFnDependencies {
   ) => Promise<Partial<Record<string, string>> | null>;
 
   /**
+   * Atomically claim the right to execute external publish side effects for
+   * `(decision_id, approved_version)`. The production adapter may use a
+   * conditional idempotency-token Put or an outbox claim. Exactly one caller
+   * may receive `ACQUIRED` for a given pair.
+   */
+  readonly acquirePublishDispatch: (
+    decisionId: string,
+    approvedVersion: number,
+  ) => Promise<'ACQUIRED' | 'ALREADY_CLAIMED'>;
+
+  /**
    * 寫入（新建或更新）PublishRecord。
    * 委派實作 publish state machine（TASK-145 的邏輯）。
    *
@@ -315,6 +326,7 @@ export function createPublishHandler(
     readPublishRecord,
     readCmsCoreText,
     readPublicAlertText,
+    acquirePublishDispatch,
     writePublishRecord,
     realtimePublisher,
   } = deps;
@@ -451,10 +463,23 @@ export function createPublishHandler(
       const shouldDispatchChannels = shouldEmitPublicAlertReady(idempotencyResult, targetState);
 
       if (shouldDispatchChannels) {
+        // Read-only payload preparation may fail safely before taking the claim.
         const cmsCoreText = await readCmsCoreText(decisionId) ?? '';
         const publicAlertText = readPublicAlertText
           ? (await readPublicAlertText(decisionId)) ?? undefined
           : undefined;
+
+        // Acquire the idempotency token BEFORE CMS/SMS. Optimistic locking the
+        // final PublishRecord after dispatch is too late: two concurrent
+        // approved→published requests could both send and only then conflict.
+        const dispatchClaim = await acquirePublishDispatch(decisionId, currentVersion);
+        if (dispatchClaim === 'ALREADY_CLAIMED') {
+          return errorResponse(
+            409,
+            'PUBLISH_DISPATCH_ALREADY_CLAIMED',
+            '另一個發布請求已取得本版本的派送權，請重新讀取發布狀態。',
+          );
+        }
         const channelResult = dispatchChannels({
           record: newRecord,
           cmsCoreText,

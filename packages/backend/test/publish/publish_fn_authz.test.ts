@@ -48,6 +48,7 @@ function makeDeps(overrides: Partial<PublishFnDependencies> = {}): PublishFnDepe
     readDecisionCoreStatus: async () => ({ exists: true, core_committed: true }),
     readPublishRecord: async () => null,
     readCmsCoreText: async () => 'cms',
+    acquirePublishDispatch: async () => 'ACQUIRED',
     writePublishRecord: async (record) => ({ success: true, record }),
     ...overrides,
   };

@@ -13,9 +13,34 @@
 import { describe, it, expect, vi } from 'vitest';
 import type { APIGatewayProxyEventV2 } from 'aws-lambda';
 import type { BedrockInvoker, BedrockResult, SopRetriever } from '@city-commander/rag';
-import { createWhatIfHandler } from '../../src/whatif/whatif_fn.js';
+import {
+  createWhatIfHandler as createRawWhatIfHandler,
+  type WhatIfFnDependencies,
+} from '../../src/whatif/whatif_fn.js';
+import type { RuleEngineWhatIfFacade } from '../../src/whatif/recompute.js';
+import { LOADED_ENTITIES } from './loaded_entities.js';
 
 const OPERATOR = 'cognito-sub-operator-1';
+
+const ruleEngineFacade: RuleEngineWhatIfFacade = {
+  async loadBaseline() {
+    return { inputSnapshot: { fixture: 'full-input-copy' }, loadedEntities: LOADED_ENTITIES };
+  },
+  rerun({ assumptions }) {
+    const userCount = assumptions.find((item) => item.field === 'User_Count')?.value;
+    return {
+      triggered_articles: userCount !== undefined && userCount > 25_000 ? [3] : [],
+      applied_formula_articles: [],
+      expected_actions: userCount !== undefined && userCount > 25_000 ? ['SOP-3：啟動分流'] : [],
+    };
+  },
+};
+
+function createWhatIfHandler(
+  deps: Omit<WhatIfFnDependencies, 'ruleEngineFacade'>,
+): ReturnType<typeof createRawWhatIfHandler> {
+  return createRawWhatIfHandler({ ...deps, ruleEngineFacade });
+}
 
 // ─── Stubs ────────────────────────────────────────────────────────────────────
 

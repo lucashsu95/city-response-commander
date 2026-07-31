@@ -1,325 +1,85 @@
-/**
- * recompute - unit tests (TASK-139, P28)
- *
- * Validates:
- * - BL17 User_Count = 40000 -> SOP-3 triggered (article 3 in triggered_articles)
- * - BL17 User_Count = 25000 -> SOP-3 NOT triggered (boundary: strictly > 25000)
- * - BL17 Growth_Rate = 0.31 -> SOP-3 triggered
- * - BL17 Growth_Rate = 0.30 -> SOP-3 NOT triggered (boundary: strictly > 0.30)
- * - Saturation_Score = 0.95 -> A level (article 1 triggered)
- * - Saturation_Score = 0.85 -> B level (article 1 triggered)
- * - Saturation_Score = 0.84 -> normal (article 1 NOT triggered)
- * - Roaming_User_Pct = 0.30 -> SOP-6 triggered (article 6 in triggered_articles)
- * - Roaming_User_Pct = 0.29 -> NOT triggered
- * - does_not_mutate_state = true (static type guarantee)
- * - expected_actions non-empty when triggered
- * - ete_preview present when Saturation_Score assumption exists
- * - P28: recompute never mutates state
- */
+/** What-if stage-3 ownership-boundary tests (TASK-139, P28). */
 
 import * as fc from 'fast-check';
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
-  classifySegments,
-  evaluateArticle1,
-  evaluateArticle3,
-  evaluateArticle6,
-  aggregateArticles,
-  ARTICLE3_STATION_ID,
-} from '@city-commander/domain';
-import { Severity } from '@city-commander/shared-schemas';
-import { recompute } from '../../src/whatif/recompute.js';
+  recompute,
+  type RuleEngineWhatIfBaseline,
+  type RuleEngineWhatIfFacade,
+} from '../../src/whatif/recompute.js';
 import type { WhatIfAssumption } from '../../src/whatif/whatif_types.js';
+import { LOADED_ENTITIES } from './loaded_entities.js';
 
-// ─── Fixture helpers ──────────────────────────────────────────────────────
+const baseline: RuleEngineWhatIfBaseline = {
+  inputSnapshot: Object.freeze({ source: 'full-loaded-input-copy', untouched: true }),
+  loadedEntities: LOADED_ENTITIES,
+};
 
-function makeBL17Count(value: number): WhatIfAssumption {
+function assumption(value = 40_000): WhatIfAssumption {
   return { entity_id: 'BS_MRT_BL17', field: 'User_Count', operator: '=', value };
 }
 
-function makeBL17Growth(value: number): WhatIfAssumption {
-  return { entity_id: 'BS_MRT_BL17', field: 'Growth_Rate', operator: '=', value };
-}
+describe('recompute — member-1 facade delegation', () => {
+  it('passes the complete opaque baseline and validated assumptions to one facade call', () => {
+    const rerun = vi.fn(() => ({
+      triggered_articles: [3],
+      applied_formula_articles: [7],
+      expected_actions: ['SOP-3：啟動分流'],
+      ete_minutes: 42,
+    }));
+    const facade: RuleEngineWhatIfFacade = {
+      loadBaseline: vi.fn(),
+      rerun,
+    };
+    const assumptions = [assumption()];
 
-function makeSaturation(segmentId: string, value: number): WhatIfAssumption {
-  return { entity_id: segmentId, field: 'Saturation_Score', operator: '=', value };
-}
+    const result = recompute({ facade, baseline, assumptions });
 
-function makeRoaming(bsId: string, value: number): WhatIfAssumption {
-  return { entity_id: bsId, field: 'Roaming_User_Pct', operator: '=', value };
-}
-
-// ─── SOP-3 (BL17 User_Count / Growth_Rate) ───────────────────────────────
-
-describe('recompute - SOP-3 (BL17)', () => {
-  it('User_Count = 40000 -> article 3 triggered', () => {
-    const result = recompute({ assumptions: [makeBL17Count(40000)] });
-    expect(result.triggered_articles).toContain(3);
-    expect(result.does_not_mutate_state).toBe(true);
-  });
-
-  it('User_Count = 25001 -> article 3 triggered (strictly > 25000)', () => {
-    const result = recompute({ assumptions: [makeBL17Count(25001)] });
-    expect(result.triggered_articles).toContain(3);
-  });
-
-  it('User_Count = 25000 -> NOT triggered (boundary: must be strictly > 25000)', () => {
-    const result = recompute({ assumptions: [makeBL17Count(25000)] });
-    expect(result.triggered_articles).not.toContain(3);
-  });
-
-  it('Growth_Rate = 0.31 -> article 3 triggered', () => {
-    const result = recompute({ assumptions: [makeBL17Growth(0.31)] });
-    expect(result.triggered_articles).toContain(3);
-  });
-
-  it('Growth_Rate = 0.30 -> NOT triggered (boundary: must be strictly > 0.30)', () => {
-    const result = recompute({ assumptions: [makeBL17Growth(0.30)] });
-    expect(result.triggered_articles).not.toContain(3);
-  });
-
-  it('User_Count OR Growth_Rate -> article 3 triggered (OR logic)', () => {
-    const r1 = recompute({ assumptions: [makeBL17Growth(0.5)] });
-    expect(r1.triggered_articles).toContain(3);
-    const r2 = recompute({ assumptions: [makeBL17Count(30000)] });
-    expect(r2.triggered_articles).toContain(3);
-  });
-
-  it('triggered SOP-3 -> expected_actions non-empty', () => {
-    const result = recompute({ assumptions: [makeBL17Count(40000)] });
-    expect(result.expected_actions.length).toBeGreaterThan(0);
-  });
-});
-
-// ─── SOP-1 (Saturation_Score) ─────────────────────────────────────────────
-
-describe('recompute - SOP-1 (Saturation_Score)', () => {
-  it('Saturation_Score = 0.95 -> A level -> article 1 triggered', () => {
-    const result = recompute({ assumptions: [makeSaturation('RD_TPE_001', 0.95)] });
-    expect(result.triggered_articles).toContain(1);
-  });
-
-  it('Saturation_Score = 0.85 -> B level -> article 1 triggered', () => {
-    const result = recompute({ assumptions: [makeSaturation('RD_TPE_001', 0.85)] });
-    expect(result.triggered_articles).toContain(1);
-  });
-
-  it('Saturation_Score = 0.84 -> normal -> article 1 NOT triggered', () => {
-    const result = recompute({ assumptions: [makeSaturation('RD_TPE_001', 0.84)] });
-    expect(result.triggered_articles).not.toContain(1);
-  });
-
-  it('Saturation_Score = 0.9499 -> B level (boundary)', () => {
-    const result = recompute({ assumptions: [makeSaturation('RD_TPE_001', 0.9499)] });
-    expect(result.triggered_articles).toContain(1);
-  });
-
-  it('no Saturation_Score hypothesis -> ete_preview absent', () => {
-    const result = recompute({ assumptions: [makeBL17Count(40000)] });
-    expect(result.ete_preview).toBeUndefined();
-  });
-});
-
-// ─── ETE preview（severity 必須明確給定，公式委派 domain）────────────────────
-
-describe('recompute - ete_preview requires an explicit severity', () => {
-  it('Saturation_Score hypothesis WITHOUT severity -> ete_preview absent (不猜測 base_clearance)', () => {
-    const result = recompute({ assumptions: [makeSaturation('RD_TPE_002', 0.9)] });
-    expect(result.ete_preview).toBeUndefined();
-    // 沒有套用 art.7 公式就不得列入 applied_formula_articles
-    expect(result.applied_formula_articles).not.toContain(7);
-  });
-
-  it('Saturation_Score hypothesis WITH severity -> ete_preview from domain calculateEte()', () => {
-    const result = recompute({
-      assumptions: [makeSaturation('RD_TPE_002', 0.9)],
-      severity: Severity.High,
+    expect(rerun).toHaveBeenCalledTimes(1);
+    expect(rerun).toHaveBeenCalledWith({ baseline, assumptions });
+    expect(result).toEqual({
+      triggered_articles: [3],
+      applied_formula_articles: [7],
+      expected_actions: ['SOP-3：啟動分流'],
+      ete_preview: { ete_minutes: 42 },
+      does_not_mutate_state: true,
     });
-    // domain SOP-7 公式：base_clearance(High)=40 + max(0,(0.9-0.5)*60)=24 → 64
-    expect(result.ete_preview?.ete_minutes).toBe(64);
-    expect(result.applied_formula_articles).toContain(7);
   });
 
-  it('severity 改變 base_clearance（Critical=60 / High=40 / Medium=20，REQ-009）', () => {
-    const assumptions = [makeSaturation('RD_TPE_002', 0.5)]; // penalty = 0
-    expect(
-      recompute({ assumptions, severity: Severity.Critical }).ete_preview?.ete_minutes,
-    ).toBe(60);
-    expect(recompute({ assumptions, severity: Severity.High }).ete_preview?.ete_minutes).toBe(40);
-    expect(recompute({ assumptions, severity: Severity.Medium }).ete_preview?.ete_minutes).toBe(20);
+  it('does not invent an ETE preview when the facade does not return one', () => {
+    const facade: RuleEngineWhatIfFacade = {
+      loadBaseline: vi.fn(),
+      rerun: () => ({
+        triggered_articles: [],
+        applied_formula_articles: [],
+        expected_actions: [],
+      }),
+    };
+
+    expect(recompute({ facade, baseline, assumptions: [] })).not.toHaveProperty('ete_preview');
   });
 
-  it('no segment hypothesis + severity -> ete_preview absent（無 saturation 讀數）', () => {
-    const result = recompute({
-      assumptions: [makeBL17Count(40000)],
-      severity: Severity.High,
-    });
-    expect(result.ete_preview).toBeUndefined();
+  it('Feature: city-response-commander, Property 28: adapter preserves facade facts and never mutates assumptions', () => {
+    fc.assert(
+      fc.property(fc.integer({ min: 0, max: 10_000_000 }), (value) => {
+        const assumptions = [assumption(value)];
+        const before = JSON.stringify(assumptions);
+        const facade: RuleEngineWhatIfFacade = {
+          loadBaseline: vi.fn(),
+          rerun: ({ assumptions: received }) => ({
+            triggered_articles: received[0]?.value === value ? [3] : [],
+            applied_formula_articles: [],
+            expected_actions: [`value=${value}`],
+          }),
+        };
+
+        const result = recompute({ facade, baseline, assumptions });
+
+        expect(result.triggered_articles).toEqual([3]);
+        expect(result.does_not_mutate_state).toBe(true);
+        expect(JSON.stringify(assumptions)).toBe(before);
+      }),
+      { numRuns: 100 },
+    );
   });
-});
-
-// ─── SOP-6 (Roaming_User_Pct) ────────────────────────────────────────────
-
-describe('recompute - SOP-6 (Roaming_User_Pct)', () => {
-  it('Roaming_User_Pct = 0.30 -> SOP-6 triggered -> article 6', () => {
-    const result = recompute({ assumptions: [makeRoaming('BS_X', 0.30)] });
-    expect(result.triggered_articles).toContain(6);
-  });
-
-  it('Roaming_User_Pct = 0.31 -> SOP-6 triggered', () => {
-    const result = recompute({ assumptions: [makeRoaming('BS_X', 0.31)] });
-    expect(result.triggered_articles).toContain(6);
-  });
-
-  it('Roaming_User_Pct = 0.299 -> NOT triggered', () => {
-    const result = recompute({ assumptions: [makeRoaming('BS_X', 0.299)] });
-    expect(result.triggered_articles).not.toContain(6);
-  });
-});
-
-// ─── does_not_mutate_state ────────────────────────────────────────────────
-
-describe('recompute - does_not_mutate_state', () => {
-  it('always returns does_not_mutate_state = true', () => {
-    const cases: readonly WhatIfAssumption[][] = [
-      [makeBL17Count(40000)],
-      [makeSaturation('RD_TPE_001', 0.95)],
-      [makeRoaming('BS_X', 0.3)],
-      [],
-    ];
-    for (const assumptions of cases) {
-      const result = recompute({ assumptions });
-      expect(result.does_not_mutate_state).toBe(true);
-    }
-  });
-
-  it('input assumptions are not mutated', () => {
-    const assumptions: WhatIfAssumption[] = [makeBL17Count(40000)];
-    const before = JSON.stringify(assumptions);
-    recompute({ assumptions });
-    expect(JSON.stringify(assumptions)).toBe(before);
-  });
-});
-
-// ─── Empty assumptions ────────────────────────────────────────────────────
-
-describe('recompute - empty assumptions', () => {
-  it('empty -> no triggered articles, does_not_mutate_state=true', () => {
-    const result = recompute({ assumptions: [] });
-    expect(result.triggered_articles).toHaveLength(0);
-    expect(result.does_not_mutate_state).toBe(true);
-  });
-});
-
-// ─── Rule Engine 委派（art.1 觸發路段語意）────────────────────────────────
-
-describe('recompute - delegates SOP-1 trigger scope to the Rule Engine', () => {
-  it('non-trigger segment at A level -> article 1 NOT triggered (evaluateArticle1 semantics)', () => {
-    // art.1 的措施只適用於 RD_TPE_001 / RD_TPE_002（ARTICLE1_TRIGGER_SEGMENTS）。
-    // 其他路段即使達 A 級也不會把 1 加入 triggered_articles。
-    const result = recompute({ assumptions: [makeSaturation('RD_TPE_009', 0.99)] });
-    expect(result.triggered_articles).not.toContain(1);
-  });
-
-  it('non-BL17 station User_Count -> article 3 NOT triggered', () => {
-    const result = recompute({
-      assumptions: [{ entity_id: 'BS_MRT_BL18', field: 'User_Count', operator: '=', value: 99_999 }],
-    });
-    expect(result.triggered_articles).not.toContain(3);
-  });
-});
-
-// ─── P28 property test ────────────────────────────────────────────────────
-
-/**
- * P28 的核心命題：stage 3 的結果必須等於「以相同假設值直接跑 Rule Engine」。
- * 這裡把 domain 的 Rule Engine 以相同輸入獨立跑一次做為 oracle 比對，
- * 而不是拿 recompute 跟自己比（那是恆真命題，證明不了任何事）。
- */
-function ruleEngineOracle(
-  segmentId: string,
-  saturation: number,
-  userCount: number,
-  roamingStationId: string,
-  roamingPct: number,
-): readonly number[] {
-  const article1 = evaluateArticle1(
-    classifySegments([{ segment_id: segmentId, saturation_score: saturation }]),
-  );
-  const article3 = evaluateArticle3({
-    bs_id: ARTICLE3_STATION_ID,
-    user_count: userCount,
-    growth_rate: null,
-  });
-  const article6 = evaluateArticle6({
-    mode: 'explicit_host_policy',
-    stations_in_scope: [{ bs_id: roamingStationId, roaming_pct_value: roamingPct }],
-  });
-  return aggregateArticles({
-    evaluations: [
-      { article: 1, triggered: article1.triggered },
-      { article: 3, triggered: article3.triggered },
-      { article: 6, triggered: article6.triggered },
-    ],
-    applied_formula_articles: [],
-  }).triggered_articles;
-}
-
-describe('P28: recompute equals a direct Rule Engine rerun', () => {
-  it(
-    'Feature: city-response-commander, Property 28: recompute triggered_articles equals a direct deterministic Rule Engine run',
-    () => {
-      fc.assert(
-        fc.property(
-          fc.constantFrom('RD_TPE_001', 'RD_TPE_002', 'RD_TPE_007'),
-          fc.double({ min: 0, max: 1, noNaN: true }),
-          fc.integer({ min: 0, max: 100_000 }),
-          fc.double({ min: 0, max: 1, noNaN: true }),
-          (segmentId, saturation, userCount, roamingPct) => {
-            const roamingStationId = 'BS_MRT_BL18';
-            const result = recompute({
-              assumptions: [
-                makeSaturation(segmentId, saturation),
-                makeBL17Count(userCount),
-                makeRoaming(roamingStationId, roamingPct),
-              ],
-            });
-
-            expect(result.triggered_articles).toEqual(
-              ruleEngineOracle(segmentId, saturation, userCount, roamingStationId, roamingPct),
-            );
-            expect(result.does_not_mutate_state).toBe(true);
-          },
-        ),
-        { numRuns: 100 },
-      );
-    },
-  );
-});
-
-describe('P28: recompute never mutates state', () => {
-  it(
-    'Feature: city-response-commander, Property 28: recompute always returns does_not_mutate_state=true for any valid input',
-    () => {
-      fc.assert(
-        fc.property(
-          fc.integer({ min: 0, max: 100_000 }),
-          fc.double({ min: 0, max: 1, noNaN: true }),
-          (userCount, saturation) => {
-            const result = recompute({
-              assumptions: [
-                makeBL17Count(userCount),
-                makeSaturation('RD_TPE_001', saturation),
-              ],
-            });
-            expect(result.does_not_mutate_state).toBe(true);
-            for (const article of result.triggered_articles) {
-              expect([1, 2, 3, 4, 5, 6, 7]).toContain(article);
-            }
-          },
-        ),
-        { numRuns: 100 },
-      );
-    },
-  );
 });

@@ -87,6 +87,7 @@ function makeHandler(seed: PublishRecord | null, overrides: Record<string, unkno
     readDecisionCoreStatus: async () => ({ exists: true, core_committed: true }),
     readPublishRecord: async (id) => store.getRecord(id) ?? null,
     readCmsCoreText: async () => '忠孝東路封閉，請改道 光復南路，預計延誤 78.6 分鐘',
+    acquirePublishDispatch: async () => 'ACQUIRED',
     writePublishRecord: (record, expectedVersion) =>
       applyPublishTransition(store, record, expectedVersion),
     ...overrides,
@@ -187,6 +188,7 @@ describe('PublishFn — channel 失敗時的 publish_failed 轉移', () => {
       readDecisionCoreStatus: async () => ({ exists: true, core_committed: true }),
       readPublishRecord: async (id) => store.getRecord(id) ?? null,
       readCmsCoreText: async () => 'cms',
+      acquirePublishDispatch: async () => 'ACQUIRED',
       // 模擬並發：寫入時版本已被別人推進
       writePublishRecord: async () => ({
         success: false,
@@ -199,5 +201,40 @@ describe('PublishFn — channel 失敗時的 publish_failed 轉移', () => {
     const response = result as { statusCode: number; body: string };
     expect(response.statusCode).toBe(409);
     expect(JSON.parse(response.body).error_code).toBe('PUBLISH_FAILED_NOT_RECORDED');
+  });
+
+  it('concurrent approved→published requests dispatch channels exactly once', async () => {
+    vi.mocked(evaluateChannelOutcome).mockReturnValue({ failed: false });
+    const seed = approvedRecord();
+    const store = createPublishRecordStoreStub();
+    await store.conditionalPut(seed);
+    const claimed = new Set<string>();
+    const acquirePublishDispatch = vi.fn(async (decisionId: string, version: number) => {
+      const key = `${decisionId}:${version}`;
+      if (claimed.has(key)) return 'ALREADY_CLAIMED' as const;
+      claimed.add(key);
+      return 'ACQUIRED' as const;
+    });
+    const handler = createPublishHandler({
+      readDecisionCoreStatus: async () => ({ exists: true, core_committed: true }),
+      // Force both requests to observe the same approved version; the claim is
+      // therefore the only gate before the external side effect.
+      readPublishRecord: async () => seed,
+      readCmsCoreText: async () => 'cms',
+      acquirePublishDispatch,
+      writePublishRecord: (record, expectedVersion) =>
+        applyPublishTransition(store, record, expectedVersion),
+    });
+
+    const results = await Promise.all([
+      handler(makeEvent({ target_state: 'published' })),
+      handler(makeEvent({ target_state: 'published' })),
+    ]);
+
+    expect(acquirePublishDispatch).toHaveBeenCalledTimes(2);
+    expect(dispatchChannels).toHaveBeenCalledTimes(1);
+    expect(results.map((result) => (result as { statusCode: number }).statusCode).sort())
+      .toEqual([200, 409]);
+    expect(store.getRecord(DECISION_ID)?.publish_state).toBe(PublishStatus.published);
   });
 });

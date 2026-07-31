@@ -3,14 +3,14 @@
  *
  * 職責（§13, §10.11d）：
  * - 每次 PublishRecord 狀態轉移後推送 `publish.status_changed` 事件
- * - event payload 攜帶 `publish_state` + `audit_trail` + `ready_event_id`（去重）
+ * - event payload 嚴格遵守 shared `PublishStatusChangedEvent`
  * - 以 `GET /decisions/{id}` polling 作為 WebSocket 斷線時的 fallback
  * - 推送失敗不拋出例外：publish 狀態已寫入 DynamoDB，polling 為授權的 fallback（§13, §16.4）
  * - **不**修改 DecisionCore / PublishRecord（此模組純推送，零寫入 DynamoDB）
  *
  * 事件去重（§13）：
- * - `ready_event_id = decision_id|publish.status_changed|publish_state|version`
- * - Dashboard 以此 key 排除重複投遞（at-least-once WebSocket delivery）
+ * - 可由 `buildPublishStatusChangedReadyEventId` 產生候選去重 key；在 shared
+ *   schema owner 正式納入前，不把它私自放進 runtime payload。
  *
  * Polling fallback（§13, §16.4）：
  * - 斷線時 Dashboard 呼叫 `GET /decisions/{id}`
@@ -70,20 +70,15 @@ export function buildPublishStatusChangedReadyEventId(input: {
  * 成員 1 之後調整事件契約時兩邊會**靜默分歧**——編譯照過，執行期才發現對不上。
  * 繼承之後，任何契約變動都會在本檔案立刻變成編譯錯誤。
  *
- * ⚠️ 以下兩個欄位是本模組的**擴充**，尚未進入 shared-schemas：
- * `ready_event_id`、`polling_fallback_path`。
- * 需請成員 1 納入 `PublishStatusChangedEvent`，前端才能有型別地取用；
- * 在那之前，前端讀取這兩個欄位會是 untyped access。
+ * 本模組不得增加 shared-schemas 未定義的 runtime 欄位。
+ * Polling fallback 是 HTTP 行為約定，透過
+ * `publishStatusPollingFallback()` 另行取得，不混入事件 payload。
  */
-export interface PublishStatusChangedPayload extends PublishStatusChangedEvent {
-  /** 去重 key（§13）*/
-  readonly ready_event_id: string;
-  /**
-   * Polling fallback URL hint（§13, §16.4）。
-   *
-   * 告知 Dashboard 斷線時以 `GET {polling_fallback_path}` 取得最新 publish 狀態。
-   */
-  readonly polling_fallback_path: string;
+export type PublishStatusChangedPayload = PublishStatusChangedEvent;
+
+/** Polling fallback contract kept outside the shared WebSocket payload. */
+export function publishStatusPollingFallback(decisionId: string): string {
+  return `/decisions/${decisionId}`;
 }
 
 // ─── Payload builder ──────────────────────────────────────────────────────────
@@ -109,15 +104,9 @@ export function buildPublishStatusChangedPayload(input: {
     occurred_at: record.updated_at,
     provisional: false,
     policy_version: policyVersion,
-    ready_event_id: buildPublishStatusChangedReadyEventId({
-      decisionId: record.decision_id,
-      publishState: record.publish_state,
-      version: record.version,
-    }),
     decision_id: record.decision_id,
     publish_state: record.publish_state,
     audit_trail: record.audit_trail,
-    polling_fallback_path: `/decisions/${record.decision_id}`,
   };
 }
 
@@ -196,7 +185,7 @@ export function isStalePublishConnection(error: unknown): boolean {
  * 設計保證：
  * - **推送失敗不拋出例外**：publish 狀態已持久化；polling 是授權 fallback（§16.4）
  * - **零寫入 DynamoDB**：此函式只發 WebSocket 事件，不碰 PublishRecordTable
- * - **idempotent payload**：`ready_event_id` 讓 Dashboard 對重複投遞安全去重
+ * - **contract-safe payload**：不增加 shared schema 尚未定義的欄位
  *
  * @param publisher - WebSocket 傳輸埠（生產注入 API Gateway Management Client）
  * @param input.record - 已完成狀態轉移的 PublishRecord

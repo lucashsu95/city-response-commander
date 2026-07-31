@@ -40,6 +40,12 @@ function echo(value: string): string {
 
 type EntityType = 'road_segment' | 'base_station';
 
+/** Entity IDs present in the loaded baseline data for this What-if request. */
+export interface LoadedEntityCatalog {
+  readonly roadSegmentIds: ReadonlySet<string>;
+  readonly baseStationIds: ReadonlySet<string>;
+}
+
 function classifyEntity(entityId: string): EntityType | null {
   if (entityId.startsWith(ROAD_SEGMENT_PREFIX)) return 'road_segment';
   if (entityId.startsWith(BASE_STATION_PREFIX)) return 'base_station';
@@ -162,6 +168,22 @@ function validateEntityPrefix(assumption: WhatIfAssumption): string | null {
   return null;
 }
 
+/** TASK-138: an ID-shaped string is not valid unless that entity is loaded. */
+function validateEntityExists(
+  assumption: WhatIfAssumption,
+  catalog: LoadedEntityCatalog,
+): string | null {
+  const entityType = classifyEntity(assumption.entity_id);
+  if (entityType === null) return null;
+
+  const loaded =
+    entityType === 'road_segment' ? catalog.roadSegmentIds : catalog.baseStationIds;
+  if (!loaded.has(assumption.entity_id)) {
+    return `實體「${echo(assumption.entity_id)}」不存在於目前載入的官方資料中，請確認 ID。`;
+  }
+  return null;
+}
+
 /** field 白名單驗證（SchemaValidator） */
 function validateFieldWhitelist(assumption: WhatIfAssumption): string | null {
   if (!(assumption.field in FIELD_SPECS)) {
@@ -246,6 +268,7 @@ function detectAmbiguity(assumptions: readonly WhatIfAssumption[]): string | nul
  */
 export function validateScenario(
   assumptions: readonly WhatIfAssumption[],
+  loadedEntities: LoadedEntityCatalog,
 ): ValidateScenarioResult {
   if (assumptions.length === 0) {
     return {
@@ -264,6 +287,9 @@ export function validateScenario(
 
     const fieldError = validateFieldWhitelist(assumption);
     if (fieldError) errors.push(fieldError);
+
+    const existenceError = validateEntityExists(assumption, loadedEntities);
+    if (existenceError) errors.push(existenceError);
   }
 
   // ── 2. 量綱正規化（百分比 → 小數）；無法判定單位即澄清 ────────────────

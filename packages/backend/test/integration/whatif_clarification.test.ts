@@ -14,7 +14,7 @@
  * delivery_class: MANDATORY_ACCEPTANCE_GATE（release-blocking）
  */
 import { describe, it, expect } from 'vitest';
-import { validateScenario } from '../../src/whatif/validators.js';
+import { validateScenario } from '../whatif/loaded_entities.js';
 import { parseScenario } from '../../src/whatif/scenario_parser.js';
 import type { WhatIfAssumption } from '../../src/whatif/whatif_types.js';
 import type { BedrockInvoker, BedrockResult } from '@city-commander/rag';
