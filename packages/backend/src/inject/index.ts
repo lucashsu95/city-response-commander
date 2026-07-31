@@ -31,6 +31,18 @@ export {
 
 export type { RecoveryLeaseInput, RecoveryLeaseOutcome } from './recovery_transitions.js';
 
+export {
+  routeSameKeyRequest,
+  isTerminalConflict,
+  isStartingLeaseExpired,
+} from './rerequest_router.js';
+
+export type {
+  RerequestRoute,
+  RerequestRouterPorts,
+  RerequestRouterInput,
+} from './rerequest_router.js';
+
 export { orchestrateStaleRunning, isStaleRunning } from './stale_orchestration.js';
 
 export type {
