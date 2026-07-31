@@ -246,6 +246,39 @@ function parsePublishBody(body: string | null | undefined): ParsedPublishBody {
  */
 // inferNextState 已移除 — 直接呼叫 inferNextPublishState（publish_transitions.ts）
 
+// ─── Realtime emit helper ─────────────────────────────────────────────────────
+
+/**
+ * 推送 `publish.status_changed`（TASK-148）。
+ *
+ * **每一次**成功持久化的狀態轉移都要推送，包含 `publish_failed` —— Dashboard
+ * 才能即時看到發布失敗，而不是停在「發布中」。
+ *
+ * 推送失敗永遠不影響 HTTP 回應：狀態已寫入 DynamoDB，
+ * `GET /decisions/{id}` polling 是授權的 fallback（§13 / §16.4）。
+ * 未注入 publisher（LOCAL_MOCK / 測試）時靜默跳過。
+ */
+function emitStatusChanged(
+  publisher: PublishStatusConnectionPublisher | undefined,
+  record: PublishRecord,
+  event: APIGatewayProxyEventV2,
+  decisionId: string,
+): void {
+  if (publisher === undefined) return;
+
+  emitPublishStatusChanged(publisher, {
+    record,
+    traceId: event.requestContext?.requestId ?? 'unknown',
+    policyVersion: 'v1',
+  }).catch((err) => {
+    console.error('[PublishFn] publish.status_changed 推送失敗（非阻斷）', {
+      decision_id: decisionId,
+      publish_state: record.publish_state,
+      error: err instanceof Error ? err.message : String(err),
+    });
+  });
+}
+
 // ─── Main handler factory ─────────────────────────────────────────────────────
 
 /**
@@ -405,17 +438,43 @@ export function createPublishHandler(
 
         const outcome = evaluateChannelOutcome(channelResult);
         if (outcome.failed) {
-          // channel 整體失敗 → 執行 published → publish_failed 狀態轉移（spec §10.17）
-          // 組裝 publish_failed record（含 failure_reason）
+          // channel 整體失敗 → 本次轉移的目標改為 publish_failed（spec §10.17、TASK-146）。
+          //
+          // ⚠️ from_state 必須是 **DynamoDB 中實際持久化的狀態**（= `existing`，approved），
+          //    不能用 `newRecord`（published）。newRecord 到這一步從未寫入資料庫，
+          //    以它為基準會同時造成兩個錯誤：
+          //    (1) 非法轉移：published 在 PUBLISH_TRANSITIONS 中沒有任何出口
+          //    (2) 樂觀鎖錯位：expectedVersion 會變成 currentVersion + 1，
+          //        但表中仍是 currentVersion → 必定 VERSION_CONFLICT
+          //    兩者都會讓 publish_failed 靜默寫不進去，稽核軌跡出現缺口。
           const failedRecord: PublishRecord = appendAuditEntry({
             decisionId,
             actor,
-            existing: newRecord,          // 從 published record 繼續轉移
+            existing,                     // ← 實際持久化的 record（approved）
             targetState: PublishStatus.publish_failed,
             failureReason: outcome.reason,
           });
-          // 寫入 publish_failed（不回 500，而是正確轉移狀態）
-          await writePublishRecord(failedRecord, newRecord.version);
+
+          const failedWrite = await writePublishRecord(failedRecord, currentVersion);
+
+          if (!failedWrite.success) {
+            // 連 publish_failed 都寫不進去 → 稽核軌跡有缺口，必須據實回報，不可吞掉
+            console.error('[PublishFn] publish_failed 狀態寫入失敗，稽核軌跡不完整', {
+              decision_id: decisionId,
+              channel_reason: outcome.reason,
+              write_reason: failedWrite.reason,
+            });
+            const statusCode = failedWrite.reason === 'VERSION_CONFLICT' ? 409 : 500;
+            return errorResponse(
+              statusCode,
+              'PUBLISH_FAILED_NOT_RECORDED',
+              `發布通道執行失敗（${outcome.reason}），且 publish_failed 狀態寫入失敗：${failedWrite.message}。請重新讀取後再試。`,
+            );
+          }
+
+          // publish_failed 也是一次狀態轉移 → 同樣推送 publish.status_changed（§13）
+          emitStatusChanged(realtimePublisher, failedWrite.record, event, decisionId);
+
           return errorResponse(
             500,
             'CHANNEL_DISPATCH_FAILED',
@@ -457,20 +516,7 @@ export function createPublishHandler(
       const _shouldEmitAlert = shouldEmitPublicAlertReady(idempotencyResult, targetState);
 
       // TASK-148: 推送 publish.status_changed WebSocket 事件
-      // 推送失敗不影響 HTTP 回應（polling 為授權 fallback，§13/§16.4）
-      if (realtimePublisher !== undefined) {
-        emitPublishStatusChanged(realtimePublisher, {
-          record: writeResult.record,
-          traceId: event.requestContext?.requestId ?? 'unknown',
-          policyVersion: 'v1',
-        }).catch((err) => {
-          // 推送失敗不拋出——publish 狀態已持久化，polling 是授權的 fallback
-          console.error('[PublishFn] publish.status_changed 推送失敗（非阻斷）', {
-            decision_id: decisionId,
-            error: err instanceof Error ? err.message : String(err),
-          });
-        });
-      }
+      emitStatusChanged(realtimePublisher, writeResult.record, event, decisionId);
 
       return jsonResponse(200, {
         schema_version: SCHEMA_VERSION,
