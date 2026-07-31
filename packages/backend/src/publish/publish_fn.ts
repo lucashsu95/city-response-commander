@@ -23,6 +23,12 @@
 import type { APIGatewayProxyEventV2, APIGatewayProxyResultV2 } from 'aws-lambda';
 import type { PublishRecord, AuditTrailEntry } from '@city-commander/shared-schemas';
 import { PublishStatus, SCHEMA_VERSION } from '@city-commander/shared-schemas';
+import {
+  PUBLISH_TRANSITIONS,
+  isLegalPublishTransition,
+  inferNextPublishState,
+  allowedNextStates,
+} from './publish_transitions.js';
 
 // ─── Publish result type ──────────────────────────────────────────────────────
 
@@ -172,34 +178,8 @@ function nowTimestamp(): string {
 }
 
 // ─── State transition logic ───────────────────────────────────────────────────
-
-/**
- * 合法的 publish 狀態轉移表。
- *
- * 根據設計文件 §10.11d：
- * - draft → approved
- * - approved → published
- * - approved → publish_failed
- *
- * 初次建立時允許 null → draft（publish record 尚未存在）。
- */
-const LEGAL_TRANSITIONS: ReadonlyMap<PublishStatus | null, readonly PublishStatus[]> = new Map([
-  [null, [PublishStatus.draft]],
-  [PublishStatus.draft, [PublishStatus.approved]],
-  [PublishStatus.approved, [PublishStatus.published, PublishStatus.publish_failed]],
-]);
-
-/**
- * 驗證狀態轉移是否合法。
- *
- * @param from - 當前狀態（null 表示首次建立）
- * @param to - 目標狀態
- * @returns true 表示合法轉移
- */
-function isLegalTransition(from: PublishStatus | null, to: PublishStatus): boolean {
-  const allowed = LEGAL_TRANSITIONS.get(from);
-  return allowed !== undefined && (allowed as readonly PublishStatus[]).includes(to);
-}
+// 轉移規則定義集中在 publish_transitions.ts（SINGLE SOURCE OF TRUTH）
+// 此處 re-export PUBLISH_TRANSITIONS 供模組內 isLegalPublishTransition / inferNextPublishState 使用
 
 /**
  * 解析後的 request body 欄位。
@@ -248,22 +228,10 @@ function parsePublishBody(body: string | null | undefined): ParsedPublishBody {
 }
 
 /**
- * 從當前狀態推斷下一個合法目標狀態。
- *
- * - null → draft（首次建立）
- * - draft → approved
- * - approved → published（無 target_state 時預設推進）
- *
- * @returns PublishStatus 或 null（無法推斷，需明確指定 target_state）
+ * 從當前狀態推斷下一個合法目標狀態（委派 publish_transitions.ts）。
  */
 function inferNextState(currentState: PublishStatus | null): PublishStatus | null {
-  const allowed = LEGAL_TRANSITIONS.get(currentState);
-  if (!allowed) return null;
-  if (allowed.length === 1) return allowed[0];
-  // approved 有兩個出口（published / publish_failed），
-  // 無 target_state 時預設推進到 published
-  if (currentState === PublishStatus.approved) return PublishStatus.published;
-  return null;
+  return inferNextPublishState(currentState);
 }
 
 // ─── Main handler factory ─────────────────────────────────────────────────────
@@ -364,12 +332,12 @@ export function createPublishHandler(
       }
 
       // ── 6. 驗證狀態轉移合法性 ────────────────────────────────────────────
-      if (!isLegalTransition(currentState, targetState)) {
+      if (!isLegalPublishTransition(currentState, targetState)) {
         return errorResponse(
           409,
           'ILLEGAL_TRANSITION',
           `狀態轉移 ${currentState ?? 'null'} → ${targetState} 不合法。` +
-            `合法的後續狀態為：${(LEGAL_TRANSITIONS.get(currentState) ?? []).join('、') || '（無）'}。`,
+            `合法的後續狀態為：${allowedNextStates(currentState).join('、') || '（無）'}。`,
         );
       }
 
