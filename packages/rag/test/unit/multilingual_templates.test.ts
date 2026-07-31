@@ -15,6 +15,7 @@ import { describe, it, expect } from 'vitest';
 import {
   renderMultilingualTemplates,
   formatEteForAlert,
+  formatEteForLanguage,
 } from '../../src/multilingual_templates.js';
 import { Language } from '@city-commander/shared-schemas';
 import type { DecisionCore } from '@city-commander/shared-schemas';
@@ -186,6 +187,99 @@ describe('formatEteForAlert', () => {
       } as unknown as DecisionCore['ete'],
     });
     expect(formatEteForAlert(core)).toBe('延誤時間待確認');
+  });
+});
+
+// ─── 語言純度：ETE 等決定性事實必須在地化 ─────────────────────────────────
+
+/** CJK 統一表意文字（中文字／日文漢字）。en / ko 模板中不應出現。 */
+const CJK_IDEOGRAPH = /[一-鿿]/;
+
+/** 只會出現在中文 ETE 措辭中的字串（用於檢查 ja 模板未混入中文） */
+const ZH_ONLY_ETE_PHRASES = ['預計延誤', '分鐘', '延誤時間待確認', '查無合規替代路段'];
+
+describe('語言純度：非中文模板不得混入中文', () => {
+  const coreWithEte = () =>
+    makeCore({
+      ete: {
+        calculation_status: 'computed',
+        ete_minutes: 78.6,
+      } as unknown as DecisionCore['ete'],
+    });
+
+  it('en 模板不含任何 CJK 表意文字（含 ETE 句）', () => {
+    const result = renderMultilingualTemplates({
+      core: coreWithEte(),
+      languages: [Language.EN],
+    });
+    const text = result.public_alert_text[Language.EN]!;
+    expect(text).toContain('78.6');
+    expect(text).not.toMatch(CJK_IDEOGRAPH);
+  });
+
+  it('ko 模板不含任何 CJK 表意文字（含 ETE 句）', () => {
+    const result = renderMultilingualTemplates({
+      core: coreWithEte(),
+      languages: [Language.KO],
+    });
+    const text = result.public_alert_text[Language.KO]!;
+    expect(text).toContain('78.6');
+    expect(text).not.toMatch(CJK_IDEOGRAPH);
+  });
+
+  it('ja 模板不含中文專屬措辭（日文漢字允許）', () => {
+    const result = renderMultilingualTemplates({
+      core: coreWithEte(),
+      languages: [Language.JA],
+    });
+    const text = result.public_alert_text[Language.JA]!;
+    expect(text).toContain('78.6');
+    for (const phrase of ZH_ONLY_ETE_PHRASES) {
+      expect(text).not.toContain(phrase);
+    }
+  });
+
+  it('ETE 待確認時同樣在地化，不退回中文', () => {
+    const core = makeCore({
+      ete: {
+        calculation_status: 'insufficient_common_snapshot',
+        ete_lower_bound_minutes: 60,
+      } as unknown as DecisionCore['ete'],
+    });
+    const result = renderMultilingualTemplates({ core, languages: ALL_LANGUAGES });
+    expect(result.public_alert_text[Language.EN]).not.toMatch(CJK_IDEOGRAPH);
+    expect(result.public_alert_text[Language.KO]).not.toMatch(CJK_IDEOGRAPH);
+    for (const phrase of ZH_ONLY_ETE_PHRASES) {
+      expect(result.public_alert_text[Language.JA]).not.toContain(phrase);
+    }
+  });
+
+  it('null primary_evacuation 的備援文字也在地化', () => {
+    const core = makeCore({ primary_evacuation: null });
+    const result = renderMultilingualTemplates({ core, languages: ALL_LANGUAGES });
+    expect(result.public_alert_text[Language.EN]).not.toMatch(CJK_IDEOGRAPH);
+    expect(result.public_alert_text[Language.KO]).not.toMatch(CJK_IDEOGRAPH);
+  });
+});
+
+describe('formatEteForLanguage', () => {
+  it('四種語言各自產出不同措辭，數值一致', () => {
+    const core = makeCore({
+      ete: { calculation_status: 'computed', ete_minutes: 42 } as unknown as DecisionCore['ete'],
+    });
+    const rendered = ALL_LANGUAGES.map((lang) => formatEteForLanguage(core, lang));
+    for (const text of rendered) {
+      expect(text).toContain('42');
+    }
+    // 四種語言的措辭必須彼此不同（證明有真的在地化，不是同一份中文）
+    expect(new Set(rendered).size).toBe(4);
+  });
+
+  it('無 ete → 所有語言均為空字串', () => {
+    const core = makeCore({ ete: undefined });
+    for (const lang of ALL_LANGUAGES) {
+      expect(formatEteForLanguage(core, lang)).toBe('');
+    }
   });
 });
 

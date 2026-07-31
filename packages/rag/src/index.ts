@@ -71,6 +71,7 @@ export {
 export {
   renderMultilingualTemplates,
   formatEteForAlert,
+  formatEteForLanguage,
   type MultilingualTemplateInput,
 } from './multilingual_templates.js';
 
