@@ -190,7 +190,11 @@ export class SopRetriever {
       const missingArticles = citationArticleSet.filter((a) => !coveredArticles.has(a));
 
       if (missingArticles.length === 0) {
-        return { outcome: 'success', citations, source: 'kb' };
+        return {
+          outcome: 'success',
+          citations: orderByArticleSet(citations, citationArticleSet),
+          source: 'kb',
+        };
       }
 
       // KB 部分缺漏 → 對缺漏的 article 走 S3 fallback
@@ -202,13 +206,17 @@ export class SopRetriever {
         return {
           outcome: 'both_failed',
           failed_articles: fallbackResult.failedArticles,
-          partial_citations: merged,
+          partial_citations: orderByArticleSet(merged, citationArticleSet),
           kb_error: `KB returned partial results (missing articles: ${missingArticles.join(', ')})`,
           s3_error: fallbackResult.s3Error ?? 'partial S3 failure',
         };
       }
 
-      return { outcome: 'success', citations: merged, source: 'kb_partial_s3_fallback' };
+      return {
+        outcome: 'success',
+        citations: orderByArticleSet(merged, citationArticleSet),
+        source: 'kb_partial_s3_fallback',
+      };
     }
 
     // KB 完全失敗 → 全部走 S3 fallback
@@ -219,13 +227,17 @@ export class SopRetriever {
       return {
         outcome: 'both_failed',
         failed_articles: fallbackResult.failedArticles,
-        partial_citations: fallbackResult.citations,
+        partial_citations: orderByArticleSet(fallbackResult.citations, citationArticleSet),
         kb_error: kbError ?? 'KB unavailable',
         s3_error: fallbackResult.s3Error ?? 'S3 fallback partial failure',
       };
     }
 
-    return { outcome: 'success', citations: fallbackResult.citations, source: 's3_fallback' };
+    return {
+      outcome: 'success',
+      citations: orderByArticleSet(fallbackResult.citations, citationArticleSet),
+      source: 's3_fallback',
+    };
   }
 
   // ─── Private helpers ──────────────────────────────────────────────────────
@@ -281,6 +293,36 @@ export function createSopRetriever(
 }
 
 // ─── Internal helpers ─────────────────────────────────────────────────────────
+
+/**
+ * 依 `citation_article_set` 的順序重排 citations。
+ *
+ * 為什麼需要：
+ * - KB 路徑的順序來自 `Map` 的插入序，也就是 KB 回傳結果的順序（相關性排序），
+ *   與 `citation_article_set` 無關
+ * - 部分 fallback 時是「KB 結果」後面接「S3 結果」，條號會跳來跳去
+ *
+ * Dashboard 與報告都是逐條列出 SOP 引用，條號亂序會讓指揮官
+ * 難以對照官方條文；`citation_article_set` 本身已由決定性程式碼遞增排序，
+ * 照它排即可得到穩定且可預期的輸出。
+ *
+ * 不在 `citation_article_set` 內的 citation（理論上不會發生，
+ * mapKbResultsToCitations 已過濾）排在最後，不靜默丟棄。
+ */
+function orderByArticleSet(
+  citations: readonly SopCitationResult[],
+  citationArticleSet: readonly number[],
+): SopCitationResult[] {
+  const rank = new Map<number, number>();
+  citationArticleSet.forEach((articleNo, index) => rank.set(articleNo, index));
+
+  return [...citations].sort((a, b) => {
+    const rankA = rank.get(a.article_no) ?? Number.MAX_SAFE_INTEGER;
+    const rankB = rank.get(b.article_no) ?? Number.MAX_SAFE_INTEGER;
+    if (rankA !== rankB) return rankA - rankB;
+    return a.article_no - b.article_no;
+  });
+}
 
 /**
  * 以 citation_article_set + eventFacts 組裝 KB 查詢字串。

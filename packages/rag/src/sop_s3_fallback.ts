@@ -134,6 +134,17 @@ function validateSOPArticleChunk(
   if (typeof obj['article_no'] !== 'number' || !Number.isInteger(obj['article_no'])) {
     throw new Error(`SOP article ${expectedArticleNo} from S3 (${s3Uri}): article_no must be an integer`);
   }
+
+  // 物件鍵由 article_no 推導，但內容是否對得上必須驗證：
+  // 若 KB ingestion（TASK-017）切塊時錯置，我們會拿第 N 條的原文
+  // 去當第 M 條的 citation——citation 張冠李戴比沒有 citation 更糟，
+  // 因為它看起來完全正常。寧可讓這條 article 記為缺口（fail closed）。
+  if (obj['article_no'] !== expectedArticleNo) {
+    throw new Error(
+      `SOP article ${expectedArticleNo} from S3 (${s3Uri}): ` +
+        `content declares article_no=${String(obj['article_no'])}, refusing to mislabel the citation`,
+    );
+  }
   if (typeof obj['title'] !== 'string') {
     throw new Error(`SOP article ${expectedArticleNo} from S3 (${s3Uri}): title must be a string`);
   }

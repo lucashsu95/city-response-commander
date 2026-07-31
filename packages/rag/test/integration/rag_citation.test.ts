@@ -220,3 +220,55 @@ describe('RAG citation — verbatim content preservation', () => {
     }
   });
 });
+
+// ─── citation 排序穩定性 ──────────────────────────────────────────────────
+
+describe('SopRetriever — citations 依 citation_article_set 排序', () => {
+  it('KB 以相關性亂序回傳時，輸出仍照條號遞增', async () => {
+    // KB 依相關性排序回傳（7 → 1 → 2），與 citation_article_set 無關
+    const kbClient = makeKbClient([
+      { article_no: 7, content: 'art7', uri: 's3://kb/sop#article-7' },
+      { article_no: 1, content: 'art1', uri: 's3://kb/sop#article-1' },
+      { article_no: 2, content: 'art2', uri: 's3://kb/sop#article-2' },
+    ]);
+    const retriever = new SopRetriever('kb-id', kbClient, makeS3Fallback([]));
+
+    const result = await retriever.retrieve([1, 2, 7], 'facts');
+    expect(result.outcome).toBe('success');
+    if (result.outcome !== 'success') return;
+    expect(result.citations.map((c) => c.article_no)).toEqual([1, 2, 7]);
+  });
+
+  it('部分 KB 部分 S3 時，兩者合併後仍照條號遞增', async () => {
+    // KB 只有第 7 條，第 1、2 條走 S3 fallback
+    const kbClient = makeKbClient([
+      { article_no: 7, content: 'art7', uri: 's3://kb/sop#article-7' },
+    ]);
+    const s3 = makeS3Fallback([
+      { no: 1, text: 'art1 from s3', bucket: 'sop-bucket' },
+      { no: 2, text: 'art2 from s3', bucket: 'sop-bucket' },
+    ]);
+    const retriever = new SopRetriever('kb-id', kbClient, s3);
+
+    const result = await retriever.retrieve([1, 2, 7], 'facts');
+    expect(result.outcome).toBe('success');
+    if (result.outcome !== 'success') return;
+    expect(result.source).toBe('kb_partial_s3_fallback');
+    // 原本是「KB 結果接 S3 結果」→ [7, 1, 2]
+    expect(result.citations.map((c) => c.article_no)).toEqual([1, 2, 7]);
+  });
+
+  it('排序不影響 citation 內容與來源標記', async () => {
+    const kbClient = makeKbClient([
+      { article_no: 2, content: 'art2', uri: 's3://kb/sop#article-2' },
+      { article_no: 1, content: 'art1', uri: 's3://kb/sop#article-1' },
+    ]);
+    const retriever = new SopRetriever('kb-id', kbClient, makeS3Fallback([]));
+
+    const result = await retriever.retrieve([1, 2], 'facts');
+    if (result.outcome !== 'success') throw new Error('expected success');
+    expect(result.citations[0].content).toBe('art1');
+    expect(result.citations[0].source_location).toBe('s3://kb/sop#article-1');
+    expect(result.citations[1].content).toBe('art2');
+  });
+});
