@@ -481,6 +481,7 @@ describe('Full 4-stage integration: BL17=40000 (stage 1→2→3→4)', () => {
     const bedrock = makeBedrockExplanation('觸發 SOP-3。');
     const sopRetriever = makeSopRetrieverFailing();
     const invoke = vi.spyOn(bedrock, 'invoke');
+    const warningSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
     const result = await explainWhatIf({
       recomputeResult,
@@ -494,6 +495,11 @@ describe('Full 4-stage integration: BL17=40000 (stage 1→2→3→4)', () => {
     expect(invoke).not.toHaveBeenCalled();
     expect(result.text_source).toBe('template');
     expect(result.explanation_text).toContain('citation unavailable');
+    const logged = JSON.stringify(warningSpy.mock.calls);
+    expect(logged).not.toContain('KB unavailable');
+    expect(logged).not.toContain('S3 unavailable');
+    expect(logged).toContain('SOP_CITATION_RETRIEVAL_FAILED');
+    warningSpy.mockRestore();
     // does_not_mutate_state 仍為 true
     expect(result.does_not_mutate_state).toBe(true);
     // explanation_text 非空（安全 template）

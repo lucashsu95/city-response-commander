@@ -105,8 +105,9 @@ export async function explainWhatIf(
     // 但不拋出例外；完全沒有 citation 時會 fail closed，避免無 grounding 的 LLM 解釋。
     console.warn('[WhatIfExplanation] SopRetriever both KB and S3 failed; using partial citations.', {
       failed_articles: retrieveResult.failed_articles,
-      kb_error: retrieveResult.kb_error,
-      s3_error: retrieveResult.s3_error,
+      error_code: 'SOP_CITATION_RETRIEVAL_FAILED',
+      kb_failed: true,
+      s3_failed: true,
       partial_count: retrieveResult.partial_citations.length,
     });
     citations = retrieveResult.partial_citations;

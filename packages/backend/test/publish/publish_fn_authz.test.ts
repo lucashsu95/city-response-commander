@@ -10,7 +10,7 @@
  * @module backend/test/publish/publish_fn_authz
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import type { APIGatewayProxyEventV2 } from 'aws-lambda';
 import type { PublishRecord } from '@city-commander/shared-schemas';
 import { PublishStatus } from '@city-commander/shared-schemas';
@@ -311,10 +311,15 @@ describe('PublishFn — 冪等', () => {
         },
       }),
     );
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     const result = await handler(makeEvent({}));
     expect(statusOf(result)).toBe(500);
     expect(parseBody(result).error_code).toBe('INTERNAL_ERROR');
     expect(String(parseBody(result).message)).not.toContain('DynamoDB');
+    const logged = JSON.stringify(errorSpy.mock.calls);
+    expect(logged).not.toContain('DynamoDB internal table name leaked');
+    expect(logged).toContain('PUBLISH_UNEXPECTED_ERROR');
+    errorSpy.mockRestore();
   });
 });
 

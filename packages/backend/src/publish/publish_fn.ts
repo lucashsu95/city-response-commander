@@ -270,11 +270,11 @@ function emitStatusChanged(
     record,
     traceId: event.requestContext?.requestId ?? 'unknown',
     policyVersion: 'v1',
-  }).catch((err) => {
+  }).catch(() => {
     console.error('[PublishFn] publish.status_changed 推送失敗（非阻斷）', {
       decision_id: decisionId,
       publish_state: record.publish_state,
-      error: err instanceof Error ? err.message : String(err),
+      error_code: 'STATUS_EVENT_PUBLISH_FAILED',
     });
   });
 }
@@ -468,8 +468,9 @@ export function createPublishHandler(
             // 連 publish_failed 都寫不進去 → 稽核軌跡有缺口，必須據實回報，不可吞掉
             console.error('[PublishFn] publish_failed 狀態寫入失敗，稽核軌跡不完整', {
               decision_id: decisionId,
-              channel_reason: outcome.reason,
-              write_reason: failedWrite.reason,
+              error_code: 'PUBLISH_FAILED_RECORD_WRITE_FAILED',
+              failed_channel_count: channelResult.failedChannels.length,
+              write_reason_code: failedWrite.reason,
             });
             const statusCode = failedWrite.reason === 'VERSION_CONFLICT' ? 409 : 500;
             return errorResponse(
@@ -530,12 +531,11 @@ export function createPublishHandler(
         version: writeResult.record.version,
         updated_at: writeResult.record.updated_at,
       });
-    } catch (err) {
+    } catch {
       // 頂層例外捕捉：防止 Lambda crash 暴露 502
-      const message = err instanceof Error ? err.message : String(err);
       console.error('[PublishFn] Unhandled exception', {
         decision_id: decisionId,
-        error: message,
+        error_code: 'PUBLISH_UNEXPECTED_ERROR',
       });
       return errorResponse(500, 'INTERNAL_ERROR', '系統發生未預期錯誤，請稍後再試。');
     }

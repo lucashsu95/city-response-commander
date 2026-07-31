@@ -339,11 +339,13 @@ export function createWhatIfHandler(
       };
 
       return jsonResponse(200, response);
-    } catch (err) {
+    } catch {
       // 頂層例外捕捉：防止 Lambda crash 暴露 502
       // 例如 SDK transport 錯誤、credentials 過期等非 Bedrock 邏輯錯誤
-      const message = err instanceof Error ? err.message : String(err);
-      console.error('[WhatIfFn] Unhandled exception', { trace_id: traceId, error: message });
+      console.error('[WhatIfFn] Unhandled exception', {
+        trace_id: traceId,
+        error_code: 'WHATIF_UNEXPECTED_ERROR',
+      });
       return errorResponse(500, 'INTERNAL_ERROR', '系統發生未預期錯誤，請稍後再試。');
     }
   };

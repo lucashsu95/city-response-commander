@@ -10,7 +10,7 @@
  * @module backend/test/whatif/whatif_fn
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import type { APIGatewayProxyEventV2 } from 'aws-lambda';
 import type { BedrockInvoker, BedrockResult, SopRetriever } from '@city-commander/rag';
 import { createWhatIfHandler } from '../../src/whatif/whatif_fn.js';
@@ -286,8 +286,13 @@ describe('WhatIfFn — 回應不變式', () => {
       sopRetriever: retrieverStub(),
     });
 
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     const result = await handler(makeEvent({ body: JSON.stringify({ query: 'x' }) }));
     expect(statusOf(result)).toBe(500);
     expect(String(parseBody(result).message)).not.toContain('arn');
+    const logged = JSON.stringify(errorSpy.mock.calls);
+    expect(logged).not.toContain('bedrock endpoint arn leaked');
+    expect(logged).toContain('WHATIF_UNEXPECTED_ERROR');
+    errorSpy.mockRestore();
   });
 });
