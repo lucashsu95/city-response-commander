@@ -22,3 +22,11 @@ export type {
   InjectionClock,
   LeaseDurations,
 } from './first_lease.js';
+
+export {
+  recoverFromStartFailed,
+  recoverFromProcessingFailed,
+  reacquireExpiredStartingLease,
+} from './recovery_transitions.js';
+
+export type { RecoveryLeaseInput, RecoveryLeaseOutcome } from './recovery_transitions.js';
