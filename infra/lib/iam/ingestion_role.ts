@@ -66,7 +66,14 @@
  */
 
 import { Construct } from 'constructs';
-import { Effect, Policy, PolicyDocument, PolicyStatement, Role, ServicePrincipal } from 'aws-cdk-lib/aws-iam';
+import {
+  Effect,
+  Policy,
+  PolicyDocument,
+  PolicyStatement,
+  Role,
+  ServicePrincipal,
+} from 'aws-cdk-lib/aws-iam';
 import type { EnvironmentContext } from '../env_context.js';
 
 // ─── Evidence contract ────────────────────────────────────────────────────────
@@ -289,11 +296,7 @@ export class IngestionRoleConstruct extends Construct {
    */
   public readonly evidence: IngestionRoleEvidence;
 
-  public constructor(
-    scope: Construct,
-    id: string,
-    props: IngestionRoleConstructProps,
-  ) {
+  public constructor(scope: Construct, id: string, props: IngestionRoleConstructProps) {
     super(scope, id);
 
     const {
@@ -389,7 +392,11 @@ export class IngestionRoleConstruct extends Construct {
         }),
         new PolicyStatement({
           effect: Effect.ALLOW,
-          actions: ['bedrock:GetDataSource', 'bedrock:StartIngestionJob', 'bedrock:GetIngestionJob'],
+          actions: [
+            'bedrock:GetDataSource',
+            'bedrock:StartIngestionJob',
+            'bedrock:GetIngestionJob',
+          ],
           resources: [dataSourceArn],
         }),
 

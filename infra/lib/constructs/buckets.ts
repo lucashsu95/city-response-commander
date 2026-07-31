@@ -22,12 +22,7 @@
  */
 
 import { Construct } from 'constructs';
-import {
-  BlockPublicAccess,
-  Bucket,
-  BucketEncryption,
-  IBucket,
-} from 'aws-cdk-lib/aws-s3';
+import { BlockPublicAccess, Bucket, BucketEncryption, IBucket } from 'aws-cdk-lib/aws-s3';
 import { RemovalPolicy } from 'aws-cdk-lib';
 import type { EnvironmentContext } from '../env_context.js';
 
@@ -119,15 +114,13 @@ export class DataBuckets extends Construct {
     if (envContext.isLocalMock) {
       // Placeholder so the construct still instantiates cleanly in LOCAL_MOCK
       // without any AWS resources
-      this.rawBucket = (undefined as unknown) as IBucket;
-      this.sopSourceBucket = (undefined as unknown) as IBucket;
-      this.artifactBucket = (undefined as unknown) as IBucket;
+      this.rawBucket = undefined as unknown as IBucket;
+      this.sopSourceBucket = undefined as unknown as IBucket;
+      this.artifactBucket = undefined as unknown as IBucket;
       return;
     }
 
-    const removalPolicy = envContext.isCompetition
-      ? RemovalPolicy.RETAIN
-      : RemovalPolicy.DESTROY;
+    const removalPolicy = envContext.isCompetition ? RemovalPolicy.RETAIN : RemovalPolicy.DESTROY;
 
     const autoDeleteObjects = !envContext.isCompetition;
 

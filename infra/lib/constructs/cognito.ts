@@ -97,7 +97,11 @@ export type CognitoGroupName = (typeof COGNITO_GROUP_NAMES)[number];
  * a group that has that scope. Cognito does NOT auto-map group names
  * to identically-named scopes.
  */
-export const COGNITO_SCOPE_NAMES = ['incidents.inject', 'whatif.execute', 'decisions.publish'] as const;
+export const COGNITO_SCOPE_NAMES = [
+  'incidents.inject',
+  'whatif.execute',
+  'decisions.publish',
+] as const;
 export type CognitoScopeName = (typeof COGNITO_SCOPE_NAMES)[number];
 
 /**
@@ -256,12 +260,7 @@ function validateUrls(urls: string[], profile: string, label: string): void {
 }
 
 /** Validate Cognito token validity ranges. */
-function validateTokenValidity(
-  value: number,
-  label: string,
-  min: number,
-  max: number,
-): void {
+function validateTokenValidity(value: number, label: string, min: number, max: number): void {
   if (!Number.isInteger(value) || value < min || value > max) {
     fail(label, `must be integer ${min}–${max}; got ${value}`);
   }
@@ -357,10 +356,10 @@ export class CognitoAuthConstruct extends Construct {
 
     const userPool = new cognito.UserPool(this, 'UserPool', {
       userPoolName: `${resourcePrefix}-${props.userPoolName}`,
-      selfSignUpEnabled: false,        // admin-created users only
+      selfSignUpEnabled: false, // admin-created users only
       signInCaseSensitive: false,
       signInAliases: {
-        email: true,                    // email sign-in required
+        email: true, // email sign-in required
       },
       autoVerify: {
         email: true,
@@ -377,12 +376,14 @@ export class CognitoAuthConstruct extends Construct {
       // MFA: TOTP optional (not required, not SMS). When MFA is OFF,
       // mfaSecondFactor must not be set; otherwise provide OTP as the second factor.
       mfa: props.enableTotpMfa ? cognito.Mfa.OPTIONAL : cognito.Mfa.OFF,
-      ...(props.enableTotpMfa ? {
-        mfaSecondFactor: {
-          otp: true,
-          sms: false,
-        },
-      } : {}),
+      ...(props.enableTotpMfa
+        ? {
+            mfaSecondFactor: {
+              otp: true,
+              sms: false,
+            },
+          }
+        : {}),
       userInvitation: {
         emailSubject: 'Your temporary password for City Response Commander',
         emailBody: 'Your temporary password is {####}. Sign in at {##url##}.',
@@ -436,24 +437,24 @@ export class CognitoAuthConstruct extends Construct {
     const appClient = new cognito.UserPoolClient(this, 'UserPoolClient', {
       userPool,
       userPoolClientName: `${resourcePrefix}-${props.appClientName}`,
-      generateSecret: false,                          // SPA cannot keep a secret
-      enableTokenRevocation: true,                   // RFC 7009 token revocation
-      preventUserExistenceErrors: true,              // security: no user enumeration
+      generateSecret: false, // SPA cannot keep a secret
+      enableTokenRevocation: true, // RFC 7009 token revocation
+      preventUserExistenceErrors: true, // security: no user enumeration
       supportedIdentityProviders: [cognito.UserPoolClientIdentityProvider.COGNITO],
       oAuth: {
         flows: {
           authorizationCodeGrant: true,
-          implicitCodeGrant: false,                  // disabled for security
-          clientCredentials: false,                  // not a machine-to-machine client
+          implicitCodeGrant: false, // disabled for security
+          clientCredentials: false, // not a machine-to-machine client
         },
         scopes: [
           cognito.OAuthScope.OPENID,
           cognito.OAuthScope.EMAIL,
           cognito.OAuthScope.PROFILE,
           // Custom capability scopes — each grants a specific API capability
-          cognito.OAuthScope.custom(`${resourceServerIdentifier}/${COGNITO_SCOPE_NAMES[0]}`),  // incidents.inject
-          cognito.OAuthScope.custom(`${resourceServerIdentifier}/${COGNITO_SCOPE_NAMES[1]}`),  // whatif.execute
-          cognito.OAuthScope.custom(`${resourceServerIdentifier}/${COGNITO_SCOPE_NAMES[2]}`),  // decisions.publish
+          cognito.OAuthScope.custom(`${resourceServerIdentifier}/${COGNITO_SCOPE_NAMES[0]}`), // incidents.inject
+          cognito.OAuthScope.custom(`${resourceServerIdentifier}/${COGNITO_SCOPE_NAMES[1]}`), // whatif.execute
+          cognito.OAuthScope.custom(`${resourceServerIdentifier}/${COGNITO_SCOPE_NAMES[2]}`), // decisions.publish
         ],
         callbackUrls: props.callbackUrls,
         logoutUrls: props.logoutUrls,

@@ -106,7 +106,11 @@ export type AslSubstitutionKey = (typeof ASL_SUBSTITUTION_KEYS)[number];
 // ─── Validation ─────────────────────────────────────────────────────────────
 
 function validateWorkflowTimeout(seconds: number): void {
-  if (!Number.isInteger(seconds) || seconds < WORKFLOW_TIMEOUT_SECONDS_MIN || seconds > WORKFLOW_TIMEOUT_SECONDS_MAX) {
+  if (
+    !Number.isInteger(seconds) ||
+    seconds < WORKFLOW_TIMEOUT_SECONDS_MIN ||
+    seconds > WORKFLOW_TIMEOUT_SECONDS_MAX
+  ) {
     throw new Error(
       `workflowTimeoutSeconds must be an integer in [${WORKFLOW_TIMEOUT_SECONDS_MIN}, ${WORKFLOW_TIMEOUT_SECONDS_MAX}], got: ${seconds}`,
     );
@@ -247,10 +251,7 @@ function validateStateReferences(
             `TASK-068 ASL validation: ${scopeLabel}.${name}.Branches[${i}].StartAt -> '${b.StartAt}' is not defined in the branch`,
           );
         }
-        const inner = validateStateReferences(
-          `${scopeLabel}.${name}.Branches[${i}]`,
-          localStates,
-        );
+        const inner = validateStateReferences(`${scopeLabel}.${name}.Branches[${i}]`, localStates);
         for (const n of inner) seen.add(`${name}::${n}`);
       });
     }
@@ -291,9 +292,7 @@ export function validateAslDocument(
   }
   const startAt = parsed['StartAt'] as string;
   if (!(startAt in states)) {
-    throw new Error(
-      `TASK-068 ASL validation: StartAt '${startAt}' is not a defined state`,
-    );
+    throw new Error(`TASK-068 ASL validation: StartAt '${startAt}' is not a defined state`);
   }
 
   const reachable = validateStateReferences('root', states);
@@ -440,7 +439,9 @@ export class WorkflowStateMachineConstruct extends Construct {
 
     // Removal policy is driven by the environment profile.
     const cfnSm = sm.node.defaultChild as sfn.CfnStateMachine;
-    cfnSm.applyRemovalPolicy(envContext.isCompetition ? RemovalPolicy.RETAIN : RemovalPolicy.DESTROY);
+    cfnSm.applyRemovalPolicy(
+      envContext.isCompetition ? RemovalPolicy.RETAIN : RemovalPolicy.DESTROY,
+    );
 
     // CloudFormation Output (no cross-stack exportName; for deploy-time
     // evidence and for InjectFn / TASK-180 wiring).

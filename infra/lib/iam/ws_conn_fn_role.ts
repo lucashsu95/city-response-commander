@@ -57,7 +57,14 @@
  */
 
 import { Construct } from 'constructs';
-import { Effect, Policy, PolicyDocument, PolicyStatement, Role, ServicePrincipal } from 'aws-cdk-lib/aws-iam';
+import {
+  Effect,
+  Policy,
+  PolicyDocument,
+  PolicyStatement,
+  Role,
+  ServicePrincipal,
+} from 'aws-cdk-lib/aws-iam';
 import type { EnvironmentContext } from '../env_context.js';
 
 // ─── Evidence contract ────────────────────────────────────────────────────────
@@ -165,9 +172,7 @@ function validateExecuteApiArn(label: string, arn: string): void {
   validateArn(label, arn);
   if (arn.startsWith('${') || arn.includes('Token[')) return;
   if (!arn.startsWith('arn:aws:execute-api:')) {
-    throw new Error(
-      `${label} must be an execute-api ARN (arn:aws:execute-api:...), got: ${arn}`,
-    );
+    throw new Error(`${label} must be an execute-api ARN (arn:aws:execute-api:...), got: ${arn}`);
   }
   if (arn === 'arn:aws:execute-api:*:*:*' || arn.endsWith(':*')) {
     throw new Error(
@@ -216,11 +221,7 @@ export class WsConnFnRoleConstruct extends Construct {
    */
   public readonly evidence: WsConnFnRoleEvidence;
 
-  public constructor(
-    scope: Construct,
-    id: string,
-    props: WsConnFnRoleConstructProps,
-  ) {
+  public constructor(scope: Construct, id: string, props: WsConnFnRoleConstructProps) {
     super(scope, id);
 
     const {
@@ -251,10 +252,7 @@ export class WsConnFnRoleConstruct extends Construct {
       connectionsTableArn,
       webSocketManageConnectionsArn,
       logGroupStreamArn: `${wsPushLogGroupArn}:log-stream:*`,
-      explicitDenyCategories: Object.freeze([
-        'DynamoDB:write-to-other-tables',
-        'S3:read-raw-sop',
-      ]),
+      explicitDenyCategories: Object.freeze(['DynamoDB:write-to-other-tables', 'S3:read-raw-sop']),
       wildcardAllowCount: 0,
       roleBoundToFunction: false,
       finalBindingOwner: 'TASK-179',

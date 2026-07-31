@@ -159,9 +159,7 @@ export class DecisionNarrativeTableConstruct extends Construct {
       return;
     }
 
-    const removalPolicy = envContext.isCompetition
-      ? RemovalPolicy.RETAIN
-      : RemovalPolicy.DESTROY;
+    const removalPolicy = envContext.isCompetition ? RemovalPolicy.RETAIN : RemovalPolicy.DESTROY;
 
     const table = new Table(this, 'Table', {
       tableName,

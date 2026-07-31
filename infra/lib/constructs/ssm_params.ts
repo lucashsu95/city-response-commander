@@ -100,10 +100,7 @@ import type { EnvironmentContext } from '../env_context.js';
 // surface in `src/index.ts`. We depend on the published artifact, not the
 // workspace symlink's internal layout, so future build/CI/workspace-layout
 // changes can move `src/` or restructure the package without breaking us.
-import {
-  CONFIG_SCHEMA,
-  type ConfigKeyDefinition,
-} from '@city-commander/config';
+import { CONFIG_SCHEMA, type ConfigKeyDefinition } from '@city-commander/config';
 
 // ─── Canonical key set (derived from machine-readable schema) ───────────────
 
@@ -199,9 +196,7 @@ export function parameterNameForConfigKey(prefix: string, configKey: string): st
  */
 export function configKeyFromParameterName(parameterName: string, prefix: string): string {
   if (!parameterName.startsWith(prefix)) {
-    throw new Error(
-      `Parameter name "${parameterName}" does not start with prefix "${prefix}"`,
-    );
+    throw new Error(`Parameter name "${parameterName}" does not start with prefix "${prefix}"`);
   }
   return parameterName.slice(prefix.length).replace(/\//g, '.');
 }
@@ -240,10 +235,7 @@ export function configKeyFromParameterName(parameterName: string, prefix: string
  * decoded by the SSM client at runtime) — but that's the same as any
  * IaC that injects a CFN reference into a Parameter value.
  */
-export function serializeValue(
-  configKey: string,
-  value: SsmConfigValueInput,
-): string {
+export function serializeValue(configKey: string, value: SsmConfigValueInput): string {
   if (value === null || value === undefined) {
     throw new Error(
       `SsmParametersConstruct: value for "${configKey}" must not be null or undefined`,
@@ -342,14 +334,10 @@ function validatePrefix(prefix: string): void {
     );
   }
   if (!prefix.startsWith('/')) {
-    throw new Error(
-      `SsmParametersConstruct: parameterPathPrefix "${prefix}" must start with "/"`,
-    );
+    throw new Error(`SsmParametersConstruct: parameterPathPrefix "${prefix}" must start with "/"`);
   }
   if (!prefix.endsWith('/')) {
-    throw new Error(
-      `SsmParametersConstruct: parameterPathPrefix "${prefix}" must end with "/"`,
-    );
+    throw new Error(`SsmParametersConstruct: parameterPathPrefix "${prefix}" must end with "/"`);
   }
   for (const sub of FORBIDDEN_PREFIX_SUBSTRINGS) {
     if (prefix.includes(sub)) {
@@ -593,7 +581,9 @@ export class SsmParametersConstruct extends Construct {
 
     this.parameterCount = Object.keys(parametersByKey).length;
     this.configKeys = Object.freeze(CANONICAL_SSM_KEYS.slice() as SsmConfigKey[]);
-    this.parametersByKey = Object.freeze(parametersByKey as Record<SsmConfigKey, SsmParameterDefinition>);
+    this.parametersByKey = Object.freeze(
+      parametersByKey as Record<SsmConfigKey, SsmParameterDefinition>,
+    );
     this.parameterNamesByKey = Object.freeze(namesByKey as Record<SsmConfigKey, string>);
     this.parameterArnsByKey = Object.freeze(arnsByKey as Record<SsmConfigKey, string>);
     this.serializedValuesByKey = Object.freeze(valuesByKeyOut as Record<SsmConfigKey, string>);

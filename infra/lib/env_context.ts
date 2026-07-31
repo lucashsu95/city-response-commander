@@ -46,9 +46,9 @@ const ENV_CONTEXT_KEY = 'env';
  * - LOCAL_MOCK: account/region are cosmetic placeholders.
  * - PERSONAL_AWS_DEV / COMPETITION_AWS: share same architecture.
  */
-export function resolveEnvironmentContext(
-  node: { tryGetContext: (key: string) => unknown },
-): EnvironmentContext {
+export function resolveEnvironmentContext(node: {
+  tryGetContext: (key: string) => unknown;
+}): EnvironmentContext {
   const raw = node.tryGetContext(ENV_CONTEXT_KEY);
 
   if (raw === undefined || raw === null || raw === '') {
@@ -60,17 +60,14 @@ export function resolveEnvironmentContext(
   }
 
   if (typeof raw !== 'string') {
-    throw new Error(
-      `Context key '${ENV_CONTEXT_KEY}' must be a string, got: ${typeof raw}`,
-    );
+    throw new Error(`Context key '${ENV_CONTEXT_KEY}' must be a string, got: ${typeof raw}`);
   }
 
   const profile = raw as EnvironmentProfile;
 
   if (!VALID_PROFILES.includes(profile)) {
     throw new Error(
-      `Invalid env profile: '${profile}'.\n` +
-        `Valid profiles: ${VALID_PROFILES.join(', ')}`,
+      `Invalid env profile: '${profile}'.\n` + `Valid profiles: ${VALID_PROFILES.join(', ')}`,
     );
   }
 

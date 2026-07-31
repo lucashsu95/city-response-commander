@@ -81,7 +81,14 @@
  */
 
 import { Construct } from 'constructs';
-import { Effect, Policy, PolicyDocument, PolicyStatement, Role, ServicePrincipal } from 'aws-cdk-lib/aws-iam';
+import {
+  Effect,
+  Policy,
+  PolicyDocument,
+  PolicyStatement,
+  Role,
+  ServicePrincipal,
+} from 'aws-cdk-lib/aws-iam';
 import type { EnvironmentContext } from '../env_context.js';
 
 // ─── Evidence contract ────────────────────────────────────────────────────────
@@ -266,11 +273,7 @@ export class RecoveryGateFnRoleConstruct extends Construct {
    */
   public readonly evidence: RecoveryGateFnRoleEvidence;
 
-  public constructor(
-    scope: Construct,
-    id: string,
-    props: RecoveryGateFnRoleConstructProps,
-  ) {
+  public constructor(scope: Construct, id: string, props: RecoveryGateFnRoleConstructProps) {
     super(scope, id);
 
     const {
@@ -290,9 +293,7 @@ export class RecoveryGateFnRoleConstruct extends Construct {
     validateDynamoArn('decisionNarrativeTableArn', decisionNarrativeTableArn);
     validateLogGroupArn('recoveryGateLogGroupArn', recoveryGateLogGroupArn);
 
-    if (
-      new Set([idempotencyTableArn, decisionCoreTableArn, decisionNarrativeTableArn]).size < 3
-    ) {
+    if (new Set([idempotencyTableArn, decisionCoreTableArn, decisionNarrativeTableArn]).size < 3) {
       throw new Error(
         'idempotencyTableArn, decisionCoreTableArn, and decisionNarrativeTableArn must all be distinct',
       );

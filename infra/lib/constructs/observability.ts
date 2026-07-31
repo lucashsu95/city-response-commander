@@ -53,17 +53,10 @@ import {
   TreatMissingData,
   Unit,
 } from 'aws-cdk-lib/aws-cloudwatch';
-import {
-  ILogGroup,
-  LogGroup,
-  RetentionDays,
-} from 'aws-cdk-lib/aws-logs';
+import { ILogGroup, LogGroup, RetentionDays } from 'aws-cdk-lib/aws-logs';
 import { CfnFunction, IFunction } from 'aws-cdk-lib/aws-lambda';
 import type { EnvironmentContext } from '../env_context.js';
-import {
-  RUNTIME_LAMBDA_NAMES,
-  type RuntimeLambdaName,
-} from './lambdas.js';
+import { RUNTIME_LAMBDA_NAMES, type RuntimeLambdaName } from './lambdas.js';
 
 // ─── Metric name constants ───────────────────────────────────────────────────
 
@@ -228,9 +221,7 @@ export interface ObservabilityConstructProps {
 
 function validateLogGroupNamePrefix(prefix: string): void {
   if (!prefix || typeof prefix !== 'string' || prefix.trim() === '') {
-    throw new Error(
-      'ObservabilityConstruct: logGroupNamePrefix must be a non-empty string',
-    );
+    throw new Error('ObservabilityConstruct: logGroupNamePrefix must be a non-empty string');
   }
   if (prefix.startsWith('aws/') || prefix.startsWith('/aws/')) {
     throw new Error(
@@ -241,20 +232,14 @@ function validateLogGroupNamePrefix(prefix: string): void {
 
 function validateMetricNamespace(ns: string): void {
   if (!ns || typeof ns !== 'string' || ns.trim() === '') {
-    throw new Error(
-      'ObservabilityConstruct: metricNamespace must be a non-empty string',
-    );
+    throw new Error('ObservabilityConstruct: metricNamespace must be a non-empty string');
   }
   if (ns.includes('*')) {
-    throw new Error(
-      `ObservabilityConstruct: metricNamespace must not contain wildcard characters`,
-    );
+    throw new Error(`ObservabilityConstruct: metricNamespace must not contain wildcard characters`);
   }
 }
 
-function validateRuntimeFunctions(
-  funcs: Readonly<Record<RuntimeLambdaName, IFunction>>,
-): void {
+function validateRuntimeFunctions(funcs: Readonly<Record<RuntimeLambdaName, IFunction>>): void {
   const providedKeys = new Set(Object.keys(funcs) as RuntimeLambdaName[]);
   for (const name of RUNTIME_LAMBDA_NAMES) {
     if (!providedKeys.has(name)) {
@@ -282,9 +267,7 @@ function validateRetention(days: RetentionDays): void {
 
 function validatePositiveInt(value: number, name: string): void {
   if (!Number.isInteger(value) || value <= 0) {
-    throw new Error(
-      `ObservabilityConstruct: ${name} must be a positive integer, got ${value}`,
-    );
+    throw new Error(`ObservabilityConstruct: ${name} must be a positive integer, got ${value}`);
   }
 }
 
@@ -300,9 +283,7 @@ function validateAlarmPeriod(period: number): void {
 
 function validateAlarmNamePrefix(prefix: string): void {
   if (!prefix || typeof prefix !== 'string' || prefix.trim() === '') {
-    throw new Error(
-      'ObservabilityConstruct: alarmNamePrefix must be a non-empty string',
-    );
+    throw new Error('ObservabilityConstruct: alarmNamePrefix must be a non-empty string');
   }
 }
 
@@ -404,9 +385,7 @@ export class ObservabilityConstruct extends Construct {
 
     // ── LOCAL_MOCK: zero resources ─────────────────────────────────────────
     if (envContext.isLocalMock) {
-      this.logGroups = Object.freeze({}) as Readonly<
-        Record<RuntimeLambdaName, ILogGroup>
-      >;
+      this.logGroups = Object.freeze({}) as Readonly<Record<RuntimeLambdaName, ILogGroup>>;
       this.logGroupCount = 0;
       this.alarmCount = 0;
       this.alarmNames = Object.freeze([]);
@@ -417,9 +396,7 @@ export class ObservabilityConstruct extends Construct {
     validateRuntimeFunctions(runtimeFunctions);
 
     // ── Removal policy ───────────────────────────────────────────────────
-    const removalPolicy = envContext.isCompetition
-      ? RemovalPolicy.RETAIN
-      : RemovalPolicy.DESTROY;
+    const removalPolicy = envContext.isCompetition ? RemovalPolicy.RETAIN : RemovalPolicy.DESTROY;
 
     // ── Build LogGroups ──────────────────────────────────────────────────
     const logGroupMap: Record<string, ILogGroup> = {};
@@ -518,9 +495,6 @@ export class ObservabilityConstruct extends Construct {
     });
 
     this.alarmCount = 2;
-    this.alarmNames = Object.freeze([
-      endToEndAlarm.alarmName,
-      bedrockAlarm.alarmName,
-    ]);
+    this.alarmNames = Object.freeze([endToEndAlarm.alarmName, bedrockAlarm.alarmName]);
   }
 }

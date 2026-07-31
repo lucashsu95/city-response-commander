@@ -75,7 +75,14 @@
  */
 
 import { Construct } from 'constructs';
-import { Effect, Policy, PolicyDocument, PolicyStatement, Role, ServicePrincipal } from 'aws-cdk-lib/aws-iam';
+import {
+  Effect,
+  Policy,
+  PolicyDocument,
+  PolicyStatement,
+  Role,
+  ServicePrincipal,
+} from 'aws-cdk-lib/aws-iam';
 import type { EnvironmentContext } from '../env_context.js';
 
 // ─── Evidence contract ────────────────────────────────────────────────────────
@@ -229,11 +236,7 @@ export class WorkflowStatusFnRoleConstruct extends Construct {
    */
   public readonly evidence: WorkflowStatusFnRoleEvidence;
 
-  public constructor(
-    scope: Construct,
-    id: string,
-    props: WorkflowStatusFnRoleConstructProps,
-  ) {
+  public constructor(scope: Construct, id: string, props: WorkflowStatusFnRoleConstructProps) {
     super(scope, id);
 
     const { envContext, roleName, idempotencyTableArn, workflowStatusLogGroupArn } = props;

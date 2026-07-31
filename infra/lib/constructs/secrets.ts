@@ -109,9 +109,7 @@ function validateDefinitions(defs: SecretDefinition[]): void {
       throw new Error(`Secret definition '${def.secretKey}' must have either name or arn`);
     }
     if (hasName && hasArn) {
-      throw new Error(
-        `Secret definition '${def.secretKey}' must not have both name and arn`,
-      );
+      throw new Error(`Secret definition '${def.secretKey}' must not have both name and arn`);
     }
 
     if (hasName) {
@@ -139,9 +137,7 @@ function validateDefinitions(defs: SecretDefinition[]): void {
 
       // ── must match Secrets Manager ARN shape ──────────────────────────────
       if (!SECRET_ARN_RE.test(a)) {
-        throw new Error(
-          `Secret definition '${def.secretKey}' has a malformed ARN: '${a}'`,
-        );
+        throw new Error(`Secret definition '${def.secretKey}' has a malformed ARN: '${a}'`);
       }
     }
   }
@@ -172,9 +168,7 @@ export class SecretsManager extends Construct {
       return;
     }
 
-    const removalPolicy = envContext.isCompetition
-      ? RemovalPolicy.RETAIN
-      : RemovalPolicy.DESTROY;
+    const removalPolicy = envContext.isCompetition ? RemovalPolicy.RETAIN : RemovalPolicy.DESTROY;
 
     const secretHandles = new Map<string, ISecret>();
 

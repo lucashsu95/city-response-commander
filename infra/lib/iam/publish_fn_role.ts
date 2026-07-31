@@ -79,7 +79,14 @@
  */
 
 import { Construct } from 'constructs';
-import { Effect, Policy, PolicyDocument, PolicyStatement, Role, ServicePrincipal } from 'aws-cdk-lib/aws-iam';
+import {
+  Effect,
+  Policy,
+  PolicyDocument,
+  PolicyStatement,
+  Role,
+  ServicePrincipal,
+} from 'aws-cdk-lib/aws-iam';
 import type { EnvironmentContext } from '../env_context.js';
 
 // ─── Evidence contract ────────────────────────────────────────────────────────
@@ -264,11 +271,7 @@ export class PublishFnRoleConstruct extends Construct {
    */
   public readonly evidence: PublishFnRoleEvidence;
 
-  public constructor(
-    scope: Construct,
-    id: string,
-    props: PublishFnRoleConstructProps,
-  ) {
+  public constructor(scope: Construct, id: string, props: PublishFnRoleConstructProps) {
     super(scope, id);
 
     const {

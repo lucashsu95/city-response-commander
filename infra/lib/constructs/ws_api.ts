@@ -215,9 +215,15 @@ export const WS_STAGE_VAR_CONNECTIONS_TTL_ATTRIBUTE = 'CONNECTIONS_TTL_ATTRIBUTE
 /** Forbidden route keys — reserved for system, Server → Client events, or anonymous broadcasts. */
 const FORBIDDEN_CUSTOM_ROUTE_KEYS: ReadonlySet<string> = new Set([
   // System
-  '$connect', '$disconnect', '$default',
+  '$connect',
+  '$disconnect',
+  '$default',
   // Forbidden $prefixed route keys
-  '$broadcast', '$sendmessage', '$publish', '$push', '$subscribe',
+  '$broadcast',
+  '$sendmessage',
+  '$publish',
+  '$push',
+  '$subscribe',
   // Server → Client event TYPES (must not be inbound Client → Backend route keys)
   'timeline.updated',
   'anomaly.detected',
@@ -229,7 +235,11 @@ const FORBIDDEN_CUSTOM_ROUTE_KEYS: ReadonlySet<string> = new Set([
   'publish.status_changed',
   'processing.failed',
   // Anonymous-broadcast keys (would expose WsPushFn)
-  'broadcast', 'sendmessage', 'publish', 'push', 'subscribe',
+  'broadcast',
+  'sendmessage',
+  'publish',
+  'push',
+  'subscribe',
 ]);
 
 // ─── Outbound push binding contract (§4.5) ──────────────────────────────────
@@ -344,7 +354,9 @@ export class WebSocketApiConstruct extends Construct {
     requireFunction('connFn', props.connFn);
     requireFunction('wsPushFn', props.wsPushFn);
     if (props.connFn === props.wsPushFn) {
-      throw new Error('connFn and wsPushFn must be distinct Lambda references (not the same Function)');
+      throw new Error(
+        'connFn and wsPushFn must be distinct Lambda references (not the same Function)',
+      );
     }
     // The custom route key is fixed at module load. We re-assert
     // its structural invariants here so accidental edits to the
@@ -412,11 +424,15 @@ export class WebSocketApiConstruct extends Construct {
     // ── Routes ────────────────────────────────────────────────────────────
 
     for (const routeKey of WS_ROUTE_CONTRACT) {
-      const route = new apigwv2.WebSocketRoute(this, `Route_${routeKey.replace(/[^A-Za-z0-9]/g, '_')}`, {
-        webSocketApi,
-        routeKey,
-        integration: integrationsByRouteKey[routeKey],
-      });
+      const route = new apigwv2.WebSocketRoute(
+        this,
+        `Route_${routeKey.replace(/[^A-Za-z0-9]/g, '_')}`,
+        {
+          webSocketApi,
+          routeKey,
+          integration: integrationsByRouteKey[routeKey],
+        },
+      );
       this.routesByKey[routeKey] = route;
     }
 
@@ -492,7 +508,8 @@ function isBlank(s: string): boolean {
 
 function validateApiName(name: string): void {
   if (isBlank(name)) fail('webSocketApiName', 'must not be blank');
-  if (name !== name.trim()) fail('webSocketApiName', 'must not have leading or trailing whitespace');
+  if (name !== name.trim())
+    fail('webSocketApiName', 'must not have leading or trailing whitespace');
 }
 
 function validateStageName(name: string): void {
@@ -528,7 +545,10 @@ function validateCustomRouteKey(key: string): void {
     fail('customRouteKey', `must not start with "$"; got "${key}"`);
   }
   if (FORBIDDEN_CUSTOM_ROUTE_KEYS.has(key)) {
-    fail('customRouteKey', `forbidden key "${key}" (system, server→client event type, or anonymous broadcast)`);
+    fail(
+      'customRouteKey',
+      `forbidden key "${key}" (system, server→client event type, or anonymous broadcast)`,
+    );
   }
   if (WS_SYSTEM_ROUTE_KEYS.includes(key as WsSystemRouteKey)) {
     fail('customRouteKey', `must not equal a system route key; got "${key}"`);
@@ -548,10 +568,15 @@ function requireFunction(label: string, fn: IFunction | undefined): asserts fn i
  */
 function routeKeyToIntegrationId(routeKey: string): string {
   switch (routeKey) {
-    case '$connect':    return 'ConnectIntegration';
-    case '$disconnect': return 'DisconnectIntegration';
-    case '$default':    return 'DefaultIntegration';
-    case 'ping':        return 'PingIntegration';
-    default:            return `${routeKey.replace(/[^A-Za-z0-9]/g, '_')}Integration`;
+    case '$connect':
+      return 'ConnectIntegration';
+    case '$disconnect':
+      return 'DisconnectIntegration';
+    case '$default':
+      return 'DefaultIntegration';
+    case 'ping':
+      return 'PingIntegration';
+    default:
+      return `${routeKey.replace(/[^A-Za-z0-9]/g, '_')}Integration`;
   }
 }

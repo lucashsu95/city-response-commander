@@ -54,7 +54,14 @@
  */
 
 import { Construct } from 'constructs';
-import { Effect, Policy, PolicyDocument, PolicyStatement, Role, ServicePrincipal } from 'aws-cdk-lib/aws-iam';
+import {
+  Effect,
+  Policy,
+  PolicyDocument,
+  PolicyStatement,
+  Role,
+  ServicePrincipal,
+} from 'aws-cdk-lib/aws-iam';
 import type { EnvironmentContext } from '../env_context.js';
 
 // ─── Evidence contract ────────────────────────────────────────────────────────
@@ -191,11 +198,7 @@ export class OrchestratorRoleConstruct extends Construct {
    */
   public readonly evidence: OrchestratorRoleEvidence;
 
-  public constructor(
-    scope: Construct,
-    id: string,
-    props: OrchestratorRoleConstructProps,
-  ) {
+  public constructor(scope: Construct, id: string, props: OrchestratorRoleConstructProps) {
     super(scope, id);
 
     const {
@@ -244,10 +247,7 @@ export class OrchestratorRoleConstruct extends Construct {
       workflowStatusFunctionArn,
       recoveryGateFunctionArn,
       wildcardAllowCount: 0,
-      explicitDenyCategories: Object.freeze([
-        'Lambda:invoke-non-workflow',
-        'Lambda:invoke-future',
-      ]),
+      explicitDenyCategories: Object.freeze(['Lambda:invoke-non-workflow', 'Lambda:invoke-future']),
       roleBoundToStateMachine: false,
       finalBindingOwner: 'TASK-179',
     } as OrchestratorRoleEvidence;

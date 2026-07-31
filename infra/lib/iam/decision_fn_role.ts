@@ -61,7 +61,14 @@
  */
 
 import { Construct } from 'constructs';
-import { Effect, Policy, PolicyDocument, PolicyStatement, Role, ServicePrincipal } from 'aws-cdk-lib/aws-iam';
+import {
+  Effect,
+  Policy,
+  PolicyDocument,
+  PolicyStatement,
+  Role,
+  ServicePrincipal,
+} from 'aws-cdk-lib/aws-iam';
 import type { EnvironmentContext } from '../env_context.js';
 
 // ─── Evidence contract ────────────────────────────────────────────────────────
@@ -247,20 +254,14 @@ function validateS3BucketArn(label: string, arn: string): void {
   }
 }
 
-function validateS3ObjectPattern(
-  label: string,
-  pattern: string,
-  bucketArn: string,
-): void {
+function validateS3ObjectPattern(label: string, pattern: string, bucketArn: string): void {
   validateArn(label, pattern);
   if (pattern.startsWith('${') || pattern.includes('Token[')) return;
   if (pattern === '*') {
     throw new Error(`${label} must not be a full-account wildcard "*"`);
   }
   if (!pattern.startsWith(bucketArn)) {
-    throw new Error(
-      `${label} must be a child of ${bucketArn} (got: ${pattern})`,
-    );
+    throw new Error(`${label} must be a child of ${bucketArn} (got: ${pattern})`);
   }
   if (pattern === bucketArn) {
     throw new Error(
@@ -304,11 +305,7 @@ export class DecisionFnRoleConstruct extends Construct {
    */
   public readonly evidence: DecisionFnRoleEvidence;
 
-  public constructor(
-    scope: Construct,
-    id: string,
-    props: DecisionFnRoleConstructProps,
-  ) {
+  public constructor(scope: Construct, id: string, props: DecisionFnRoleConstructProps) {
     super(scope, id);
 
     const {
@@ -332,11 +329,7 @@ export class DecisionFnRoleConstruct extends Construct {
     validateDynamoArn('decisionNarrativeTableArn', decisionNarrativeTableArn);
     validateDynamoArn('publishRecordTableArn', publishRecordTableArn);
     validateS3BucketArn('rawDataBucketArn', rawDataBucketArn);
-    validateS3ObjectPattern(
-      'rawDataObjectArnPattern',
-      rawDataObjectArnPattern,
-      rawDataBucketArn,
-    );
+    validateS3ObjectPattern('rawDataObjectArnPattern', rawDataObjectArnPattern, rawDataBucketArn);
     validateLogGroupArn('decisionLogGroupArn', decisionLogGroupArn);
     validateSsmArn('ssmParameterHierarchyArn', ssmParameterHierarchyArn);
 
@@ -417,11 +410,7 @@ export class DecisionFnRoleConstruct extends Construct {
         // actions to the exact three required here.
         new PolicyStatement({
           effect: Effect.ALLOW,
-          actions: [
-            'dynamodb:GetItem',
-            'dynamodb:PutItem',
-            'dynamodb:UpdateItem',
-          ],
+          actions: ['dynamodb:GetItem', 'dynamodb:PutItem', 'dynamodb:UpdateItem'],
           resources: [decisionCoreTableArn],
         }),
 

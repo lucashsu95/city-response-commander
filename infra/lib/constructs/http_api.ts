@@ -101,10 +101,7 @@ import * as apigw from 'aws-cdk-lib/aws-apigatewayv2';
 import { HttpLambdaIntegration } from 'aws-cdk-lib/aws-apigatewayv2-integrations';
 import type { IFunction } from 'aws-cdk-lib/aws-lambda';
 import type { EnvironmentContext } from '../env_context.js';
-import {
-  COGNITO_GROUP_NAMES,
-  type AuthorizationContract,
-} from './cognito.js';
+import { COGNITO_GROUP_NAMES, type AuthorizationContract } from './cognito.js';
 
 // ─── Route contract ─────────────────────────────────────────────────────────
 
@@ -131,15 +128,11 @@ export type HttpApiAuthorizationMode = 'public-read' | 'protected-write';
  *     `authorizationContract.admin/operator/commander.requiredScope`
  */
 export interface HttpApiRouteTarget {
-  readonly key: string;          // canonical key, e.g. "GET /timeline"
+  readonly key: string; // canonical key, e.g. "GET /timeline"
   readonly method: HttpApiRouteMethod;
-  readonly path: string;         // route key path, e.g. "/timeline"
+  readonly path: string; // route key path, e.g. "/timeline"
   readonly mode: HttpApiAuthorizationMode;
-  readonly lambdaSlot:
-    | 'apiReadFn'
-    | 'injectFn'
-    | 'whatIfFn'
-    | 'publishFn';
+  readonly lambdaSlot: 'apiReadFn' | 'injectFn' | 'whatIfFn' | 'publishFn';
   readonly requiredGroup?: 'admin' | 'operator' | 'commander';
   readonly requiredScope?: string;
 }
@@ -155,23 +148,86 @@ export const HTTP_API_ROUTE_CONTRACT: readonly HttpApiRouteTarget[] = (() => {
   // that structural tests can verify shape before scope-binding occurs.
   // Resolution happens in `HttpApiConstructProps`.
   return Object.freeze([
-    { key: 'GET /timeline',          method: 'GET',  path: '/timeline',                mode: 'public-read',     lambdaSlot: 'apiReadFn' },
-    { key: 'GET /roads',             method: 'GET',  path: '/roads',                   mode: 'public-read',     lambdaSlot: 'apiReadFn' },
-    { key: 'GET /crowd',             method: 'GET',  path: '/crowd',                   mode: 'public-read',     lambdaSlot: 'apiReadFn' },
-    { key: 'GET /incidents',         method: 'GET',  path: '/incidents',               mode: 'public-read',     lambdaSlot: 'apiReadFn' },
-    { key: 'GET /decisions/{id}',    method: 'GET',  path: '/decisions/{id}',          mode: 'public-read',     lambdaSlot: 'apiReadFn' },
-    { key: 'GET /reports/{id}',      method: 'GET',  path: '/reports/{id}',            mode: 'public-read',     lambdaSlot: 'apiReadFn' },
-    { key: 'POST /incidents/{id}/inject',  method: 'POST', path: '/incidents/{id}/inject',  mode: 'protected-write', lambdaSlot: 'injectFn',  requiredGroup: 'admin'    },
-    { key: 'POST /what-if',                method: 'POST', path: '/what-if',                mode: 'protected-write', lambdaSlot: 'whatIfFn',  requiredGroup: 'operator' },
-    { key: 'POST /decisions/{id}/publish', method: 'POST', path: '/decisions/{id}/publish', mode: 'protected-write', lambdaSlot: 'publishFn', requiredGroup: 'commander' },
+    {
+      key: 'GET /timeline',
+      method: 'GET',
+      path: '/timeline',
+      mode: 'public-read',
+      lambdaSlot: 'apiReadFn',
+    },
+    {
+      key: 'GET /roads',
+      method: 'GET',
+      path: '/roads',
+      mode: 'public-read',
+      lambdaSlot: 'apiReadFn',
+    },
+    {
+      key: 'GET /crowd',
+      method: 'GET',
+      path: '/crowd',
+      mode: 'public-read',
+      lambdaSlot: 'apiReadFn',
+    },
+    {
+      key: 'GET /incidents',
+      method: 'GET',
+      path: '/incidents',
+      mode: 'public-read',
+      lambdaSlot: 'apiReadFn',
+    },
+    {
+      key: 'GET /decisions/{id}',
+      method: 'GET',
+      path: '/decisions/{id}',
+      mode: 'public-read',
+      lambdaSlot: 'apiReadFn',
+    },
+    {
+      key: 'GET /reports/{id}',
+      method: 'GET',
+      path: '/reports/{id}',
+      mode: 'public-read',
+      lambdaSlot: 'apiReadFn',
+    },
+    {
+      key: 'POST /incidents/{id}/inject',
+      method: 'POST',
+      path: '/incidents/{id}/inject',
+      mode: 'protected-write',
+      lambdaSlot: 'injectFn',
+      requiredGroup: 'admin',
+    },
+    {
+      key: 'POST /what-if',
+      method: 'POST',
+      path: '/what-if',
+      mode: 'protected-write',
+      lambdaSlot: 'whatIfFn',
+      requiredGroup: 'operator',
+    },
+    {
+      key: 'POST /decisions/{id}/publish',
+      method: 'POST',
+      path: '/decisions/{id}/publish',
+      mode: 'protected-write',
+      lambdaSlot: 'publishFn',
+      requiredGroup: 'commander',
+    },
   ]);
 })();
 
 export const HTTP_API_ROUTE_COUNT = HTTP_API_ROUTE_CONTRACT.length;
 export const HTTP_API_GET_COUNT = HTTP_API_ROUTE_CONTRACT.filter((r) => r.method === 'GET').length;
-export const HTTP_API_POST_COUNT = HTTP_API_ROUTE_CONTRACT.filter((r) => r.method === 'POST').length;
-export const HTTP_API_PUBLIC_READ_COUNT = HTTP_API_ROUTE_CONTRACT.filter((r) => r.mode === 'public-read').length;
-export const HTTP_API_PROTECTED_WRITE_COUNT = HTTP_API_ROUTE_CONTRACT.filter((r) => r.mode === 'protected-write').length;
+export const HTTP_API_POST_COUNT = HTTP_API_ROUTE_CONTRACT.filter(
+  (r) => r.method === 'POST',
+).length;
+export const HTTP_API_PUBLIC_READ_COUNT = HTTP_API_ROUTE_CONTRACT.filter(
+  (r) => r.mode === 'public-read',
+).length;
+export const HTTP_API_PROTECTED_WRITE_COUNT = HTTP_API_ROUTE_CONTRACT.filter(
+  (r) => r.mode === 'protected-write',
+).length;
 
 // ─── Public Constants ───────────────────────────────────────────────────────
 
@@ -266,7 +322,9 @@ export class HttpApiConstruct extends Construct {
       props.whatIfFn === props.injectFn ||
       props.whatIfFn === props.publishFn
     ) {
-      throw new Error('whatIfFn must be a distinct Lambda reference (not aliased to injectFn/apiReadFn/publishFn)');
+      throw new Error(
+        'whatIfFn must be a distinct Lambda reference (not aliased to injectFn/apiReadFn/publishFn)',
+      );
     }
 
     // ── LOCAL_MOCK: short-circuit (0 AWS resources) ──────────────────────
@@ -332,9 +390,10 @@ export class HttpApiConstruct extends Construct {
 
     // ── Lambda integrations (one per Lambda; routes share them) ──────────
 
-    const integrationTimeout = props.integrationTimeoutSeconds !== undefined
-      ? Duration.seconds(props.integrationTimeoutSeconds)
-      : undefined;
+    const integrationTimeout =
+      props.integrationTimeoutSeconds !== undefined
+        ? Duration.seconds(props.integrationTimeoutSeconds)
+        : undefined;
 
     const integrations: Record<HttpApiRouteTarget['lambdaSlot'], HttpLambdaIntegration> = {
       apiReadFn: new HttpLambdaIntegration('ApiReadIntegration', props.apiReadFn, {
@@ -369,7 +428,10 @@ export class HttpApiConstruct extends Construct {
 
     for (const target of HTTP_API_ROUTE_CONTRACT) {
       const integration = integrations[target.lambdaSlot];
-      const routeKey = apigw.HttpRouteKey.with(target.path, target.method === 'GET' ? apigw.HttpMethod.GET : apigw.HttpMethod.POST);
+      const routeKey = apigw.HttpRouteKey.with(
+        target.path,
+        target.method === 'GET' ? apigw.HttpMethod.GET : apigw.HttpMethod.POST,
+      );
 
       const route = new apigw.HttpRoute(this, `Route_${target.key.replace(/[^A-Za-z0-9]/g, '_')}`, {
         httpApi,
@@ -441,7 +503,10 @@ function validateAuthorizationContract(contract: AuthorizationContract): void {
     const entry = contract[groupName];
     if (!entry) fail('authorizationContract', `missing entry for group "${groupName}"`);
     if (entry.group !== groupName) {
-      fail('authorizationContract', `entry for "${groupName}" has wrong group name: "${entry.group}"`);
+      fail(
+        'authorizationContract',
+        `entry for "${groupName}" has wrong group name: "${entry.group}"`,
+      );
     }
     if (typeof entry.requiredScope !== 'string' || isBlank(entry.requiredScope)) {
       fail('authorizationContract', `${groupName}.requiredScope must be a non-blank string`);
@@ -468,7 +533,8 @@ function validateCors(origins: string[], headers: string[], profile: string): vo
   const originSeen = new Set<string>();
   for (const o of origins) {
     if (isBlank(o)) fail('corsAllowedOrigins', `must not contain blank entry`);
-    if (o === '*' || o.includes('*')) fail('corsAllowedOrigins', `wildcard not allowed; got "${o}"`);
+    if (o === '*' || o.includes('*'))
+      fail('corsAllowedOrigins', `wildcard not allowed; got "${o}"`);
     if (o.includes('#')) fail('corsAllowedOrigins', `fragment not allowed; got "${o}"`);
     if (originSeen.has(o)) fail('corsAllowedOrigins', `duplicate origin: "${o}"`);
     originSeen.add(o);
@@ -477,12 +543,20 @@ function validateCors(origins: string[], headers: string[], profile: string): vo
         fail('corsAllowedOrigins', `COMPETITION_AWS requires HTTPS; got "${o}"`);
       }
       const host = (() => {
-        try { return new URL(o).hostname; } catch { return ''; }
+        try {
+          return new URL(o).hostname;
+        } catch {
+          return '';
+        }
       })();
       if (host === 'localhost' || host === '127.0.0.1') {
         fail('corsAllowedOrigins', `COMPETITION_AWS prohibits localhost/127.0.0.1; got "${o}"`);
       }
-    } else if (!o.toLowerCase().startsWith('https://') && !o.toLowerCase().startsWith('http://localhost') && !o.toLowerCase().startsWith('http://127.0.0.1')) {
+    } else if (
+      !o.toLowerCase().startsWith('https://') &&
+      !o.toLowerCase().startsWith('http://localhost') &&
+      !o.toLowerCase().startsWith('http://127.0.0.1')
+    ) {
       fail('corsAllowedOrigins', `non-localhost origin must be HTTPS; got "${o}"`);
     }
   }
@@ -498,7 +572,8 @@ function validateCors(origins: string[], headers: string[], profile: string): vo
   const headerSeen = new Set<string>();
   for (const h of headers) {
     if (isBlank(h)) fail('corsAllowedHeaders', `must not contain blank entry`);
-    if (h === '*' || h.includes('*')) fail('corsAllowedHeaders', `wildcard not allowed; got "${h}"`);
+    if (h === '*' || h.includes('*'))
+      fail('corsAllowedHeaders', `wildcard not allowed; got "${h}"`);
     const k = h.toLowerCase();
     if (headerSeen.has(k)) fail('corsAllowedHeaders', `duplicate header: "${h}"`);
     headerSeen.add(k);
@@ -506,8 +581,15 @@ function validateCors(origins: string[], headers: string[], profile: string): vo
 }
 
 function validateIntegrationTimeout(seconds: number): void {
-  if (!Number.isInteger(seconds) || seconds < INTEGRATION_TIMEOUT_MIN_SECONDS || seconds > INTEGRATION_TIMEOUT_MAX_SECONDS) {
-    fail('integrationTimeoutSeconds', `must be integer ${INTEGRATION_TIMEOUT_MIN_SECONDS}–${INTEGRATION_TIMEOUT_MAX_SECONDS}; got ${seconds}`);
+  if (
+    !Number.isInteger(seconds) ||
+    seconds < INTEGRATION_TIMEOUT_MIN_SECONDS ||
+    seconds > INTEGRATION_TIMEOUT_MAX_SECONDS
+  ) {
+    fail(
+      'integrationTimeoutSeconds',
+      `must be integer ${INTEGRATION_TIMEOUT_MIN_SECONDS}–${INTEGRATION_TIMEOUT_MAX_SECONDS}; got ${seconds}`,
+    );
   }
 }
 

@@ -60,7 +60,14 @@
  */
 
 import { Construct } from 'constructs';
-import { Effect, Policy, PolicyDocument, PolicyStatement, Role, ServicePrincipal } from 'aws-cdk-lib/aws-iam';
+import {
+  Effect,
+  Policy,
+  PolicyDocument,
+  PolicyStatement,
+  Role,
+  ServicePrincipal,
+} from 'aws-cdk-lib/aws-iam';
 import type { EnvironmentContext } from '../env_context.js';
 
 // ─── Evidence contract ────────────────────────────────────────────────────────
@@ -285,7 +292,11 @@ export class InjectFnRoleConstruct extends Construct {
     // ── Build evidence (always populated) ──────────────────────────────────
 
     this.evidence = {
-      allowedDynamoActions: Object.freeze(['dynamodb:GetItem', 'dynamodb:PutItem', 'dynamodb:UpdateItem']),
+      allowedDynamoActions: Object.freeze([
+        'dynamodb:GetItem',
+        'dynamodb:PutItem',
+        'dynamodb:UpdateItem',
+      ]),
       idempotencyTableArn,
       stateMachineArn: workflowStateMachineArn,
       allowedLambdaArns: Object.freeze([recoveryGateFunctionArn, workflowStatusFunctionArn]),

@@ -17,8 +17,8 @@
     "mock:bedrock-walkthrough": "tsx scripts/mock-bedrock-walkthrough.ts",
     "rehearsal:dry-run": "bash scripts/local_mock_rehearsal.sh --dry-run",
     "lint": "eslint packages/*/src/**/*.ts scripts/**/*.ts infra/bin/**/*.ts infra/lib/**/*.ts",
-    "format": "prettier --write 'packages/*/src/**/*.ts' 'scripts/**/*.ts' 'infra/{bin,lib}/**/*.ts'",
-    "format:check": "prettier --check 'packages/*/src/**/*.ts' 'scripts/**/*.ts' 'infra/{bin,lib}/**/*.ts'",
+    "format": "prettier --write \"packages/*/src/**/*.ts\" \"scripts/**/*.ts\" \"infra/bin/**/*.ts\" \"infra/lib/**/*.ts\"",
+    "format:check": "prettier --check \"packages/*/src/**/*.ts\" \"scripts/**/*.ts\" \"infra/bin/**/*.ts\" \"infra/lib/**/*.ts\"",
     "typecheck": "tsc --build",
     "check:language-boundary": "tsx scripts/check-language-boundary.ts",
     "check:no-credentials": "bash scripts/check-no-credentials.sh"

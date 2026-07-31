@@ -89,7 +89,14 @@
  */
 
 import { Construct } from 'constructs';
-import { Effect, Policy, PolicyDocument, PolicyStatement, Role, ServicePrincipal } from 'aws-cdk-lib/aws-iam';
+import {
+  Effect,
+  Policy,
+  PolicyDocument,
+  PolicyStatement,
+  Role,
+  ServicePrincipal,
+} from 'aws-cdk-lib/aws-iam';
 import type { EnvironmentContext } from '../env_context.js';
 
 // ─── Evidence contract ────────────────────────────────────────────────────────
@@ -346,20 +353,14 @@ function validateS3BucketArn(label: string, arn: string): void {
   }
 }
 
-function validateS3ObjectPattern(
-  label: string,
-  pattern: string,
-  bucketArn: string,
-): void {
+function validateS3ObjectPattern(label: string, pattern: string, bucketArn: string): void {
   validateArn(label, pattern);
   if (pattern.startsWith('${') || pattern.includes('Token[')) return;
   if (pattern === '*') {
     throw new Error(`${label} must not be a full-account wildcard "*"`);
   }
   if (!pattern.startsWith(bucketArn)) {
-    throw new Error(
-      `${label} must be a child of ${bucketArn} (got: ${pattern})`,
-    );
+    throw new Error(`${label} must be a child of ${bucketArn} (got: ${pattern})`);
   }
   if (pattern === bucketArn) {
     throw new Error(
@@ -372,7 +373,9 @@ function validateKnowledgeBaseArn(label: string, arn: string): void {
   validateArn(label, arn);
   if (arn.startsWith('${') || arn.includes('Token[')) return;
   if (!arn.startsWith('arn:aws:bedrock:')) {
-    throw new Error(`${label} must be a Bedrock Knowledge Base ARN (arn:aws:bedrock:...), got: ${arn}`);
+    throw new Error(
+      `${label} must be a Bedrock Knowledge Base ARN (arn:aws:bedrock:...), got: ${arn}`,
+    );
   }
 }
 
@@ -458,11 +461,7 @@ export class RendererFnRoleConstruct extends Construct {
    */
   public readonly evidence: RendererFnRoleEvidence;
 
-  public constructor(
-    scope: Construct,
-    id: string,
-    props: RendererFnRoleConstructProps,
-  ) {
+  public constructor(scope: Construct, id: string, props: RendererFnRoleConstructProps) {
     super(scope, id);
 
     const {
@@ -489,11 +488,7 @@ export class RendererFnRoleConstruct extends Construct {
     validateDynamoArn('idempotencyTableArn', idempotencyTableArn);
     validateDynamoArn('publishRecordTableArn', publishRecordTableArn);
     validateS3BucketArn('sopBucketArn', sopBucketArn);
-    validateS3ObjectPattern(
-      'sopObjectArnPattern',
-      sopObjectArnPattern,
-      sopBucketArn,
-    );
+    validateS3ObjectPattern('sopObjectArnPattern', sopObjectArnPattern, sopBucketArn);
     validateKnowledgeBaseArn('knowledgeBaseArn', knowledgeBaseArn);
     validateModelArns(modelInvocationResourceArns);
     validateLogGroupArn('rendererLogGroupArn', rendererLogGroupArn);
@@ -512,13 +507,8 @@ export class RendererFnRoleConstruct extends Construct {
       );
     }
 
-    if (
-      secretAccess.mode === 'EXACT' &&
-      secretAccess.secretArns.length === 0
-    ) {
-      throw new Error(
-        'secretAccess.mode = EXACT requires at least one secret ARN',
-      );
+    if (secretAccess.mode === 'EXACT' && secretAccess.secretArns.length === 0) {
+      throw new Error('secretAccess.mode = EXACT requires at least one secret ARN');
     }
 
     if (secretAccess.mode === 'EXACT') {
@@ -656,10 +646,7 @@ export class RendererFnRoleConstruct extends Construct {
       // the IAM actions are InvokeModel and InvokeModelWithResponseStream).
       new PolicyStatement({
         effect: Effect.ALLOW,
-        actions: [
-          'bedrock:InvokeModel',
-          'bedrock:InvokeModelWithResponseStream',
-        ],
+        actions: ['bedrock:InvokeModel', 'bedrock:InvokeModelWithResponseStream'],
         resources: [...modelInvocationResourceArns],
       }),
 
@@ -667,10 +654,7 @@ export class RendererFnRoleConstruct extends Construct {
       // Only the injected model ARNs are excluded from this Deny.
       new PolicyStatement({
         effect: Effect.DENY,
-        actions: [
-          'bedrock:InvokeModel',
-          'bedrock:InvokeModelWithResponseStream',
-        ],
+        actions: ['bedrock:InvokeModel', 'bedrock:InvokeModelWithResponseStream'],
         notResources: [...modelInvocationResourceArns],
       }),
 

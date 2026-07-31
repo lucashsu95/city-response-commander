@@ -188,9 +188,7 @@ const POLICY_MATRIX: Readonly<Record<DataLifecycleProfile, DataLifecyclePolicy>>
  *
  * Throws on any string that is not one of the three documented profiles.
  */
-export function resolveDataLifecyclePolicy(
-  profile: DataLifecycleProfile,
-): DataLifecyclePolicy {
+export function resolveDataLifecyclePolicy(profile: DataLifecycleProfile): DataLifecyclePolicy {
   const policy = POLICY_MATRIX[profile];
   if (!policy) {
     throw new Error(
@@ -282,8 +280,8 @@ export function assertDestroyAuthorized(
  * integration layer does not need to import `env_context` directly when
  * computing the lifecycle contract.
  */
-export function lifecycleProfileFromEnvironment(
-  env: { readonly profile: EnvironmentProfile },
-): DataLifecycleProfile {
+export function lifecycleProfileFromEnvironment(env: {
+  readonly profile: EnvironmentProfile;
+}): DataLifecycleProfile {
   return env.profile;
 }

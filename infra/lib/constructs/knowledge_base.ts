@@ -288,7 +288,10 @@ function validatePrincipalArn(arn: string, listField: string): void {
     throw new Error(`${listField} must not contain wildcard principal '${arn}'`);
   }
   // Accept IAM role ARN or any AWS principal ARN (role / user / federated)
-  if (!/^arn:[^:]+:[^:]*:[^:]*:\d{12}:.+/i.test(arn) && !/^arn:[^:]+:iam::\d{12}:(role|user)\/.+/.test(arn)) {
+  if (
+    !/^arn:[^:]+:[^:]*:[^:]*:\d{12}:.+/i.test(arn) &&
+    !/^arn:[^:]+:iam::\d{12}:(role|user)\/.+/.test(arn)
+  ) {
     throw new Error(`${listField} entry '${arn}' is not a valid AWS principal ARN`);
   }
 }
@@ -400,9 +403,7 @@ function validateInclusionPrefixes(prefixes: string[] | undefined): void {
       throw new Error(`inclusionPrefixes entry '${p}' must not contain a backslash`);
     }
     if (/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//.test(p)) {
-      throw new Error(
-        `inclusionPrefixes entry '${p}' must not contain a URL scheme`,
-      );
+      throw new Error(`inclusionPrefixes entry '${p}' must not contain a URL scheme`);
     }
   }
 }
@@ -458,7 +459,10 @@ export class KnowledgeBaseConstruct extends Construct {
       { value: textFieldName, field: 'textFieldName' },
       { value: metadataFieldName, field: 'metadataFieldName' },
     );
-    validateDeploymentPrincipalArns(vectorIndexDeploymentPrincipalArns, knowledgeBaseServiceRoleArn);
+    validateDeploymentPrincipalArns(
+      vectorIndexDeploymentPrincipalArns,
+      knowledgeBaseServiceRoleArn,
+    );
     validateInclusionPrefixes(inclusionPrefixes);
 
     if (envContext.isLocalMock) {
@@ -544,7 +548,12 @@ export class KnowledgeBaseConstruct extends Construct {
             {
               ResourceType: 'index',
               Resource: [indexResourceArn],
-              Permission: ['aoss:CreateIndex', 'aoss:DescribeIndex', 'aoss:UpdateIndex', 'aoss:DeleteIndex'],
+              Permission: [
+                'aoss:CreateIndex',
+                'aoss:DescribeIndex',
+                'aoss:UpdateIndex',
+                'aoss:DeleteIndex',
+              ],
             },
           ],
           Principal: [knowledgeBaseServiceRoleArn, ...vectorIndexDeploymentPrincipalArns],
@@ -634,9 +643,7 @@ export class KnowledgeBaseConstruct extends Construct {
         type: 'S3',
         s3Configuration: {
           bucketArn: sopSourceBucketArn,
-          ...(inclusionPrefixes && inclusionPrefixes.length > 0
-            ? { inclusionPrefixes }
-            : {}),
+          ...(inclusionPrefixes && inclusionPrefixes.length > 0 ? { inclusionPrefixes } : {}),
         },
       },
       // ChunkingStrategy = NONE — each of the seven SOP article files is one

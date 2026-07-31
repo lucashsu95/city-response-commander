@@ -225,9 +225,7 @@ function isHandlerControlChar(ch: string): boolean {
 
 function validateMemory(memoryMb: number, fnName: RuntimeLambdaName): void {
   if (!Number.isInteger(memoryMb) || memoryMb < 128 || memoryMb > 10240) {
-    throw new Error(
-      `${fnName}.memorySizeMb must be an integer in [128, 10240], got: ${memoryMb}`,
-    );
+    throw new Error(`${fnName}.memorySizeMb must be an integer in [128, 10240], got: ${memoryMb}`);
   }
 }
 
@@ -241,9 +239,7 @@ function validateTimeout(timeoutSeconds: number, fnName: RuntimeLambdaName): voi
 
 function validateReservedConcurrency(value: number): void {
   if (!Number.isInteger(value) || value <= 0) {
-    throw new Error(
-      `decisionFnReservedConcurrency must be a positive integer, got: ${value}`,
-    );
+    throw new Error(`decisionFnReservedConcurrency must be a positive integer, got: ${value}`);
   }
 }
 
@@ -261,7 +257,10 @@ function validateHandler(handler: string, fnName: RuntimeLambdaName): void {
   }
 }
 
-function validateEnvironment(env: Record<string, string> | undefined, fnName: RuntimeLambdaName): void {
+function validateEnvironment(
+  env: Record<string, string> | undefined,
+  fnName: RuntimeLambdaName,
+): void {
   if (env === undefined) return;
   if (env === null || typeof env !== 'object' || Array.isArray(env)) {
     throw new Error(`${fnName}.environment must be a plain object`);
@@ -273,9 +272,7 @@ function validateEnvironment(env: Record<string, string> | undefined, fnName: Ru
   }
   for (const [k, v] of Object.entries(env)) {
     if (FORBIDDEN_AWS_RESERVED_ENV_KEYS.has(k)) {
-      throw new Error(
-        `${fnName}.environment must not contain reserved AWS env var '${k}'`,
-      );
+      throw new Error(`${fnName}.environment must not contain reserved AWS env var '${k}'`);
     }
     if (!Number.isFinite(v.length)) {
       throw new Error(`${fnName}.environment.${k} must be a string`);
@@ -474,8 +471,7 @@ export class RuntimeLambdas extends Construct {
           : {}),
       };
 
-      const reservedConcurrency =
-        name === 'DecisionFn' ? decisionFnReservedConcurrency : undefined;
+      const reservedConcurrency = name === 'DecisionFn' ? decisionFnReservedConcurrency : undefined;
 
       const fn = new Function(this, name, {
         functionName: fnName,
