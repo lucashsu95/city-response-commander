@@ -11,6 +11,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import type { PublishRecord } from '@city-commander/shared-schemas';
 import { PublishStatus, SCHEMA_VERSION } from '@city-commander/shared-schemas';
+import type { PublishStatusChangedEvent } from '@city-commander/shared-schemas';
 import {
   PUBLISH_STATUS_CHANGED_EVENT,
   buildPublishStatusChangedReadyEventId,
@@ -232,5 +233,51 @@ describe('emitPublishStatusChanged', () => {
     const parsed = JSON.parse(captured) as { ready_event_id: string; event_type: string };
     expect(parsed.event_type).toBe(PUBLISH_STATUS_CHANGED_EVENT);
     expect(parsed.ready_event_id).toBe(`${DECISION_ID}|publish.status_changed|published|3`);
+  });
+});
+
+// ─── 與 shared-schemas 契約對齊（成員 1 的事件定義）─────────────────────────
+
+describe('payload 符合 shared-schemas 的 PublishStatusChangedEvent 契約', () => {
+  it('型別層：payload 可指派給 PublishStatusChangedEvent', () => {
+    const payload = buildPublishStatusChangedPayload({
+      record: record(),
+      traceId: 'trace-1',
+      policyVersion: 'v1',
+    });
+    // 型別不符時此行編譯失敗——契約分歧會在 build 期就被抓到，而非執行期
+    const asContract: PublishStatusChangedEvent = payload;
+    expect(asContract.event_type).toBe('publish.status_changed');
+  });
+
+  it('執行期：BaseEvent 與事件專屬欄位全部存在且型別正確', () => {
+    const payload = buildPublishStatusChangedPayload({
+      record: record(),
+      traceId: 'trace-1',
+      policyVersion: 'v1',
+    });
+
+    // BaseEvent
+    expect(typeof payload.schema_version).toBe('string');
+    expect(typeof payload.trace_id).toBe('string');
+    expect(typeof payload.occurred_at).toBe('string');
+    expect(typeof payload.provisional).toBe('boolean');
+    expect(typeof payload.policy_version).toBe('string');
+    // PublishStatusChangedEvent
+    expect(typeof payload.decision_id).toBe('string');
+    expect(Object.values(PublishStatus)).toContain(payload.publish_state);
+    expect(Array.isArray(payload.audit_trail)).toBe(true);
+  });
+
+  it('本模組的擴充欄位（尚未進入 shared-schemas）明確可辨識', () => {
+    const payload = buildPublishStatusChangedPayload({
+      record: record(),
+      traceId: 'trace-1',
+      policyVersion: 'v1',
+    });
+    // 這兩個欄位需請成員 1 納入 PublishStatusChangedEvent，
+    // 在那之前前端讀取它們是 untyped access
+    expect(typeof payload.ready_event_id).toBe('string');
+    expect(typeof payload.polling_fallback_path).toBe('string');
   });
 });

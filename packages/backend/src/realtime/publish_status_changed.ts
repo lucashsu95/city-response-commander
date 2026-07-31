@@ -19,7 +19,10 @@
  * @module backend/realtime/publish_status_changed
  */
 
-import type { AuditTrailEntry, PublishRecord } from '@city-commander/shared-schemas';
+import type {
+  PublishRecord,
+  PublishStatusChangedEvent,
+} from '@city-commander/shared-schemas';
 import { PublishStatus, SCHEMA_VERSION } from '@city-commander/shared-schemas';
 
 // ─── Event constant ───────────────────────────────────────────────────────────
@@ -61,22 +64,20 @@ export function buildPublishStatusChangedReadyEventId(input: {
 /**
  * `publish.status_changed` WebSocket event payload（§13）。
  *
- * Note: shared-schemas PublishStatusChangedEvent 尚未包含 ready_event_id /
- * polling_fallback_path，此 payload 在本模組中作為完整的 wire format。
- * shared-schemas 的對齊由成員 1 在 shared-schemas 套件中處理。
+ * **刻意 `extends` shared-schemas 的 `PublishStatusChangedEvent`**，
+ * 而不是自己重列一份欄位：
+ * 前端（成員 5）是照 shared-schemas 的型別寫的，若這裡自行維護一份平行定義，
+ * 成員 1 之後調整事件契約時兩邊會**靜默分歧**——編譯照過，執行期才發現對不上。
+ * 繼承之後，任何契約變動都會在本檔案立刻變成編譯錯誤。
+ *
+ * ⚠️ 以下兩個欄位是本模組的**擴充**，尚未進入 shared-schemas：
+ * `ready_event_id`、`polling_fallback_path`。
+ * 需請成員 1 納入 `PublishStatusChangedEvent`，前端才能有型別地取用；
+ * 在那之前，前端讀取這兩個欄位會是 untyped access。
  */
-export interface PublishStatusChangedPayload {
-  readonly event_type: typeof PUBLISH_STATUS_CHANGED_EVENT;
-  readonly schema_version: string;
-  readonly trace_id: string;
-  readonly occurred_at: string;
-  readonly provisional: boolean;
-  readonly policy_version: string;
+export interface PublishStatusChangedPayload extends PublishStatusChangedEvent {
   /** 去重 key（§13）*/
   readonly ready_event_id: string;
-  readonly decision_id: string;
-  readonly publish_state: PublishStatus;
-  readonly audit_trail: readonly AuditTrailEntry[];
   /**
    * Polling fallback URL hint（§13, §16.4）。
    *
