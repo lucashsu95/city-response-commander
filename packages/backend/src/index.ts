@@ -1,5 +1,6 @@
 // @city-commander/backend — 後端 API (Lambda + API Gateway)
 
+export * from './decision/index.js';
 export * from './errors/index.js';
 export * from './inject/index.js';
 export * from './recovery/index.js';
