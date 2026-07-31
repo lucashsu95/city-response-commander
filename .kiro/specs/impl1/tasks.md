@@ -1480,7 +1480,7 @@ CHECKPOINT C (not a task): Ensure all Phase 2 property/boundary/golden/policy-sw
 
 > All Phase 3 tasks author **AWS CDK (TypeScript)** infrastructure definitions only (§4.13, §24). No `cdk deploy` is performed here; deployment runbooks live in Phase 11. Every resource name carries an environment prefix and is parameterized via CDK context (`--context env=...`) so LOCAL_MOCK / PERSONAL_AWS_DEV / COMPETITION_AWS switch without code edits (§23). IAM is `Deny`-by-default with per-role least privilege that mechanically enforces the §9 boundary and the FIX-1/2/3 writer isolation.
 
-- [ ] TASK-059 Bootstrap CDK app, env-context profiles, and stack wiring
+- [x] TASK-059 Bootstrap CDK app, env-context profiles, and stack wiring
   - objective: Create the CDK app root that instantiates the four stacks and resolves all three environment profiles from context, so later infra tasks attach resources to a working, parameterized app.
   - requirements_covered: REQ-032, REQ-024 (DELIVERABLE), R-supporting (all)
   - design_sections: §24 (stack split), §23 (profiles), §4.13
@@ -1503,7 +1503,7 @@ CHECKPOINT C (not a task): Ensure all Phase 2 property/boundary/golden/policy-sw
   - competition_quality_floor: CDK app bootstraps with the three env-context profiles (LOCAL_MOCK/PERSONAL_AWS_DEV/COMPETITION_AWS); resources env-prefixed; stacks wired; `--context env=...` switches params with zero code edits; no hard-coded account/region.
   - demo_or_evidence_output: `cdk synth` per profile; context switch changes parameters only (no resource redefinition).
 
-- [ ] TASK-060 DataStack: S3 buckets (raw, sop_source, artifact)
+- [x] TASK-060 DataStack: S3 buckets (raw, sop_source, artifact)
   - objective: Define the three S3 buckets for official raw data, SOP KB source, and generated artifacts with parameterized names and secure defaults (§4.8, §15.1).
   - requirements_covered: REQ-001, REQ-005, REQ-013, REQ-032, R1, R5
   - design_sections: §4.8, §15.1, §10.0 (source storage)
@@ -1526,7 +1526,7 @@ CHECKPOINT C (not a task): Ensure all Phase 2 property/boundary/golden/policy-sw
   - competition_quality_floor: raw / sop_source / artifact buckets parameterized; per-profile removal policy; official raw bucket read-only for the decision path (no public write); no hard-coded names.
   - demo_or_evidence_output: `cdk synth` assertion (three buckets, parameterized names, removal policies).
 
-- [ ] TASK-061 DataStack: IdempotencyTable (DynamoDB) with TTL
+- [x] TASK-061 DataStack: IdempotencyTable (DynamoDB) with TTL
   - objective: Define the `IdempotencyTable` (PK `idempotency_key`, TTL on `expires_at`) that backs dedup, lease state, and stale-running reconciliation (§10.11e, §15.1).
   - requirements_covered: REQ-003, REQ-004, R5
   - design_sections: §10.11e, §15.1, §6
@@ -1549,7 +1549,7 @@ CHECKPOINT C (not a task): Ensure all Phase 2 property/boundary/golden/policy-sw
   - competition_quality_floor: PK `idempotency_key` + TTL(`expires_at`); on-demand; schema supports the lease/recovery conditional Put/Update state machine (starting/running/completed/start_failed/processing_failed) with fencing attributes.
   - demo_or_evidence_output: `cdk synth` assertion (PK, TTL, on-demand).
 
-- [ ] TASK-062 DataStack: DecisionCoreTable (immutable) DynamoDB
+- [x] TASK-062 DataStack: DecisionCoreTable (immutable) DynamoDB
   - objective: Define the `DecisionCoreTable` (PK `decision_id`) that stores immutable core decisions written solely by DecisionFn (§10.11a, §15.1).
   - requirements_covered: REQ-011..REQ-022, R2..R16
   - design_sections: §10.11a, §15.1, §6
@@ -1572,7 +1572,7 @@ CHECKPOINT C (not a task): Ensure all Phase 2 property/boundary/golden/policy-sw
   - competition_quality_floor: PK `decision_id`; on-demand; immutability enforced by writer isolation (DecisionFn sole writer, TASK-077) + app-level `immutable_after_commit`; no publish/mutable state in this table.
   - demo_or_evidence_output: `cdk synth` assertion (PK decision_id, on-demand); writer-isolation asserted via IAM (TASK-077).
 
-- [ ] TASK-063 DataStack: DecisionNarrativeTable (PK decision_id + SK narrative_type)
+- [x] TASK-063 DataStack: DecisionNarrativeTable (PK decision_id + SK narrative_type)
   - objective: Define the `DecisionNarrativeTable` composite-key table so each `narrative_type` (REPORT/PUBLIC_ALERT/EXPLANATION) is an independent item written by its own RendererFn branch (§10.11b, §15.1).
   - requirements_covered: REQ-021, REQ-022, REQ-008, R13, R14, R15
   - design_sections: §10.11b, §15.1, §6
@@ -1595,7 +1595,7 @@ CHECKPOINT C (not a task): Ensure all Phase 2 property/boundary/golden/policy-sw
   - competition_quality_floor: PK `decision_id` + SK `narrative_type` (REPORT/PUBLIC_ALERT/EXPLANATION); supports per-branch `attribute_not_exists(decision_id)` conditional Put on the composite key (single-arg form only); no double-arg `attribute_not_exists`.
   - demo_or_evidence_output: `cdk synth` assertion (composite PK+SK key schema).
 
-- [ ] TASK-064 DataStack: PublishRecordTable (DynamoDB)
+- [x] TASK-064 DataStack: PublishRecordTable (DynamoDB)
   - objective: Define the `PublishRecordTable` (PK `decision_id`) holding mutable publish state + audit trail, isolated from immutable DecisionCore (§10.11d, §10.17).
   - requirements_covered: REQ-022, R11
   - design_sections: §10.11d, §10.17, §15.1
@@ -1618,7 +1618,7 @@ CHECKPOINT C (not a task): Ensure all Phase 2 property/boundary/golden/policy-sw
   - competition_quality_floor: PK `decision_id` + optimistic-lock `version`; on-demand; physically separate from the immutable DecisionCoreTable (publish_state never written back to Core).
   - demo_or_evidence_output: `cdk synth` assertion (separate table, version attribute).
 
-- [ ] TASK-065 DataStack: connections table (WebSocket)
+- [x] TASK-065 DataStack: connections table (WebSocket)
   - objective: Define the DynamoDB `connections` table (PK `connectionId`, TTL) for WebSocket connection storage per the AWS reference pattern (§4.5, §15.1).
   - requirements_covered: REQ-001, REQ-004, R4, R5
   - design_sections: §4.5, §15.1, §6
@@ -1640,7 +1640,7 @@ CHECKPOINT C (not a task): Ensure all Phase 2 property/boundary/golden/policy-sw
   - competition_quality_floor: PK `connectionId` + TTL; on-demand; WebSocket connection storage per the AWS reference pattern; `PostToConnection` confined to Ws roles (TASK-083).
   - demo_or_evidence_output: `cdk synth` assertion (PK connectionId, TTL) + connections-table wiring to the WebSocket API.
 
-- [ ] TASK-066 DataStack: Bedrock Knowledge Base, data source, and vector store config
+- [-] TASK-066 DataStack: Bedrock Knowledge Base, data source, and vector store config
   - objective: Define the Bedrock Knowledge Base (SOP source in S3, article-chunked) with parameterized `kb.knowledge_base_id`, `kb.embedding_model_id`, and vector store, for RAG retrieval (§4.1, §4.2, §14.1).
   - requirements_covered: REQ-005, REQ-007, REQ-008, R5, R15, R16
   - design_sections: §4.1, §4.2, §14.1
