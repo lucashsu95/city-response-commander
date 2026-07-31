@@ -206,6 +206,20 @@ a:focus-visible {
   background-color: #f59e0b;
 }
 
+/* Degraded realtime mode: text glyph + underline so colour is never the only cue */
+.status-indicator--degraded {
+  border-bottom: 2px solid #f59e0b;
+}
+
+.status-indicator--polling-error {
+  background-color: #7f1d1d;
+  border-bottom: 2px solid #fca5a5;
+}
+
+.status-indicator--polling-ok {
+  background-color: #1f2d45;
+}
+
 .status-indicator--provisional {
   background-color: #3730a3;
 }

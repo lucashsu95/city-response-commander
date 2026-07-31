@@ -111,6 +111,123 @@ export interface ApiClientConfig {
   readonly baseEndpoint: string;
 }
 
+// ─── Read-only Route Fragment Guard ────────────────────────
+
+/** Explicit scheme prefix, e.g. `https:`, `javascript:`, `data:`. */
+const EXPLICIT_SCHEME_PATTERN = /^[a-zA-Z][a-zA-Z\d+\-.]*:/;
+
+/** Root-relative or protocol-relative syntax. */
+const LEADING_SLASH_PATTERN = /^\//;
+
+/** ASCII C0 control characters plus DEL, anywhere in the fragment. */
+// eslint-disable-next-line no-control-regex -- deliberately matching C0/DEL to reject smuggled control characters
+const CONTROL_CHARACTER_PATTERN = /[\u0000-\u001F\u007F]/;
+
+/** Why a read-only route fragment was refused. */
+type ReadOnlyPathRejection =
+  | 'EMPTY'
+  | 'SURROUNDING_WHITESPACE'
+  | 'BACKSLASH'
+  | 'CONTROL_CHARACTER'
+  | 'EXPLICIT_SCHEME'
+  | 'LEADING_SLASH'
+  | 'DOT_SEGMENT'
+  | 'MALFORMED_ENCODING'
+  | 'UNRESOLVABLE'
+  | 'CROSS_ORIGIN'
+  | 'OUTSIDE_BASE_PATH';
+
+type ReadOnlyPathValidation =
+  | { readonly valid: true; readonly url: URL }
+  | { readonly valid: false; readonly reason: ReadOnlyPathRejection };
+
+/**
+ * Returns the path portion of a route fragment, excluding query and hash.
+ */
+function pathPortion(path: string): string {
+  const cut = path.search(/[?#]/);
+  return cut === -1 ? path : path.slice(0, cut);
+}
+
+/**
+ * Validates that a route fragment cannot escape the injected API endpoint.
+ *
+ * Defence in depth, in order:
+ *  1. reject empty input
+ *  2. reject surrounding whitespace (a trimmed value differing from the input)
+ *  3. reject backslashes, which URL parsers may treat as separators
+ *  4. reject ASCII control characters
+ *  5. reject explicit schemes
+ *  6. reject root-relative and protocol-relative syntax
+ *  7. reject `.` and `..` path segments
+ *  8. resolve against the injected endpoint
+ *  9. require the same origin as the endpoint
+ * 10. require the pathname to stay inside the normalized base path prefix
+ *
+ * No host, origin, or endpoint literal appears here: the base always comes from
+ * the injected configuration.
+ */
+function validateReadOnlyPath(path: string, baseEndpoint: string): ReadOnlyPathValidation {
+  if (path === '') {
+    return { valid: false, reason: 'EMPTY' };
+  }
+  if (path !== path.trim()) {
+    return { valid: false, reason: 'SURROUNDING_WHITESPACE' };
+  }
+  if (path.includes('\\')) {
+    return { valid: false, reason: 'BACKSLASH' };
+  }
+  if (CONTROL_CHARACTER_PATTERN.test(path)) {
+    return { valid: false, reason: 'CONTROL_CHARACTER' };
+  }
+  if (EXPLICIT_SCHEME_PATTERN.test(path)) {
+    return { valid: false, reason: 'EXPLICIT_SCHEME' };
+  }
+  if (LEADING_SLASH_PATTERN.test(path)) {
+    return { valid: false, reason: 'LEADING_SLASH' };
+  }
+  for (const rawSegment of pathPortion(path).split('/')) {
+    if (rawSegment === '.' || rawSegment === '..') {
+      return { valid: false, reason: 'DOT_SEGMENT' };
+    }
+    // A percent-encoded dot segment (`%2e%2e`, `..%2f..`) is not a separator to
+    // the URL parser, so the base-path check below would not catch it. Reject it
+    // here in case the server decodes before routing. Only dot segments are
+    // checked after decoding: other decoded characters (a backslash inside an
+    // `encodeURIComponent` identifier, for example) remain legitimate.
+    let decodedSegment: string;
+    try {
+      decodedSegment = decodeURIComponent(rawSegment);
+    } catch {
+      return { valid: false, reason: 'MALFORMED_ENCODING' };
+    }
+    for (const part of decodedSegment.split('/')) {
+      if (part === '.' || part === '..') {
+        return { valid: false, reason: 'DOT_SEGMENT' };
+      }
+    }
+  }
+
+  // Resolve against the injected endpoint and confirm the result stayed inside it.
+  let base: URL;
+  let resolved: URL;
+  try {
+    base = new URL(`${baseEndpoint}/`);
+    resolved = new URL(path, base);
+  } catch {
+    return { valid: false, reason: 'UNRESOLVABLE' };
+  }
+  if (resolved.origin !== base.origin) {
+    return { valid: false, reason: 'CROSS_ORIGIN' };
+  }
+  const basePathname = base.pathname.endsWith('/') ? base.pathname : `${base.pathname}/`;
+  if (!resolved.pathname.startsWith(basePathname)) {
+    return { valid: false, reason: 'OUTSIDE_BASE_PATH' };
+  }
+
+  return { valid: true, url: resolved };
+}
+
 // ─── API Client ────────────────────────────────────────────
 
 /**
@@ -198,6 +315,36 @@ export function createApiClient(config: ApiClientConfig) {
      */
     getCrowd(options?: RequestOptions): Promise<ApiResult<GetCrowdResponse>> {
       return get<GetCrowdResponse>('crowd', options);
+    },
+
+    /**
+     * GET {route fragment} - Generic read-only JSON request.
+     *
+     * Used by the §13 polling fallback for routes that have no canonical
+     * shared-schema response contract yet (`/timeline`, `/incidents`,
+     * `/reports/{id}`). The result stays `unknown` on purpose: no duplicate
+     * canonical response interface is invented in the frontend.
+     *
+     * @param path - Relative route fragment with identifiers already
+     *               URL-encoded. Anything that could escape the injected base
+     *               endpoint is rejected before any request is made: absolute,
+     *               protocol-relative and root-relative paths, backslashes,
+     *               control characters, surrounding whitespace, dot-segment
+     *               traversal, and any fragment that resolves to a different
+     *               origin or outside the base path prefix.
+     */
+    getReadOnlyJson(path: string, options?: RequestOptions): Promise<ApiResult<unknown>> {
+      const validation = validateReadOnlyPath(path, baseUrl);
+      if (!validation.valid) {
+        // The rejected fragment is not echoed back into the error message.
+        return Promise.resolve({
+          ok: false,
+          error: configurationError(
+            `Read-only path rejected: must be a relative route fragment inside the configured API endpoint (${validation.reason})`,
+          ),
+        });
+      }
+      return get<unknown>(path, options);
     },
   };
 }

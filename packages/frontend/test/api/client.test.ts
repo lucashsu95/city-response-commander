@@ -231,4 +231,128 @@ describe('API Client', () => {
       );
     });
   });
+
+  // ─── F-02: read-only route fragment guard ────────────────
+
+  describe('getReadOnlyJson route fragment guard', () => {
+    const BASE_ENDPOINT = 'https://api.example.com';
+    const NESTED_BASE_ENDPOINT = 'https://api.example.com/stage/v1';
+
+    const rejectedPaths: readonly { readonly label: string; readonly path: string }[] = [
+      { label: 'absolute https URL', path: 'https://evil.example' },
+      { label: 'absolute http URL', path: 'http://evil.example/steal' },
+      { label: 'javascript scheme', path: 'javascript:alert(1)' },
+      { label: 'data scheme', path: 'data:text/html,<b>x</b>' },
+      { label: 'protocol-relative', path: '//evil.example' },
+      { label: 'root-relative', path: '/absolute/path' },
+      { label: 'double backslash host', path: '\\\\evil.example' },
+      { label: 'single backslash', path: '\\evil' },
+      { label: 'space-prefixed absolute URL', path: '  https://evil.example' },
+      { label: 'tab-prefixed absolute URL', path: '\thttps://evil.example' },
+      { label: 'space-prefixed protocol-relative', path: ' //evil.example' },
+      { label: 'trailing whitespace', path: 'timeline ' },
+      { label: 'embedded newline', path: 'time\nline' },
+      { label: 'embedded NUL', path: 'time\u0000line' },
+      { label: 'embedded DEL', path: 'time\u007fline' },
+      { label: 'single dot segment', path: '.' },
+      { label: 'double dot segment', path: '..' },
+      { label: 'traversal', path: '../../secret' },
+      { label: 'nested traversal', path: 'reports/../../secret' },
+      { label: 'leading traversal with dot', path: './timeline' },
+      { label: 'percent-encoded traversal', path: '..%2f..%2fsecret' },
+      { label: 'percent-encoded dot segment', path: '%2e%2e/secret' },
+      { label: 'malformed percent encoding', path: 'reports/%zz' },
+      { label: 'empty string', path: '' },
+    ];
+
+    it.each(rejectedPaths)('rejects $label without calling fetch', async ({ path }) => {
+      const client = createApiClient({ baseEndpoint: BASE_ENDPOINT });
+      const result = await client.getReadOnlyJson(path);
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error.code).toBe('CONFIGURATION_ERROR');
+        expect(result.error.message).toContain('Read-only path rejected');
+      }
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    const acceptedPaths: readonly { readonly label: string; readonly path: string }[] = [
+      { label: 'timeline', path: 'timeline' },
+      { label: 'incidents', path: 'incidents' },
+      { label: 'encoded report id', path: 'reports/a%2Fb' },
+      { label: 'query string', path: 'q?x=1&y=2' },
+      { label: 'nested route', path: 'reports/abc/detail' },
+    ];
+
+    it.each(acceptedPaths)('accepts $label and resolves against the endpoint', async ({ path }) => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({ any: 'payload' }),
+      });
+
+      const client = createApiClient({ baseEndpoint: BASE_ENDPOINT });
+      const result = await client.getReadOnlyJson(path);
+
+      expect(result.ok).toBe(true);
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+      const requestedUrl = String(mockFetch.mock.calls[0]?.[0]);
+      expect(requestedUrl.startsWith('https://api.example.com/')).toBe(true);
+      expect(requestedUrl).not.toContain('evil.example');
+    });
+
+    it('accepts an encodeURIComponent identifier containing slash, space, question mark and backslash', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({ any: 'payload' }),
+      });
+
+      const rawId = 'dec/1 2?x\\y';
+      const path = `reports/${encodeURIComponent(rawId)}`;
+      expect(path).toBe('reports/dec%2F1%202%3Fx%5Cy');
+
+      const client = createApiClient({ baseEndpoint: BASE_ENDPOINT });
+      const result = await client.getReadOnlyJson(path);
+
+      expect(result.ok).toBe(true);
+      const requestedUrl = String(mockFetch.mock.calls[0]?.[0]);
+      expect(requestedUrl).toBe('https://api.example.com/reports/dec%2F1%202%3Fx%5Cy');
+    });
+
+    it('keeps a nested base path prefix and rejects traversal that escapes it', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({ any: 'payload' }),
+      });
+
+      const client = createApiClient({ baseEndpoint: NESTED_BASE_ENDPOINT });
+      const allowed = await client.getReadOnlyJson('timeline');
+      expect(allowed.ok).toBe(true);
+      expect(String(mockFetch.mock.calls[0]?.[0])).toBe(
+        'https://api.example.com/stage/v1/timeline',
+      );
+
+      mockFetch.mockReset();
+      const escaped = await client.getReadOnlyJson('..%2f..%2fsecret');
+      expect(escaped.ok).toBe(false);
+      if (!escaped.ok) {
+        expect(escaped.error.code).toBe('CONFIGURATION_ERROR');
+      }
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    it('never contacts an external origin for any rejected fragment', async () => {
+      const client = createApiClient({ baseEndpoint: BASE_ENDPOINT });
+
+      for (const { path } of rejectedPaths) {
+        const result = await client.getReadOnlyJson(path);
+        expect(result.ok).toBe(false);
+      }
+
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+  });
 });

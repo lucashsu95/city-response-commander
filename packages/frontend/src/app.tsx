@@ -15,16 +15,11 @@ import { DashboardPage } from './pages/dashboard.js';
 import { NotFoundPage } from './pages/not_found.js';
 import { ConfigurationErrorScreen } from './components/system/configuration_error.js';
 import { loadRuntimeConfig } from './config/runtime_config.js';
-import type { RuntimeConfig } from './config/runtime_config.js';
+import { AppConfigProvider } from './state/app_context.js';
 
 // ─── Application Context ───────────────────────────────────
 
-/**
- * Application context value provided to child components.
- */
-export interface AppContextValue {
-  readonly config: RuntimeConfig;
-}
+export type { AppContextValue } from './state/app_context.js';
 
 // ─── Main Application ──────────────────────────────────────
 
@@ -43,13 +38,15 @@ export function App(): ReactNode {
     return <ConfigurationErrorScreen errors={configResult.errors} />;
   }
 
-  // Configuration is valid; render application routes
+  // Configuration is valid; provide it to the routes and render
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<DashboardPage />} />
-        <Route path="*" element={<NotFoundPage />} />
-      </Routes>
-    </BrowserRouter>
+    <AppConfigProvider config={configResult.config}>
+      <BrowserRouter>
+        <Routes>
+          <Route path="/" element={<DashboardPage />} />
+          <Route path="*" element={<NotFoundPage />} />
+        </Routes>
+      </BrowserRouter>
+    </AppConfigProvider>
   );
 }

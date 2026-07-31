@@ -17,7 +17,7 @@ import { OperationalStatusBar } from '../components/system/operational_status.js
 import { SnapshotProvenance } from '../components/decision/snapshot_provenance.js';
 import { AffectedRoadContextView } from '../components/decision/affected_road_context_view.js';
 import { createDefaultOperationalStatus } from '../state/app_state.js';
-import type { OperationalStatus } from '../state/app_state.js';
+import type { ConnectionMode, OperationalStatus } from '../state/app_state.js';
 
 // ─── Region Components ─────────────────────────────────────
 
@@ -129,6 +129,15 @@ export interface DashboardShellProps {
    * reason.
    */
   readonly affectedRoadContext?: AffectedRoadContext | null;
+  /**
+   * Realtime connection mode reported by the realtime transport (§16.4).
+   * Defaults to `disconnected` before a connection is attempted.
+   */
+  readonly connectionMode?: ConnectionMode;
+  /** Current polling failure text while degraded, if any. */
+  readonly pollingErrorMessage?: string | null;
+  /** Polling cycles that refreshed at least one canonical read target. */
+  readonly pollingUpdateCount?: number;
 }
 
 /**
@@ -139,8 +148,11 @@ export interface DashboardShellProps {
  * backend truth. This is a pass-through of a backend value, not a
  * calculation: no timestamp comparison or policy defaulting occurs here.
  */
-function resolveOperationalStatus(snapshot: SelectedSnapshot | null): OperationalStatus {
-  const base = createDefaultOperationalStatus();
+function resolveOperationalStatus(
+  snapshot: SelectedSnapshot | null,
+  connectionMode: ConnectionMode,
+): OperationalStatus {
+  const base: OperationalStatus = { ...createDefaultOperationalStatus(), connectionMode };
 
   if (snapshot === null) {
     return base;
@@ -158,14 +170,21 @@ function resolveOperationalStatus(snapshot: SelectedSnapshot | null): Operationa
 export function DashboardShell({
   selectedSnapshot = null,
   affectedRoadContext = null,
+  connectionMode = 'disconnected',
+  pollingErrorMessage = null,
+  pollingUpdateCount = 0,
 }: DashboardShellProps = {}): ReactNode {
-  const operationalStatus = resolveOperationalStatus(selectedSnapshot);
+  const operationalStatus = resolveOperationalStatus(selectedSnapshot, connectionMode);
 
   return (
     <div className="dashboard-shell">
       <header className="dashboard-header" role="banner">
         <h1 className="dashboard-header__title">城市交通應變 AI 指揮台</h1>
-        <OperationalStatusBar status={operationalStatus} />
+        <OperationalStatusBar
+          status={operationalStatus}
+          pollingErrorMessage={pollingErrorMessage}
+          pollingUpdateCount={pollingUpdateCount}
+        />
       </header>
 
       <main className="dashboard-main" role="main">
