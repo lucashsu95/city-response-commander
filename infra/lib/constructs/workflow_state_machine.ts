@@ -161,7 +161,7 @@ export interface WorkflowStateMachineProps {
  * process get independent definitions.
  *
  * The canonical `workflow.asl.json` file is the single source of truth
- * for the workflow topology (StartAt, the 28 state names, Retry/Catch
+ * for the workflow topology (StartAt, the state names, Retry/Catch
  * configuration, etc.). Only the `TimeoutSeconds` is injected here.
  */
 function loadAslWithTimeout(aslPath: string, workflowTimeoutSeconds: number): string {
@@ -173,6 +173,153 @@ function loadAslWithTimeout(aslPath: string, workflowTimeoutSeconds: number): st
     TimeoutSeconds: workflowTimeoutSeconds,
   };
   return JSON.stringify(withTimeout);
+}
+
+// ─── ASL pre-synth validation (TASK-068 canonical-source patch) ───────────
+
+interface AslLikeState {
+  Type?: string;
+  Next?: string;
+  End?: boolean;
+  Default?: string;
+  Choices?: Array<{ Next?: string }>;
+  Catch?: Array<{ Next?: string }>;
+  Branches?: Array<{ StartAt?: string; States?: Record<string, unknown> }>;
+}
+
+export type { AslLikeState };
+
+/**
+ * Walk the ASL state map once and validate that every Next / Default /
+ * Choices.Next / Catch.Next target references a state name that actually
+ * exists in the same scope. Branch-internal references are validated
+ * against the branch-local States map.
+ *
+ * Returns the list of validated (scope, state-name) pairs.
+ */
+function validateStateReferences(
+  scopeLabel: string,
+  states: Record<string, AslLikeState>,
+): Set<string> {
+  const seen = new Set<string>();
+  for (const [name, s] of Object.entries(states)) {
+    seen.add(name);
+    if (s.Next && !(s.Next in states)) {
+      throw new Error(
+        `TASK-068 ASL validation: ${scopeLabel}.${name}.Next -> '${s.Next}' is not a defined state`,
+      );
+    }
+    if (s.Default && !(s.Default in states)) {
+      throw new Error(
+        `TASK-068 ASL validation: ${scopeLabel}.${name}.Default -> '${s.Default}' is not a defined state`,
+      );
+    }
+    if (s.Choices) {
+      for (const c of s.Choices) {
+        if (!c.Next) continue;
+        if (!(c.Next in states)) {
+          throw new Error(
+            `TASK-068 ASL validation: ${scopeLabel}.${name}.Choices -> '${c.Next}' is not a defined state`,
+          );
+        }
+      }
+    }
+    if (s.Catch) {
+      for (const c of s.Catch) {
+        if (!c.Next) continue;
+        if (!(c.Next in states)) {
+          throw new Error(
+            `TASK-068 ASL validation: ${scopeLabel}.${name}.Catch -> '${c.Next}' is not a defined state`,
+          );
+        }
+      }
+    }
+    if (s.Branches) {
+      s.Branches.forEach((b, i) => {
+        if (!b.StartAt) {
+          throw new Error(
+            `TASK-068 ASL validation: ${scopeLabel}.${name}.Branches[${i}] is missing StartAt`,
+          );
+        }
+        const localStates = (b.States ?? {}) as Record<string, AslLikeState>;
+        if (!(b.StartAt in localStates)) {
+          throw new Error(
+            `TASK-068 ASL validation: ${scopeLabel}.${name}.Branches[${i}].StartAt -> '${b.StartAt}' is not defined in the branch`,
+          );
+        }
+        const inner = validateStateReferences(
+          `${scopeLabel}.${name}.Branches[${i}]`,
+          localStates,
+        );
+        for (const n of inner) seen.add(`${name}::${n}`);
+      });
+    }
+  }
+  return seen;
+}
+
+/**
+ * Pre-synth validation of the canonical ASL document.
+ *
+ * Asserts:
+ *   1. JSON parses (this is implied by the caller having parsed it)
+ *   2. `StartAt` is a non-empty string pointing to a defined top-level state
+ *   3. Every `Next` / `Default` / `Choices[i].Next` / `Catch[i].Next`
+ *      references a state that exists in the same scope
+ *   4. Every `${XxxArn}` placeholder the Construct expects to substitute
+ *      actually appears at least once in the serialized document (so CDK
+ *      can substitute it; otherwise the placeholder would be silently
+ *      left intact and Step Functions would fail at runtime)
+ *   5. After applying the supplied substitution map, no `${…}` token
+ *      remains in the serialized document (so the deployed definition
+ *      contains no unresolved placeholders)
+ *
+ * The function returns the validated state-name set for callers that
+ * want to assert reachability separately.
+ */
+export function validateAslDocument(
+  parsed: Record<string, unknown>,
+  expectedPlaceholders: readonly string[],
+  substitutions: Record<string, string>,
+): Set<string> {
+  if (typeof parsed['StartAt'] !== 'string' || parsed['StartAt'].length === 0) {
+    throw new Error('TASK-068 ASL validation: missing or empty StartAt');
+  }
+  const states = parsed['States'] as Record<string, AslLikeState> | undefined;
+  if (!states || typeof states !== 'object') {
+    throw new Error('TASK-068 ASL validation: missing or invalid States map');
+  }
+  const startAt = parsed['StartAt'] as string;
+  if (!(startAt in states)) {
+    throw new Error(
+      `TASK-068 ASL validation: StartAt '${startAt}' is not a defined state`,
+    );
+  }
+
+  const reachable = validateStateReferences('root', states);
+
+  const serialized = JSON.stringify(parsed);
+  for (const placeholder of expectedPlaceholders) {
+    const token = '${' + placeholder + '}';
+    if (!serialized.includes(token)) {
+      throw new Error(
+        `TASK-068 ASL validation: expected placeholder '${token}' not present in workflow.asl.json`,
+      );
+    }
+  }
+
+  let afterSubstitution = serialized;
+  for (const [k, v] of Object.entries(substitutions)) {
+    afterSubstitution = afterSubstitution.split('${' + k + '}').join(v);
+  }
+  const leftover = afterSubstitution.match(/\$\{[^}]+\}/g);
+  if (leftover && leftover.length > 0) {
+    throw new Error(
+      `TASK-068 ASL validation: unresolved placeholders after substitution: ${leftover.join(', ')}`,
+    );
+  }
+
+  return reachable;
 }
 
 // ─── Construct ─────────────────────────────────────────────────────────────
@@ -220,6 +367,35 @@ export class WorkflowStateMachineConstruct extends Construct {
     validateFunctionArn('rendererFn', rendererFn.functionArn);
     validateFunctionArn('wsPushFn', wsPushFn.functionArn);
 
+    // TASK-068 canonical-source patch: pre-synth validation runs here,
+    // BEFORE the LOCAL_MOCK bail-out so all profiles (LOCAL_MOCK,
+    // PERSONAL_AWS_DEV, COMPETITION_AWS) see the same errors when the
+    // canonical `workflow.asl.json` is malformed. This rejects:
+    //   - unparseable JSON (thrown by `JSON.parse`)
+    //   - missing or empty `StartAt`
+    //   - `Next` / `Default` / `Choices[i].Next` / `Catch[i].Next`
+    //     pointing to a state that does not exist in the same scope
+    //   - placeholder names that the Construct expects to substitute but
+    //     that are absent from the document
+    //   - `${...}` tokens that remain after substitution (unresolved
+    //     placeholders would break Step Functions at deploy time)
+    //
+    // The substitutions map here mirrors the `definitionSubstitutions`
+    // prop below; it is applied manually so we can detect any token CDK
+    // would leave in the deployed definition. The Construct itself
+    // relies on CDK to perform the real substitution at synth time.
+    const aslPath = path.resolve(__dirname, '..', '..', 'statemachine', 'workflow.asl.json');
+    const rawAsl = fs.readFileSync(aslPath, 'utf8');
+    const parsedAsl = JSON.parse(rawAsl) as Record<string, unknown>;
+    const substitutions: Record<string, string> = {
+      WorkflowStatusFnArn: workflowStatusFn.functionArn,
+      RecoveryGateFnArn: recoveryGateFn.functionArn,
+      DecisionFnArn: decisionFn.functionArn,
+      RendererFnArn: rendererFn.functionArn,
+      WsPushFnArn: wsPushFn.functionArn,
+    };
+    validateAslDocument(parsedAsl, ASL_SUBSTITUTION_KEYS, substitutions);
+
     this.workflowTimeoutSeconds = workflowTimeoutSeconds;
 
     if (envContext.isLocalMock) {
@@ -235,14 +411,14 @@ export class WorkflowStateMachineConstruct extends Construct {
       throw new Error(`Generated stateMachineName '${stateMachineName}' is invalid`);
     }
 
-    const aslPath = path.resolve(__dirname, '..', '..', 'statemachine', 'workflow.asl.json');
-
-    // Read the canonical `workflow.asl.json` and inject the configured
-    // `TimeoutSeconds` at the top level. The canonical file remains the
-    // single source of truth for the workflow topology (StartAt, the 28
-    // state names, Retry/Catch configuration, etc.). Only the timeout
-    // value is injected here — the file is NOT mutated, and no duplicate
-    // PERSONAL/COMPETITION file is maintained.
+    // Read the canonical `workflow.asl.json`. The Construct then injects
+    // the configured `TimeoutSeconds` at the top level for deployment.
+    // The canonical file remains the single source of truth for the
+    // workflow topology (StartAt, the state names, Retry/Catch
+    // configuration, etc.). Only the timeout value is injected here —
+    // the file is NOT mutated, and no duplicate PERSONAL/COMPETITION
+    // file is maintained. The pre-synth validation above already ran
+    // against the same file before the LOCAL_MOCK bail-out.
     const definitionBody = sfn.DefinitionBody.fromString(
       loadAslWithTimeout(aslPath, workflowTimeoutSeconds),
     );

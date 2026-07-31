@@ -19,6 +19,7 @@ import {
   WORKFLOW_TIMEOUT_SECONDS_MIN,
   WORKFLOW_TIMEOUT_SECONDS_MAX,
   ASL_SUBSTITUTION_KEYS,
+  validateAslDocument,
 } from '../lib/constructs/workflow_state_machine.js';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -475,12 +476,20 @@ describe('B. First-state gate', () => {
     expect(doc.States['RECOVERY_GATE'].Type).toBe('Task');
   });
 
-  it('MARK_RUNNING uses $$.Execution.Id', () => {
+  it('MARK_RUNNING injects workflow_execution_arn from $$.Execution.Id (no input dependency)', () => {
     const params = doc.States['MARK_RUNNING'].Parameters as Record<string, unknown> | undefined;
     expect(params).toBeDefined();
     const payload = (params as { Payload: Record<string, string> })?.Payload;
     expect(payload).toBeDefined();
-    expect(payload['execution_id.$']).toBe('$$.Execution.Id');
+    expect(payload['workflow_execution_arn.$']).toBe('$$.Execution.Id');
+    // Spec contract: do NOT read workflow_execution_arn from the input.
+    expect(payload['workflow_execution_arn.$']).not.toBe('$.workflow_execution_arn');
+  });
+
+  it('MARK_RUNNING reads request_timestamp (not trace_id) from input', () => {
+    const params = doc.States['MARK_RUNNING'].Parameters as { Payload: Record<string, string> };
+    expect(params.Payload['request_timestamp.$']).toBe('$.request_timestamp');
+    expect(params.Payload['trace_id.$']).toBeUndefined();
   });
 
   it('MARK_RUNNING error path goes to FAIL_BEFORE_RUNNING_REGISTERED', () => {
@@ -584,14 +593,47 @@ describe('D. Core-write Choice Gate', () => {
     expect(x?.Next).toBe('MARK_CORE_COMMITTED_DECISION');
   });
 
-  it('CORE_IDENTITY_CONFLICT -> terminal failure chain', () => {
+  it('CORE_IDENTITY_CONFLICT -> terminal failure chain (separate from general failure path)', () => {
     const c = doc.States['DECISION_CORE_WRITE_GATE'].Choices!;
     const x = c.find((y) => y.StringEquals === 'CORE_IDENTITY_CONFLICT');
     expect(x?.Next).toBe('PREPARE_CORE_IDENTITY_CONFLICT');
+    // The Pass state carries retryable=false, recovery_stage=NONE,
+    // last_error=CORE_IDENTITY_CONFLICT into the terminal Task.
+    const prepareParams = doc.States['PREPARE_CORE_IDENTITY_CONFLICT'].Parameters as {
+      last_error: string;
+      retryable: boolean;
+      recovery_stage: string;
+    };
+    expect(prepareParams.last_error).toBe('CORE_IDENTITY_CONFLICT');
+    expect(prepareParams.retryable).toBe(false);
+    expect(prepareParams.recovery_stage).toBe('NONE');
+    // Identity-conflict path is its own dedicated handoff chain, NOT
+    // the general MARK_PROCESSING_FAILED -> FAIL_PROCESSING_FAILED one:
     expect(doc.States['PREPARE_CORE_IDENTITY_CONFLICT'].Next).toBe('MARK_PROCESSING_FAILED_TERMINAL');
     expect(doc.States['MARK_PROCESSING_FAILED_TERMINAL'].Next).toBe('PUBLISH_PROCESSING_FAILED');
     expect(doc.States['PUBLISH_PROCESSING_FAILED'].Next).toBe('FAIL_CORE_IDENTITY_CONFLICT');
     expect(doc.States['FAIL_CORE_IDENTITY_CONFLICT'].Type).toBe('Fail');
+    // MARK_PROCESSING_FAILED_TERMINAL hardcodes the same identity-conflict
+    // payload so TASK-097 (the backend wiring owner) sees a deterministic
+    // handoff node regardless of the upstream Pass state.
+    const termParams = doc.States['MARK_PROCESSING_FAILED_TERMINAL'].Parameters as {
+      Payload: { action: string; terminal: boolean; last_error: string; retryable: boolean; recovery_stage: string };
+    };
+    expect(termParams.Payload.action).toBe('MARK_PROCESSING_FAILED');
+    expect(termParams.Payload.terminal).toBe(true);
+    expect(termParams.Payload.last_error).toBe('CORE_IDENTITY_CONFLICT');
+    expect(termParams.Payload.retryable).toBe(false);
+    expect(termParams.Payload.recovery_stage).toBe('NONE');
+    // The dedicated WsPushFn handoff publishes `decision.processing_failed`
+    // so downstream consumers (security alert, audit) can pick it up.
+    const pubParams = doc.States['PUBLISH_PROCESSING_FAILED'].Parameters as {
+      Payload: { event_type: string; last_error: string };
+    };
+    expect(pubParams.Payload.event_type).toBe('decision.processing_failed');
+    expect(pubParams.Payload.last_error).toBe('CORE_IDENTITY_CONFLICT');
+    // Identity conflict and general failure must NOT share the same Fail.
+    expect(doc.States['MARK_PROCESSING_FAILED'].Next).toBe('FAIL_PROCESSING_FAILED');
+    expect(doc.States['MARK_PROCESSING_FAILED'].Next).not.toBe('FAIL_CORE_IDENTITY_CONFLICT');
   });
 
   it('CORE_IDENTITY_CONFLICT path never reaches Fast Path or Renderer or Completed', () => {
@@ -1311,5 +1353,304 @@ describe('M. Static sanity', () => {
     const all = Object.values(getStateMachineResources(resources));
     expect(all.length).toBe(1);
     expect(getProps(all[0])['StateMachineType']).toBe('EXPRESS');
+  });
+});
+
+// ─── N. Canonical-source patch (TASK-068 handoff) ─────────────────────────
+
+describe('N. Canonical-source patch (TASK-068 handoff)', () => {
+  it('Construct source contains exactly one canonical-file path resolution (no second copy)', () => {
+    const src = fs.readFileSync(
+      path.resolve(__dirname, '..', 'lib', 'constructs', 'workflow_state_machine.ts'),
+      'utf8',
+    );
+    // Single canonical-source load: the path.resolve + readFileSync pair
+    // must appear exactly once. The Construct must not declare any
+    // inline DefinitionString constant for any state name (proves no
+    // second copy of the topology exists in TypeScript).
+    expect(src).not.toMatch(/"StartAt"\s*:\s*"MARK_RUNNING"/);
+    expect(src).not.toMatch(/"SELECT_RECOVERY_MODE"/);
+    expect(src).not.toMatch(/"ENRICHMENT_PARALLEL"/);
+    expect(src).not.toMatch(/"MARK_COMPLETED"/);
+    // No second workflow.asl file (e.g. workflow.personal.asl.json,
+    // workflow.competition.asl.json). Only the canonical filename.
+    const aslFilenames = src.match(/[A-Za-z_]+\.asl\.json/g) ?? [];
+    expect(new Set(aslFilenames)).toEqual(new Set(['workflow.asl.json']));
+  });
+
+  it('validateAslDocument: rejects dangling Next', () => {
+    const doc = JSON.parse(fs.readFileSync(ASL_PATH, 'utf8')) as Record<string, unknown>;
+    const states = doc['States'] as Record<string, Record<string, unknown>>;
+    states['MARK_RUNNING'] = { ...states['MARK_RUNNING'], Next: 'NO_SUCH_STATE' };
+    expect(() =>
+      validateAslDocument(doc, ASL_SUBSTITUTION_KEYS, {
+        WorkflowStatusFnArn: 'a',
+        RecoveryGateFnArn: 'a',
+        DecisionFnArn: 'a',
+        RendererFnArn: 'a',
+        WsPushFnArn: 'a',
+      }),
+    ).toThrow(/NO_SUCH_STATE|not a defined state/i);
+  });
+
+  it('validateAslDocument: rejects dangling Default', () => {
+    const doc = JSON.parse(fs.readFileSync(ASL_PATH, 'utf8')) as Record<string, unknown>;
+    const states = doc['States'] as Record<string, Record<string, unknown>>;
+    states['SELECT_RECOVERY_MODE'] = { ...states['SELECT_RECOVERY_MODE'], Default: 'NO_SUCH_STATE' };
+    expect(() =>
+      validateAslDocument(doc, ASL_SUBSTITUTION_KEYS, {
+        WorkflowStatusFnArn: 'a',
+        RecoveryGateFnArn: 'a',
+        DecisionFnArn: 'a',
+        RendererFnArn: 'a',
+        WsPushFnArn: 'a',
+      }),
+    ).toThrow(/NO_SUCH_STATE|not a defined state/i);
+  });
+
+  it('validateAslDocument: rejects Choices.Next pointing to a missing state', () => {
+    const doc = JSON.parse(fs.readFileSync(ASL_PATH, 'utf8')) as Record<string, unknown>;
+    const states = doc['States'] as Record<string, Record<string, unknown>>;
+    const core = states['DECISION_CORE_WRITE_GATE'] as { Choices: Array<Record<string, unknown>> };
+    core.Choices = core.Choices.map((ch, i) =>
+      i === 0 ? { ...ch, Next: 'NO_SUCH_STATE' } : ch,
+    );
+    expect(() =>
+      validateAslDocument(doc, ASL_SUBSTITUTION_KEYS, {
+        WorkflowStatusFnArn: 'a',
+        RecoveryGateFnArn: 'a',
+        DecisionFnArn: 'a',
+        RendererFnArn: 'a',
+        WsPushFnArn: 'a',
+      }),
+    ).toThrow(/NO_SUCH_STATE|not a defined state/i);
+  });
+
+  it('validateAslDocument: rejects Catch.Next pointing to a missing state', () => {
+    const doc = JSON.parse(fs.readFileSync(ASL_PATH, 'utf8')) as Record<string, unknown>;
+    const states = doc['States'] as Record<string, Record<string, unknown>>;
+    const runDecision = states['RUN_DECISION'] as { Catch: Array<Record<string, unknown>> };
+    runDecision.Catch = [{ ...runDecision.Catch[0], Next: 'NO_SUCH_STATE' }];
+    expect(() =>
+      validateAslDocument(doc, ASL_SUBSTITUTION_KEYS, {
+        WorkflowStatusFnArn: 'a',
+        RecoveryGateFnArn: 'a',
+        DecisionFnArn: 'a',
+        RendererFnArn: 'a',
+        WsPushFnArn: 'a',
+      }),
+    ).toThrow(/NO_SUCH_STATE|not a defined state/i);
+  });
+
+  it('validateAslDocument: rejects missing StartAt', () => {
+    const doc = JSON.parse(fs.readFileSync(ASL_PATH, 'utf8')) as Record<string, unknown>;
+    delete doc['StartAt'];
+    expect(() =>
+      validateAslDocument(doc, ASL_SUBSTITUTION_KEYS, {
+        WorkflowStatusFnArn: 'a',
+        RecoveryGateFnArn: 'a',
+        DecisionFnArn: 'a',
+        RendererFnArn: 'a',
+        WsPushFnArn: 'a',
+      }),
+    ).toThrow(/missing or empty StartAt/);
+  });
+
+  it('validateAslDocument: rejects StartAt pointing to a missing state', () => {
+    const doc = JSON.parse(fs.readFileSync(ASL_PATH, 'utf8')) as Record<string, unknown>;
+    doc['StartAt'] = 'NO_SUCH_STATE';
+    expect(() =>
+      validateAslDocument(doc, ASL_SUBSTITUTION_KEYS, {
+        WorkflowStatusFnArn: 'a',
+        RecoveryGateFnArn: 'a',
+        DecisionFnArn: 'a',
+        RendererFnArn: 'a',
+        WsPushFnArn: 'a',
+      }),
+    ).toThrow(/StartAt 'NO_SUCH_STATE'|not a defined state/i);
+  });
+
+  it('validateAslDocument: rejects missing expected placeholder', () => {
+    const doc = JSON.parse(fs.readFileSync(ASL_PATH, 'utf8')) as Record<string, unknown>;
+    // Strip every ${DecisionFnArn} occurrence and serialize back.
+    const stripped = JSON.stringify(doc).split('${DecisionFnArn}').join('PLACEHOLDER_REMOVED');
+    const mutated = JSON.parse(stripped) as Record<string, unknown>;
+    expect(() =>
+      validateAslDocument(mutated, ASL_SUBSTITUTION_KEYS, {
+        WorkflowStatusFnArn: 'a',
+        RecoveryGateFnArn: 'a',
+        DecisionFnArn: 'a',
+        RendererFnArn: 'a',
+        WsPushFnArn: 'a',
+      }),
+    ).toThrow(/DecisionFnArn/);
+  });
+
+  it('validateAslDocument: rejects unresolved placeholders after substitution', () => {
+    const doc = JSON.parse(fs.readFileSync(ASL_PATH, 'utf8')) as Record<string, unknown>;
+    // Inject an unknown placeholder into MARK_RUNNING.Payload so it
+    // survives substitution. Mutating the parsed object is safer than
+    // string-replacement (which depends on JSON.stringify formatting).
+    const states = doc['States'] as Record<string, Record<string, unknown>>;
+    const payload = (states['MARK_RUNNING'].Parameters as { Payload: Record<string, unknown> })
+      .Payload;
+    payload['orphan'] = '${UnknownArn}';
+    expect(() =>
+      validateAslDocument(doc, ASL_SUBSTITUTION_KEYS, {
+        WorkflowStatusFnArn: 'a',
+        RecoveryGateFnArn: 'a',
+        DecisionFnArn: 'a',
+        RendererFnArn: 'a',
+        WsPushFnArn: 'a',
+      }),
+    ).toThrow(/UnknownArn|unresolved placeholders/i);
+  });
+
+  it('validateAslDocument: accepts the unmodified canonical ASL', () => {
+    const doc = JSON.parse(fs.readFileSync(ASL_PATH, 'utf8')) as Record<string, unknown>;
+    expect(() =>
+      validateAslDocument(doc, ASL_SUBSTITUTION_KEYS, {
+        WorkflowStatusFnArn: 'arn:aws:lambda:ap-northeast-1:111111111111:function:WorkflowStatusFn',
+        RecoveryGateFnArn: 'arn:aws:lambda:ap-northeast-1:111111111111:function:RecoveryGateFn',
+        DecisionFnArn: 'arn:aws:lambda:ap-northeast-1:111111111111:function:DecisionFn',
+        RendererFnArn: 'arn:aws:lambda:ap-northeast-1:111111111111:function:RendererFn',
+        WsPushFnArn: 'arn:aws:lambda:ap-northeast-1:111111111111:function:WsPushFn',
+      }),
+    ).not.toThrow();
+  });
+
+  it('Deployed DefinitionString (synth) contains no ${...} placeholders after CDK substitution', () => {
+    const { stack } = build('PERSONAL_AWS_DEV', undefined, { workflowTimeoutSeconds: 60 });
+    const sm = getStateMachineFromSynth(stack);
+    const ds = (sm.Properties as Record<string, unknown>)['DefinitionString'] as string;
+    // Either the value is inlined directly (DefinitionString), or CDK
+    // wraps it in Fn::Sub. In the Fn::Sub case, every substitution
+    // variable must be present in DefinitionSubstitutions. Inspect the
+    // rendered string for any leftover `${...}` that isn't a CDK wrapper.
+    expect(ds).not.toMatch(/\$\{(?!WorkflowStatusFnArn|RecoveryGateFnArn|DecisionFnArn|RendererFnArn|WsPushFnArn)/);
+  });
+
+  it('No second AWS::StepFunctions::StateMachine exists in any profile', () => {
+    for (const profile of ['LOCAL_MOCK', 'PERSONAL_AWS_DEV', 'COMPETITION_AWS'] as Profile[]) {
+      const { resources } = synthTemplate(profile);
+      expect(countResourcesByType(resources, 'AWS::StepFunctions::StateMachine')).toBeLessThanOrEqual(1);
+    }
+  });
+
+  // ─── TASK-068 FINAL CORRECTION ONLY (handoff) ─────────────────────────
+  // The corrections re-introduce the dedicated publish-then-fail chain for
+  // CORE_IDENTITY_CONFLICT and lock in $$.Execution.Id as the canonical
+  // execution-arn reference. These assertions are independent of block D
+  // because they inspect the raw source file, which guards against
+  // accidental re-replacement by future edits.
+  function loadDoc(): Record<string, unknown> {
+    return JSON.parse(fs.readFileSync(ASL_PATH, 'utf8')) as Record<string, unknown>;
+  }
+
+  it('workflow.asl.json contains $$.Execution.Id verbatim (no $$-Execution.Id typo)', () => {
+    const raw = fs.readFileSync(ASL_PATH, 'utf8') as string;
+    expect(raw).toContain('"workflow_execution_arn.$": "$$.Execution.Id"');
+    // Step Functions never uses `$$-Execution.Id`. Treat any occurrence
+    // of `$$-Execution.Id` (a JSON typo) as a hard contract violation.
+    expect(raw).not.toMatch(/\$\$-Execution\.Id/);
+    // Sanity: no field path that accidentally omits the second `$` such as
+    // `$Execution.Id`.
+    expect(raw).not.toMatch(/"\$Execution\.Id"/);
+  });
+
+  it('Three restored handoff states exist for the identity-conflict path', () => {
+    const doc = loadDoc();
+    const states = doc.States as Record<string, Record<string, unknown>>;
+    for (const name of [
+      'MARK_PROCESSING_FAILED_TERMINAL',
+      'PUBLISH_PROCESSING_FAILED',
+      'FAIL_CORE_IDENTITY_CONFLICT',
+    ]) {
+      expect(states[name]).toBeDefined();
+    }
+    expect(states['MARK_PROCESSING_FAILED_TERMINAL'].Type).toBe('Task');
+    expect(states['PUBLISH_PROCESSING_FAILED'].Type).toBe('Task');
+    expect(states['FAIL_CORE_IDENTITY_CONFLICT'].Type).toBe('Fail');
+    expect(states['FAIL_CORE_IDENTITY_CONFLICT'].Error).toBe('CORE_IDENTITY_CONFLICT');
+  });
+
+  it('Identity-conflict reachability never reaches enrichment or completed', () => {
+    const doc = loadDoc();
+    const states = doc.States as Record<string, Record<string, unknown>>;
+    // Walk the state graph starting from the identity-conflict branch of
+    // DECISION_CORE_WRITE_GATE; it must terminate in a Fail without ever
+    // touching MARK_CORE_COMMITTED_* / PUBLISH_FAST_PATH_READY /
+    // RENDERER / PUBLISH_*/MARK_COMPLETED.
+    const start = 'PREPARE_CORE_IDENTITY_CONFLICT';
+    const visited = new Set<string>();
+    const queue: string[] = [start];
+    while (queue.length) {
+      const cur = queue.shift()!;
+      if (visited.has(cur)) continue;
+      visited.add(cur);
+      const state = states[cur];
+      if (!state) continue;
+      if (state.Type === 'Fail') continue;
+      const nxt = (state as { Next?: string }).Next;
+      if (nxt) queue.push(nxt);
+    }
+    expect(visited.has('FAIL_CORE_IDENTITY_CONFLICT')).toBe(true);
+    const forbidden = [
+      'MARK_CORE_COMMITTED_DECISION',
+      'MARK_CORE_COMMITTED_RECOVERY',
+      'PUBLISH_FAST_PATH_READY',
+      'RENDERER_REPORT',
+      'RENDERER_PUBLIC_ALERT',
+      'RENDERER_EXPLANATION',
+      'PUBLISH_REPORT',
+      'PUBLISH_PUBLIC_ALERT',
+      'PUBLISH_EXPLANATION',
+      'MARK_COMPLETED',
+      'RECOVERY_GATE_ENRICHMENT',
+      'NARRATIVE_FALLBACK_REPORT',
+      'NARRATIVE_FALLBACK_PUBLIC_ALERT',
+      'NARRATIVE_FALLBACK_EXPLANATION',
+    ];
+    for (const name of forbidden) {
+      expect(visited.has(name)).toBe(false);
+    }
+  });
+
+  it('Every Next / Default / Catch.Next / Choice.Next points to a defined state (extended)', () => {
+    const doc = loadDoc();
+    const states = doc.States as Record<string, Record<string, unknown>>;
+    const stateNames = new Set(Object.keys(states));
+    for (const [name, state] of Object.entries(states)) {
+      const next = state['Next'];
+      if (typeof next === 'string') {
+        expect(stateNames.has(next), `state ${name} -> Next ${next}`).toBe(true);
+      }
+      const def = state['Default'];
+      if (typeof def === 'string') {
+        expect(stateNames.has(def), `state ${name} -> Default ${def}`).toBe(true);
+      }
+      const choices = state['Choices'] as Array<Record<string, unknown>> | undefined;
+      if (Array.isArray(choices)) {
+        for (const ch of choices) {
+          if (typeof ch['Next'] === 'string') {
+            expect(
+              stateNames.has(ch['Next'] as string),
+              `state ${name} -> Choice.Next ${ch['Next']}`,
+            ).toBe(true);
+          }
+        }
+      }
+      const catchers = state['Catch'] as Array<Record<string, unknown>> | undefined;
+      if (Array.isArray(catchers)) {
+        for (const ca of catchers) {
+          if (typeof ca['Next'] === 'string') {
+            expect(
+              stateNames.has(ca['Next'] as string),
+              `state ${name} -> Catch.Next ${ca['Next']}`,
+            ).toBe(true);
+          }
+        }
+      }
+    }
   });
 });

@@ -10,13 +10,13 @@
         "FunctionName": "${WorkflowStatusFnArn}",
         "Payload": {
           "action": "MARK_RUNNING",
-          "execution_id.$": "$$.Execution.Id",
+          "workflow_execution_arn.$": "$$.Execution.Id",
           "idempotency_key.$": "$.idempotency_key",
           "decision_id.$": "$.decision_id",
           "attempt_count.$": "$.attempt_count",
           "lease_owner.$": "$.lease_owner",
           "recovery_mode.$": "$.recovery_mode",
-          "trace_id.$": "$.trace_id"
+          "request_timestamp.$": "$.request_timestamp"
         }
       },
       "Retry": [
