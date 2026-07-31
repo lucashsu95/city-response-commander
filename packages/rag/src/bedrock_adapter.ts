@@ -101,7 +101,7 @@ export class BedrockAdapter implements BedrockInvoker {
   }
 
   /**
-   * Converse API を呼び出す。
+   * 呼叫 Converse API。
    *
    * fallback 策略（§21.2 spec）：
    * - timeout / throttled / unexpected_error → 繼續嘗試下一個 fallback
@@ -162,9 +162,9 @@ export class BedrockAdapter implements BedrockInvoker {
 // ─── Internal helpers ──────────────────────────────────────────────────────
 
 /**
- * Promise に timeout を追加する（racing Promise パターン）。
- * AWS SDK v3 の send() は AbortSignal をサポートするが、
- * racing Promise で統一することで SDK バージョン依存を避ける。
+ * 為 Promise 加上 timeout（racing Promise 模式）。
+ * AWS SDK v3 的 send() 雖支援 AbortSignal，
+ * 但統一用 racing Promise 可避免 SDK 版本依賴。
  */
 function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   return new Promise<T>((resolve, reject) => {
@@ -186,8 +186,8 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
 }
 
 /**
- * ConverseCommandOutput から最初のテキストブロックを抽出する。
- * AWS SDK v3 の型定義を使用し、any を排除する。
+ * 從 ConverseCommandOutput 抽取第一個文字區塊。
+ * 使用 AWS SDK v3 的官方型別定義，避免 any。
  */
 function extractTextFromConverse(response: ConverseCommandOutput): string | null {
   const blocks = response?.output?.message?.content;
@@ -198,7 +198,7 @@ function extractTextFromConverse(response: ConverseCommandOutput): string | null
   return null;
 }
 
-/** AWS SDK エラーを BedrockFailure に分類する */
+/** 將 AWS SDK 錯誤分類為對應的 BedrockFailure */
 function classifyError(err: unknown, modelId: string): BedrockFailure {
   if (err instanceof TimeoutError) {
     return { outcome: 'use_template', reason: 'timeout', message: err.message };
@@ -238,8 +238,8 @@ function isAwsError(err: unknown): err is { name: string; message: string } {
 // ─── Config helpers ────────────────────────────────────────────────────────
 
 /**
- * ConfigProvider から string 値を取得する。
- * validateConfig でスキーマが保護されていない場合でも runtime で型を保証する。
+ * 從 ConfigProvider 取得 string 值。
+ * 即使外部未執行 validateConfig()，也能在 runtime 確保型別正確。
  */
 function requireString(config: ConfigProvider, key: string): string {
   const value = config.get(key);
@@ -253,7 +253,7 @@ function requireString(config: ConfigProvider, key: string): string {
 }
 
 /**
- * ConfigProvider から string[] 値を取得する。
+ * 從 ConfigProvider 取得 string[] 值。
  */
 function requireStringArray(config: ConfigProvider, key: string): readonly string[] {
   const value = config.get(key);
