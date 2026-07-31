@@ -43,6 +43,7 @@ const KEY = 'TPE_2026_ACC_001|2026-05-20 22:10|prov-2026a';
 const DECISION = 'DEC_TPE_2026_ACC_001_abcdef123456';
 const NOW_MS = 1_800_000_000_000;
 const NOW_DISPLAY = '2026-05-20 22:10';
+const TRACE = 'req-abc-123';
 
 const LEGAL_NAME = /^[a-zA-Z0-9_-]{1,80}$/;
 
@@ -114,6 +115,10 @@ function launchInput(overrides: Partial<WorkflowLaunchInput> = {}): WorkflowLaun
     leaseOwner: 'req-1',
     recoveryMode: RecoveryMode.NORMAL,
     requestTimestamp: NOW_DISPLAY,
+    // Required by `assertUsable`: an empty trace_id still satisfies the ASL
+    // `$.trace_id` path, so it would not fail the workflow — it would silently
+    // produce uncorrelatable logs for the whole execution (§19).
+    traceId: TRACE,
     ...overrides,
   };
 }
@@ -262,7 +267,7 @@ describe('resolveStateMachineArn', () => {
 // ─── Payload ───────────────────────────────────────────────
 
 describe('buildExecutionPayload', () => {
-  it('carries exactly the six documented INPUT fields', () => {
+  it('carries exactly the eight fields the ASL reads from INPUT', () => {
     expect(buildExecutionPayload(launchInput())).toEqual({
       idempotency_key: KEY,
       decision_id: DECISION,
@@ -270,6 +275,11 @@ describe('buildExecutionPayload', () => {
       lease_owner: 'req-1',
       recovery_mode: RecoveryMode.NORMAL,
       request_timestamp: NOW_DISPLAY,
+      // Read by eight ASL states; its absence failed every injection at
+      // RUN_DECISION with a non-retryable States.Runtime (TASK-097).
+      trace_id: TRACE,
+      // RECOVERY_GATE reads this unconditionally on the ENRICHMENT_ONLY path.
+      missing_narrative_types: [],
     });
   });
 
@@ -332,6 +342,8 @@ describe('launch — success', () => {
       lease_owner: 'req-1',
       recovery_mode: RecoveryMode.NORMAL,
       request_timestamp: NOW_DISPLAY,
+      trace_id: TRACE,
+      missing_narrative_types: [],
     });
   });
 

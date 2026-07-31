@@ -25,7 +25,9 @@ export type {
   IngestionPort,
 } from './domain_pipeline_adapter.js';
 
-export { runDecisionFn, DecisionFn } from './decision_fn.js';
+export { runDecisionFn, DecisionFn, SKIPPED_INSUFFICIENT_DATA } from './decision_fn.js';
+
+export type { CoreWriteGateValue } from './decision_fn.js';
 
 export type {
   DecisionFnInput,

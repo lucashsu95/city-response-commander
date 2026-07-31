@@ -43,3 +43,27 @@ export type {
   ProcessingFailedEvent,
   ProcessingFailedPublisherPort,
 } from './async_conflict_handler.js';
+
+export {
+  WORKFLOW_INPUT_JSONPATHS,
+  AslState,
+  AslPayloadError,
+  ASL_GAP_INSUFFICIENT_DATA_BRANCH,
+  ASL_DIVERGENCE_PROCESSING_FAILED_RETRYABLE,
+  jsonPathToField,
+  nextStateForRecoveryMode,
+  nextStateForCoreWriteStatus,
+  resolveExecutionArn,
+  dispatchWorkflowStatusAction,
+} from './wiring.js';
+
+export type {
+  AslStateName,
+  AslMarkRunningPayload,
+  AslMarkCoreCommittedPayload,
+  AslMarkCompletedPayload,
+  AslMarkProcessingFailedPayload,
+  AslReconcileStaleRunningPayload,
+  AslWorkflowStatusPayload,
+  WiringContext,
+} from './wiring.js';

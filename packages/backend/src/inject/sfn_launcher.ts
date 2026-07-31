@@ -89,6 +89,24 @@ export interface WorkflowLaunchInput {
   readonly recoveryMode: RecoveryMode;
   /** Request receipt time, for latency attribution. */
   readonly requestTimestamp: string;
+  /**
+   * Correlation id, read by EIGHT states in `workflow.asl.json`.
+   *
+   * Omitting it does not degrade anything — under JSONPath, `"trace_id.$":
+   * "$.trace_id"` raises a non-retryable `States.Runtime` the moment
+   * `RUN_DECISION` is entered, so every injection fails while looking like a
+   * DecisionFn fault.
+   */
+  readonly traceId: string;
+  /**
+   * Narrative types already known to be missing, for `RECOVERY_GATE`.
+   *
+   * Defaults to `[]`. `RecoveryGateFn` computes this itself by querying the
+   * narrative table, so the value is advisory; the field exists because the ASL
+   * reads `$.missing_narrative_types` unconditionally on the `ENRICHMENT_ONLY`
+   * path and a missing path is a hard failure.
+   */
+  readonly missingNarrativeTypes?: readonly string[];
 }
 
 /** The JSON payload handed to Step Functions. Snake_case to match the ASL. */
@@ -99,6 +117,8 @@ export interface WorkflowExecutionPayload {
   readonly lease_owner: string;
   readonly recovery_mode: RecoveryMode;
   readonly request_timestamp: string;
+  readonly trace_id: string;
+  readonly missing_narrative_types: readonly string[];
 }
 
 /** Result of a launch attempt. Failures throw instead of returning. */
@@ -198,7 +218,14 @@ export function deriveExecutionName(idempotencyKey: string, attemptCount: number
   return name;
 }
 
-/** Assemble the workflow INPUT. Exported so the ASL contract can be tested. */
+/**
+ * Assemble the workflow INPUT.
+ *
+ * Every field here is read by at least one state in `workflow.asl.json`.
+ * `WORKFLOW_INPUT_JSONPATHS` (TASK-097) enumerates those paths and a test asserts
+ * this function covers all of them — a missing field is a runtime failure in
+ * Step Functions, not a type error, so the coverage has to be pinned by a test.
+ */
 export function buildExecutionPayload(input: WorkflowLaunchInput): WorkflowExecutionPayload {
   return {
     idempotency_key: input.idempotencyKey,
@@ -207,6 +234,8 @@ export function buildExecutionPayload(input: WorkflowLaunchInput): WorkflowExecu
     lease_owner: input.leaseOwner,
     recovery_mode: input.recoveryMode,
     request_timestamp: input.requestTimestamp,
+    trace_id: input.traceId,
+    missing_narrative_types: input.missingNarrativeTypes ?? [],
   };
 }
 
@@ -342,6 +371,12 @@ export class SfnLauncher {
       // Without it MARK_RUNNING cannot fence, so an empty value is a bug, not a
       // recoverable condition.
       throw new SfnLauncherUsageError('launch requires a non-empty "leaseOwner".');
+    }
+    if (!input.traceId) {
+      // An empty string still satisfies `$.trace_id`, so this would not fail the
+      // workflow — it would silently produce uncorrelatable logs for the entire
+      // execution, which §19 exists to prevent.
+      throw new SfnLauncherUsageError('launch requires a non-empty "traceId".');
     }
   }
 

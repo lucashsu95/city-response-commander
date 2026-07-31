@@ -23,18 +23,27 @@ export { createGetRoadsHandler } from './get_roads_handler.js';
 export { createGetCrowdHandler } from './get_crowd_handler.js';
 export { createGetIncidentsHandler } from './get_incidents_handler.js';
 
-export { queryTimeline, queryRoads, queryCrowd, queryIncidents } from './dashboard_query.js';
+export {
+  queryTimeline,
+  queryRoads,
+  queryCrowd,
+  queryIncidents,
+  createDashboardPortsFromConfig,
+} from './dashboard_query.js';
 
 export type {
   DashboardPorts,
   DashboardIngestionPort,
   DashboardSnapshotPort,
+  DashboardPolicyPort,
   ResponseEnvelope,
+  SnapshotProvenance,
   TimelineResponse,
   RoadsResponse,
   RoadSegmentView,
   CrowdResponse,
   CrowdStationView,
+  MultilingualScopeView,
   StationFlag,
   IncidentsResponse,
 } from './dashboard_query.js';

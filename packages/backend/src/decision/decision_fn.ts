@@ -87,6 +87,27 @@ export interface DecisionFnPorts {
   readonly latency?: DecisionFnLatencyContext;
 }
 
+/**
+ * Choice-gate value emitted when no write was attempted at all.
+ *
+ * `DECISION_CORE_WRITE_GATE` in `workflow.asl.json` branches on
+ * `$.decision.payload.core_write_status`. An `insufficient_data` result has no
+ * `CoreWriteStatus` — nothing was written — and an ABSENT field falls into the
+ * ASL's `Default`, which records `UNKNOWN_CORE_WRITE_STATUS` with
+ * `retryable: false`. That mislabels a disclosed data gap as an unknown defect and
+ * makes it permanently unretryable even after the official data is corrected,
+ * which is the opposite of §21.
+ *
+ * Deliberately NOT added to the `CoreWriteStatus` enum: that enum describes the
+ * result of a conditional Put, and here no Put happened. Screaming snake case
+ * matches its siblings, because ASL `StringEquals` is case-sensitive and one
+ * lower-case value in that Choice would be a trap.
+ */
+export const SKIPPED_INSUFFICIENT_DATA = 'SKIPPED_INSUFFICIENT_DATA' as const;
+
+/** Every value `DECISION_CORE_WRITE_GATE` may observe. */
+export type CoreWriteGateValue = CoreWriteStatus | typeof SKIPPED_INSUFFICIENT_DATA;
+
 /** Handler outcome, consumed by the Step Functions Choice Gate. */
 export type DecisionFnResult =
   | {
@@ -95,6 +116,11 @@ export type DecisionFnResult =
        * `fast_path_ready` may be pushed. `200` + `data_status` at the API edge.
        */
       readonly data_status: 'insufficient_data';
+      /**
+       * Explicit gate value so the ASL can branch on a disclosed gap instead of
+       * falling through to its unknown-status default.
+       */
+      readonly core_write_status: typeof SKIPPED_INSUFFICIENT_DATA;
       readonly stop_reason: string;
       readonly source_manifest_hash: string;
       readonly pending_steps: readonly string[];
@@ -143,6 +169,7 @@ export async function runDecisionFn(
     // Disclose and stop. buildDecisionCore is NOT called.
     return {
       data_status: 'insufficient_data',
+      core_write_status: SKIPPED_INSUFFICIENT_DATA,
       stop_reason: pipeline.stop_reason ?? 'Domain pipeline reported insufficient_data.',
       source_manifest_hash: pipeline.source_manifest_hash,
       pending_steps: pipeline.pending_steps,
