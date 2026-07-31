@@ -17,3 +17,8 @@ export type {
   FencedReason,
   IdempotencyStateStore,
 } from './apply_or_confirm.js';
+
+export type { WorkflowStatusInput, StatusActionContext } from './status_context.js';
+
+export { markRunning } from './mark_running.js';
+export type { MarkRunningContext } from './mark_running.js';
