@@ -33,6 +33,13 @@ export { DecisionCoreReader } from './decision_core_reader.js';
 export type { DecisionCoreReadPort, DecisionCoreReaderOptions } from './decision_core_reader.js';
 
 export {
+  DecisionCoreRepository,
+  DecisionCoreAlreadyExistsError,
+} from './decision_core_repository.js';
+
+export type { DecisionCorePort } from './decision_core_repository.js';
+
+export {
   DecisionNarrativeReader,
   REQUIRED_NARRATIVE_TYPES,
   splitNarrativeTypes,
