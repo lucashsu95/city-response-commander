@@ -67,6 +67,13 @@ export {
   type PublicAlertComposeFailed,
 } from './public_alert_composer.js';
 
+// ─── Multilingual Templates (TASK-117) ───────────────────────────────
+export {
+  renderMultilingualTemplates,
+  formatEteForAlert,
+  type MultilingualTemplateInput,
+} from './multilingual_templates.js';
+
 // ─── Explanation Composer (TASK-115) ─────────────────────
 export {
   composeExplanation,

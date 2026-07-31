@@ -34,6 +34,10 @@ import {
   type NarrativePutResult,
 } from './narrative_writer.js';
 import type { BedrockInvoker } from './bedrock_adapter.js';
+import {
+  renderMultilingualTemplates,
+  formatEteForAlert,
+} from './multilingual_templates.js';
 
 // ─── Language floor logic ─────────────────────────────────────────────────────
 
@@ -166,15 +170,15 @@ export async function composePublicAlert(
         textSource = 'bedrock';
       } else {
         // 必要語言有缺漏 → fallback
-        alertPayload = buildTemplatePublicAlert(core, languages);
+        alertPayload = renderMultilingualTemplates({ core, languages });
         textSource = 'template';
       }
     } else {
-      alertPayload = buildTemplatePublicAlert(core, languages);
+      alertPayload = renderMultilingualTemplates({ core, languages });
       textSource = 'template';
     }
   } else {
-    alertPayload = buildTemplatePublicAlert(core, languages);
+    alertPayload = renderMultilingualTemplates({ core, languages });
     textSource = 'template';
   }
 
@@ -210,6 +214,7 @@ export async function composePublicAlert(
  * 組裝多語化民眾警示的 Bedrock prompt。
  * 明確要求 Bedrock 在同一回應內產出所有語言（§14.4）。
  * 語言集合由決定性程式碼傳入，Bedrock 無法改變。
+ * ETE 格式化委派給 `formatEteForAlert`（multilingual_templates）。
  */
 function buildPublicAlertPrompt(core: DecisionCore, languages: readonly Language[]): string {
   const primaryRoute = core.primary_evacuation ?? '（查無合規替代路段）';
@@ -253,36 +258,6 @@ ${eteText ? `- ${eteText}` : ''}
 - 不可只回傳部分語言（必須包含 ${requiredKeys}）`;
 }
 
-// ─── Template fallback ────────────────────────────────────────────────────────
-
-/**
- * 決定性多語 template fallback（§14.4, §21.3, P36）。
- * 語言下限保持不變：觸發 SOP-6 時絕不退化為只有 zh。
- */
-function buildTemplatePublicAlert(
-  core: DecisionCore,
-  languages: readonly Language[],
-): PublicAlertPayload {
-  const primaryRoute = core.primary_evacuation ?? '（查無合規替代路段）';
-  const eteText = formatEteForAlert(core);
-  const occurred = core.occurred_at;
-  const eteSuffix = eteText ? `${eteText}。` : '';
-
-  const templates: Record<Language, string> = {
-    [Language.ZH]: `【交通警示 ${occurred}】道路封閉，請改道 ${primaryRoute}。${eteSuffix}請注意安全，避開事故路段。`,
-    [Language.EN]: `[Traffic Alert ${occurred}] Road closure. Please use alternate route: ${primaryRoute}. ${eteSuffix}Stay safe and avoid the affected area.`,
-    [Language.JA]: `【交通警報 ${occurred}】道路閉鎖。迂回路：${primaryRoute}。${eteSuffix}安全にご注意ください。`,
-    [Language.KO]: `【교통 경보 ${occurred}】도로 폐쇄. 우회로: ${primaryRoute}. ${eteSuffix}안전에 유의하시기 바랍니다.`,
-  };
-
-  const alertTextMap: Partial<Record<Language, string>> = {};
-  for (const lang of languages) {
-    alertTextMap[lang] = templates[lang];
-  }
-
-  return { type: 'PUBLIC_ALERT', public_alert_text: alertTextMap };
-}
-
 // ─── Internal helpers ─────────────────────────────────────────────────────────
 
 /**
@@ -306,15 +281,4 @@ function filterToRequiredLanguages(
   }
 
   return result;
-}
-
-/**
- * 格式化 ETE 為警示文字（簡短，供 prompt 與 template 使用）。
- */
-function formatEteForAlert(core: DecisionCore): string {
-  if (!core.ete) return '';
-  if (core.ete.calculation_status === 'computed') {
-    return `預計延誤 ${core.ete.ete_minutes} 分鐘`;
-  }
-  return `延誤時間待確認`;
 }
