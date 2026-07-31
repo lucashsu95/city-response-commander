@@ -4,7 +4,7 @@
  * 驗證：
  * - P36：SOP-6 triggered 時，語言下限 zh+en；絕不退化為只有 zh
  * - 各語言 template 值均為非空字串
- * - 只插入決定性事實（occurred_at / primary_evacuation / ete）
+ * - 只插入決定性事實（occurred_at / event_facts.location / primary_evacuation / ete）
  * - ETE computed → 顯示分鐘數；insufficient → 待確認；無 ete → 空字串
  * - 無合規路段時顯示備援文字，不虛構路段名稱
  * - renderMultilingualTemplates 輸出 type === 'PUBLIC_ALERT'
@@ -120,6 +120,24 @@ describe('renderMultilingualTemplates', () => {
     const core = makeCore({ primary_evacuation: 'RD_TPE_004' });
     const result = renderMultilingualTemplates({ core, languages: [Language.EN] });
     expect(result.public_alert_text[Language.EN]).toContain('RD_TPE_004');
+  });
+
+  it('inserts event_facts.location in en template', () => {
+    const core = makeCore({
+      event_facts: { location: 'Xinyi Rd Sec 5' } as unknown as DecisionCore['event_facts'],
+    });
+    const result = renderMultilingualTemplates({ core, languages: [Language.EN] });
+    expect(result.public_alert_text[Language.EN]).toContain('Xinyi Rd Sec 5');
+  });
+
+  it('missing event_facts shows fallback text, not undefined', () => {
+    const core = makeCore({ event_facts: undefined });
+    const result = renderMultilingualTemplates({ core, languages: ALL_LANGUAGES });
+    for (const lang of ALL_LANGUAGES) {
+      const text = result.public_alert_text[lang]!;
+      expect(text).not.toContain('undefined');
+      expect(text.trim().length).toBeGreaterThan(0);
+    }
   });
 
   it('null primary_evacuation shows fallback text, not null', () => {
@@ -256,6 +274,13 @@ describe('語言純度：非中文模板不得混入中文', () => {
 
   it('null primary_evacuation 的備援文字也在地化', () => {
     const core = makeCore({ primary_evacuation: null });
+    const result = renderMultilingualTemplates({ core, languages: ALL_LANGUAGES });
+    expect(result.public_alert_text[Language.EN]).not.toMatch(CJK_IDEOGRAPH);
+    expect(result.public_alert_text[Language.KO]).not.toMatch(CJK_IDEOGRAPH);
+  });
+
+  it('missing event_facts.location 的備援文字也在地化', () => {
+    const core = makeCore({ event_facts: undefined });
     const result = renderMultilingualTemplates({ core, languages: ALL_LANGUAGES });
     expect(result.public_alert_text[Language.EN]).not.toMatch(CJK_IDEOGRAPH);
     expect(result.public_alert_text[Language.KO]).not.toMatch(CJK_IDEOGRAPH);

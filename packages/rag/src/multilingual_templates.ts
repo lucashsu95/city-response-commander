@@ -5,7 +5,7 @@
  * - 提供 zh / en / ja / ko 四種語言的已核准警示模板
  * - 當 Bedrock 失敗時，依語言集合渲染 template fallback
  * - 語言下限由外部（resolveLanguages）決定，此模組只負責渲染
- * - 只插入決定性事實（primary_evacuation / ete_minutes / timestamp_display）
+ * - 只插入決定性事實（event_facts.location / primary_evacuation / ete_minutes / timestamp_display）
  * - 絕不退化為只有 zh：若傳入語言集合含 en，必定產出 en template
  *
  * 設計原則（§9）：
@@ -90,6 +90,7 @@ export function formatEteForAlert(core: DecisionCore): string {
  *
  * 所有模板只插入決定性事實：
  * - `occurred`：`core.occurred_at`
+ * - `location`：事故位置（`core.event_facts.location`；無時顯示該語言的備援文字）
  * - `primaryRoute`：主疏散路段（無時顯示該語言的備援文字）
  * - `eteText`：已在地化的 ETE 句子（空字串代表無 ETE，整句省略）
  *
@@ -101,31 +102,32 @@ export function formatEteForAlert(core: DecisionCore): string {
 function renderTemplate(
   lang: Language,
   occurred: string,
+  location: string,
   primaryRoute: string,
   eteText: string,
 ): string {
   switch (lang) {
     case Language.ZH:
       return (
-        `【交通警示 ${occurred}】道路封閉，請改道 ${primaryRoute}。` +
+        `【交通警示 ${occurred}】${location} 道路封閉，請改道 ${primaryRoute}。` +
         (eteText ? `${eteText}。` : '') +
         `請注意安全，避開事故路段。`
       );
     case Language.EN:
       return (
-        `[Traffic Alert ${occurred}] Road closure. Please use alternate route: ${primaryRoute}.` +
+        `[Traffic Alert ${occurred}] Road closure at ${location}. Please use alternate route: ${primaryRoute}.` +
         (eteText ? ` ${eteText}.` : '') +
         ` Stay safe and avoid the affected area.`
       );
     case Language.JA:
       return (
-        `【交通警報 ${occurred}】道路閉鎖。迂回路：${primaryRoute}。` +
+        `【交通警報 ${occurred}】${location} 道路閉鎖。迂回路：${primaryRoute}。` +
         (eteText ? `${eteText}。` : '') +
         `安全にご注意ください。`
       );
     case Language.KO:
       return (
-        `[교통 경보 ${occurred}] 도로 폐쇄. 우회로: ${primaryRoute}.` +
+        `[교통 경보 ${occurred}] ${location} 도로 폐쇄. 우회로: ${primaryRoute}.` +
         (eteText ? ` ${eteText}.` : '') +
         ` 안전에 유의하시기 바랍니다.`
       );
@@ -149,6 +151,19 @@ const NO_ROUTE_FALLBACK: Record<Language, string> = {
   [Language.KO]: '(적합한 우회로 없음)',
 };
 
+/**
+ * 各語言在 `event_facts` 缺失（read model 未帶入）時的事故位置備援文字。
+ *
+ * 正常路徑一定有 `core.event_facts.location`；此常數只覆蓋型別上的
+ * optional 情況，避免 template 渲染出空字串或未在地化的中文。
+ */
+const NO_LOCATION_FALLBACK: Record<Language, string> = {
+  [Language.ZH]: '（事故位置未提供）',
+  [Language.EN]: '(incident location not provided)',
+  [Language.JA]: '（事故発生場所は未提供）',
+  [Language.KO]: '(사고 위치 정보 없음)',
+};
+
 // ─── Public API ───────────────────────────────────────────────────────────────
 
 /**
@@ -170,8 +185,8 @@ export interface MultilingualTemplateInput {
  * 保證（P36）：
  * - 若 `languages` 含 `en`，輸出一定含 `en`（絕不退化）
  * - 每種語言的 value 均為非空字串，且**只含該語言的文字**
- * - 只插入 `occurred_at` / `primary_evacuation` / ETE 等決定性事實
- * - 不虛構任何道路名稱或數值
+ * - 只插入 `occurred_at` / `event_facts.location` / `primary_evacuation` / ETE 等決定性事實
+ * - 不虛構任何道路名稱、地點或數值
  *
  * @param input - MultilingualTemplateInput（core + languages）
  * @returns PublicAlertPayload，每個 language value 為非空 string
@@ -193,10 +208,12 @@ export function renderMultilingualTemplates(
 
   const alertTextMap: Partial<Record<Language, string>> = {};
   for (const lang of languages) {
+    const location = core.event_facts?.location ?? NO_LOCATION_FALLBACK[lang];
     const primaryRoute = core.primary_evacuation ?? NO_ROUTE_FALLBACK[lang];
     alertTextMap[lang] = renderTemplate(
       lang,
       occurred,
+      location,
       primaryRoute,
       formatEteForLanguage(core, lang),
     );
