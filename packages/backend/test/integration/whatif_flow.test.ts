@@ -286,7 +286,10 @@ describe('P28: valid assumptions → stage-3 result equals deterministic recompu
     });
     expect(result.triggered_articles).toContain(1);
     expect(result.expected_actions.some((a) => a.includes('SOP-1'))).toBe(true);
-    expect(result.ete_preview).toBeDefined();
+    // severity 未提供 → 不得輸出 ete_preview（base_clearance 依 REQ-009 由 severity 決定，
+    // What-if 假設條件不帶 severity，不得自行假定）
+    expect(result.ete_preview).toBeUndefined();
+    expect(result.applied_formula_articles).not.toContain(7);
     expect(result.does_not_mutate_state).toBe(true);
   });
 

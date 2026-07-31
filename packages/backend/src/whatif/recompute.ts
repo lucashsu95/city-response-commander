@@ -33,20 +33,35 @@ import {
   evaluateArticle3,
   evaluateArticle6,
   aggregateArticles,
+  calculateEte,
   ARTICLE3_STATION_ID,
   type SegmentSnapshot,
   type CurrentStationSnapshot,
 } from '@city-commander/domain';
+import type { Severity } from '@city-commander/shared-schemas';
 import type { WhatIfAssumption, RecomputeResult } from './whatif_types.js';
+
+/**
+ * What-if 假設快照的標示時間戳。
+ *
+ * ETE 公式要求所有 saturation 讀數來自**同一個** exact snapshot（HG-001）。
+ * What-if 的假設值依定義同時成立，因此以此標籤明確標示「這是假設快照，
+ * 不是任何一筆官方觀測」，避免與真實 `observation_timestamp` 混淆。
+ */
+const HYPOTHETICAL_SNAPSHOT_LABEL = 'WHAT_IF_HYPOTHETICAL_SNAPSHOT';
 
 // ─── Input type ────────────────────────────────────────────────────────────
 
 /**
  * `recompute()` 所需的輸入。
  * - `assumptions`：stage 2 驗證通過的假設條件（read-only）
+ * - `severity`：事故嚴重度。**唯有呼叫端明確提供時**才計算 `ete_preview`。
+ *   ETE 的 `base_clearance` 由 severity 決定（Critical=60 / High=40 / Medium=20，
+ *   REQ-009），What-if 的假設條件本身不帶 severity，因此不得自行假定。
  */
 export interface RecomputeInput {
   readonly assumptions: readonly WhatIfAssumption[];
+  readonly severity?: Severity;
 }
 
 // ─── Main function ────────────────────────────────────────────────────────────
@@ -61,7 +76,7 @@ export interface RecomputeInput {
  * @returns RecomputeResult（does_not_mutate_state: true）
  */
 export function recompute(input: RecomputeInput): RecomputeResult {
-  const { assumptions } = input;
+  const { assumptions, severity } = input;
 
   // ── 1. 假設條件 → Rule Engine 輸入形狀 ────────────────────────────────────
   const hypothetical = buildHypotheticalInputs(assumptions);
@@ -84,27 +99,28 @@ export function recompute(input: RecomputeInput): RecomputeResult {
     stations_in_scope: hypothetical.roamingStations,
   });
 
-  // ── 5. 條款聚合（triggered / applied_formula 分離，由 domain 決定）───────
+  // ── 5. ETE 預覽（唯有 severity 明確給定時才計算，公式由 domain 提供）────
+  const etePreview = buildEtePreview(hypothetical.segmentSnapshots, severity);
+
+  // ── 6. 條款聚合（triggered / applied_formula 分離，由 domain 決定）───────
+  // 有算 ETE 才代表套用了 art.7 公式；沒算就不得把 7 列入 applied_formula。
   const aggregation = aggregateArticles({
     evaluations: [
       { article: 1, triggered: article1.triggered, invoked_procedures: article1.invoked_procedures },
       { article: 3, triggered: article3.triggered },
       { article: 6, triggered: article6.triggered },
     ],
-    applied_formula_articles: [],
+    applied_formula_articles: etePreview !== undefined ? [7] : [],
   });
 
-  // ── 6. 呈現層：把決定性結果轉成指揮官可讀的動作說明 ──────────────────────
+  // ── 7. 呈現層：把決定性結果轉成指揮官可讀的動作說明 ──────────────────────
   const expectedActions = buildExpectedActions(article1, article3, article6);
-
-  // ── 7. ETE 預覽（Saturation_Score 假設時提供粗略估計）────────────────────
-  const etePreview = buildEtePreview(hypothetical.segmentSnapshots);
 
   return {
     triggered_articles: aggregation.triggered_articles,
     applied_formula_articles: aggregation.applied_formula_articles,
     expected_actions: expectedActions,
-    ete_preview: etePreview,
+    ...(etePreview !== undefined && { ete_preview: etePreview }),
     does_not_mutate_state: true,
   };
 }
@@ -199,21 +215,65 @@ function buildExpectedActions(
 // ─── ETE preview ──────────────────────────────────────────────────────────────
 
 /**
- * 若有 Saturation_Score 假設，計算粗略 ETE 預覽（僅供 What-if 參考）。
- * 使用 SOP-7 公式（base=40/High, penalty=(avg_sat-0.5)*60, ≥0）。
+ * 計算 ETE 預覽——**公式一律委派 domain 的 `calculateEte()`（SOP art.7）**。
+ *
+ * 為什麼需要明確的 `severity`（成員 4 紅線：不計算 ETE）：
+ * REQ-009 的 `base_clearance` 完全由事故嚴重度決定（Critical=60 / High=40 / Medium=20）。
+ * What-if 的假設條件只包含 `{entity_id, field, operator, value}`，不帶 severity，
+ * 任意挑一個 severity 等於替指揮官假定了事故等級，ETE 會因此差到 ±20 分鐘。
+ * 依 §14.5「不猜測」原則，severity 未知時一律**不輸出** `ete_preview`，
+ * 而不是填一個看起來像官方數字的估計值。
+ *
+ * `severity` 給定時：
+ * - `affected_set` = 本次假設到的路段（去重、保持假設順序）
+ * - `snapshot_provenance` = 以假設值組成的單一 common snapshot
+ *   （What-if 的假設值依定義同時成立，符合 HG-001「同一 exact snapshot」要求；
+ *   時間戳標為 `WHAT_IF_HYPOTHETICAL_SNAPSHOT`，不冒充任何官方觀測時間）
+ * - `formula_applicability` 標為 `partially_defined`：這是假設情境，非官方定值
+ *
+ * @returns `{ete_minutes}`；severity 未給、無路段假設、或 domain 判定
+ *   `insufficient_common_snapshot`（ETE 無法計算）時回 undefined
  */
 function buildEtePreview(
   segmentSnapshots: readonly SegmentSnapshot[],
+  severity: Severity | undefined,
 ): { readonly ete_minutes: number } | undefined {
-  const saturations = segmentSnapshots
-    .map((s) => s.saturation_score)
-    .filter((s): s is number => s !== null);
-  if (saturations.length === 0) return undefined;
+  if (severity === undefined) return undefined;
 
-  const avg = saturations.reduce((sum, s) => sum + s, 0) / saturations.length;
-  const base = 40; // High severity base（What-if 預覽保守值）
-  const penalty = Math.max(0, (avg - 0.5) * 60);
-  const ete_minutes = Math.round((base + penalty) * 10) / 10;
+  const readings = segmentSnapshots
+    .filter((s): s is SegmentSnapshot & { saturation_score: number } => s.saturation_score !== null)
+    .map((s) => ({
+      road_id: s.segment_id,
+      observation_timestamp: HYPOTHETICAL_SNAPSHOT_LABEL,
+      saturation_score: s.saturation_score,
+    }));
 
-  return { ete_minutes };
+  if (readings.length === 0) return undefined;
+
+  // 同一路段被假設兩次會讓 affected_set 出現重複，domain 會據此判為快照不完整。
+  // stage 2 的歧義偵測已擋掉這種輸入，此處僅為防禦。
+  const affectedSet = [...new Set(readings.map((r) => r.road_id))];
+
+  const result = calculateEte({
+    severity,
+    affected_set: {
+      mode: 'directly_affected_roads_at_event_snapshot',
+      affected_set: affectedSet,
+      formula_applicability: 'partially_defined',
+      applicability_note: 'What-if hypothetical scenario; not an official decision value.',
+    },
+    snapshot_provenance: {
+      selection_status: 'common_exact_snapshot',
+      event_timestamp: HYPOTHETICAL_SNAPSHOT_LABEL,
+      common_snapshot_timestamp: HYPOTHETICAL_SNAPSHOT_LABEL,
+      readings,
+    },
+  });
+
+  // domain 判定資料不足時 ete_minutes 為 null —— 不以下限值冒充 ETE
+  if (result.calculation_status !== 'computed' || result.ete_minutes === null) {
+    return undefined;
+  }
+
+  return { ete_minutes: result.ete_minutes };
 }

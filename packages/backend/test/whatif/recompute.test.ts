@@ -27,6 +27,7 @@ import {
   aggregateArticles,
   ARTICLE3_STATION_ID,
 } from '@city-commander/domain';
+import { Severity } from '@city-commander/shared-schemas';
 import { recompute } from '../../src/whatif/recompute.js';
 import type { WhatIfAssumption } from '../../src/whatif/whatif_types.js';
 
@@ -113,14 +114,46 @@ describe('recompute - SOP-1 (Saturation_Score)', () => {
     expect(result.triggered_articles).toContain(1);
   });
 
-  it('Saturation_Score hypothesis -> ete_preview present', () => {
-    const result = recompute({ assumptions: [makeSaturation('RD_TPE_002', 0.9)] });
-    expect(result.ete_preview).toBeDefined();
-    expect(result.ete_preview?.ete_minutes).toBeGreaterThan(0);
-  });
-
   it('no Saturation_Score hypothesis -> ete_preview absent', () => {
     const result = recompute({ assumptions: [makeBL17Count(40000)] });
+    expect(result.ete_preview).toBeUndefined();
+  });
+});
+
+// ─── ETE preview（severity 必須明確給定，公式委派 domain）────────────────────
+
+describe('recompute - ete_preview requires an explicit severity', () => {
+  it('Saturation_Score hypothesis WITHOUT severity -> ete_preview absent (不猜測 base_clearance)', () => {
+    const result = recompute({ assumptions: [makeSaturation('RD_TPE_002', 0.9)] });
+    expect(result.ete_preview).toBeUndefined();
+    // 沒有套用 art.7 公式就不得列入 applied_formula_articles
+    expect(result.applied_formula_articles).not.toContain(7);
+  });
+
+  it('Saturation_Score hypothesis WITH severity -> ete_preview from domain calculateEte()', () => {
+    const result = recompute({
+      assumptions: [makeSaturation('RD_TPE_002', 0.9)],
+      severity: Severity.High,
+    });
+    // domain SOP-7 公式：base_clearance(High)=40 + max(0,(0.9-0.5)*60)=24 → 64
+    expect(result.ete_preview?.ete_minutes).toBe(64);
+    expect(result.applied_formula_articles).toContain(7);
+  });
+
+  it('severity 改變 base_clearance（Critical=60 / High=40 / Medium=20，REQ-009）', () => {
+    const assumptions = [makeSaturation('RD_TPE_002', 0.5)]; // penalty = 0
+    expect(
+      recompute({ assumptions, severity: Severity.Critical }).ete_preview?.ete_minutes,
+    ).toBe(60);
+    expect(recompute({ assumptions, severity: Severity.High }).ete_preview?.ete_minutes).toBe(40);
+    expect(recompute({ assumptions, severity: Severity.Medium }).ete_preview?.ete_minutes).toBe(20);
+  });
+
+  it('no segment hypothesis + severity -> ete_preview absent（無 saturation 讀數）', () => {
+    const result = recompute({
+      assumptions: [makeBL17Count(40000)],
+      severity: Severity.High,
+    });
     expect(result.ete_preview).toBeUndefined();
   });
 });
