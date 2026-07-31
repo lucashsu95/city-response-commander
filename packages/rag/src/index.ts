@@ -13,3 +13,19 @@ export {
   type RejectedPayload,
   type RejectionReason,
 } from './schema_validator.js';
+
+// ─── Bedrock Adapter (TASK-112) ───────────────────────────
+export {
+  BedrockAdapter,
+  type BedrockInvoker,
+  type BedrockResult,
+  type BedrockSuccess,
+  type BedrockFailure,
+  type BedrockFailureReason,
+  type BedrockInvokeOptions,
+} from './bedrock_adapter.js';
+
+export {
+  MockBedrockAdapter,
+  createBedrockAdapter,
+} from './mock_bedrock_adapter.js';

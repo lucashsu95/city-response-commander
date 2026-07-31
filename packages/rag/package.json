@@ -10,8 +10,9 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@city-commander/shared-schemas": "*",
-    "@city-commander/config": "*"
+    "@aws-sdk/client-bedrock-runtime": "^3.540.0",
+    "@city-commander/config": "*",
+    "@city-commander/shared-schemas": "*"
   },
   "devDependencies": {
     "typescript": "^5.4.0"
