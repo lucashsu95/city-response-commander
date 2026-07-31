@@ -37,6 +37,7 @@ ws:
 # ── Auth (disabled in LOCAL_MOCK) ──
 auth:
   user_pool_id: local-mock-pool
+  app_client_id: local-mock-client
 
 # ── Observability ──
 observability:
@@ -77,6 +78,8 @@ policy:
   # Strategy C: ETE 受影響路段集合 (HG-001 organizer guidance)
   ete:
     affected_set: incident_primary_and_selected_secondary
+    # §11.3 共同精確時間戳規則 (HG-001，仍可設定)
+    snapshot_mode: COMMON_EXACT_TIMESTAMP
 
   # Strategy D: 事故錨點解析 (OQ-004)
   incident_anchor:
