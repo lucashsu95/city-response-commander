@@ -21,7 +21,7 @@
  */
 
 import type { APIGatewayProxyEventV2, APIGatewayProxyResultV2 } from 'aws-lambda';
-import type { PublishRecord } from '@city-commander/shared-schemas';
+import type { PublicAlertPayload, PublishRecord } from '@city-commander/shared-schemas';
 import { PublishStatus, SCHEMA_VERSION } from '@city-commander/shared-schemas';
 import {
   isLegalPublishTransition,
@@ -70,12 +70,10 @@ export interface PublishFnDependencies {
    */
   readonly readCmsCoreText: (decisionId: string) => Promise<string | null>;
 
-  /**
-   * 讀取 DecisionNarrative 的多語 PublicAlert 文字（選配，供通道派送）。
-   */
-  readonly readPublicAlertText?: (
+  /** 讀取已完成的 DecisionNarrative PUBLIC_ALERT；發布不得退回 CMS 文字。 */
+  readonly readPublicAlertText: (
     decisionId: string,
-  ) => Promise<Partial<Record<string, string>> | null>;
+  ) => Promise<PublicAlertPayload['public_alert_text'] | null>;
 
   /**
    * Atomically claim the right to execute external publish side effects for
@@ -136,6 +134,14 @@ function errorResponse(
   message: string,
 ): APIGatewayProxyResultV2 {
   return jsonResponse(statusCode, { error_code: errorCode, message });
+}
+
+function hasPublicAlertText(
+  value: PublicAlertPayload['public_alert_text'] | null,
+): value is PublicAlertPayload['public_alert_text'] {
+  return value !== null && Object.values(value).some(
+    (text) => typeof text === 'string' && text.trim().length > 0,
+  );
 }
 
 // ─── Cognito commander authorization ──────────────────────────────────────────
@@ -465,9 +471,14 @@ export function createPublishHandler(
       if (shouldDispatchChannels) {
         // Read-only payload preparation may fail safely before taking the claim.
         const cmsCoreText = await readCmsCoreText(decisionId) ?? '';
-        const publicAlertText = readPublicAlertText
-          ? (await readPublicAlertText(decisionId)) ?? undefined
-          : undefined;
+        const publicAlertText = await readPublicAlertText(decisionId);
+        if (!hasPublicAlertText(publicAlertText)) {
+          return errorResponse(
+            409,
+            'PUBLIC_ALERT_NOT_READY',
+            '多語民眾警示尚未完成，暫時無法發布。',
+          );
+        }
 
         // Acquire the idempotency token BEFORE CMS/SMS. Optimistic locking the
         // final PublishRecord after dispatch is too late: two concurrent

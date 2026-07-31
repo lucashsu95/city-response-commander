@@ -87,6 +87,7 @@ function makeHandler(seed: PublishRecord | null, overrides: Record<string, unkno
     readDecisionCoreStatus: async () => ({ exists: true, core_committed: true }),
     readPublishRecord: async (id) => store.getRecord(id) ?? null,
     readCmsCoreText: async () => '忠孝東路封閉，請改道 光復南路，預計延誤 78.6 分鐘',
+    readPublicAlertText: async () => ({ zh: '繁中民眾警示', en: 'Public alert' }),
     acquirePublishDispatch: async () => 'ACQUIRED',
     writePublishRecord: (record, expectedVersion) =>
       applyPublishTransition(store, record, expectedVersion),
@@ -120,6 +121,30 @@ describe('PublishFn — channel 失敗時的 publish_failed 轉移', () => {
     expect(dispatchChannels).toHaveBeenCalledWith(
       expect.objectContaining({ publicAlertText }),
     );
+  });
+
+  it.each([
+    ['missing', null],
+    ['empty', {}],
+    ['blank', { zh: '   ' }],
+  ])('PublicAlert %s 時在 claim 與通道副作用前 fail-closed', async (_case, publicAlertText) => {
+    vi.mocked(evaluateChannelOutcome).mockReturnValue({ failed: false });
+    const acquirePublishDispatch = vi.fn(async () => 'ACQUIRED' as const);
+    const writePublishRecord = vi.fn();
+    const { handler } = makeHandler(approvedRecord(), {
+      readPublicAlertText: async () => publicAlertText,
+      acquirePublishDispatch,
+      writePublishRecord,
+    });
+
+    const result = await handler(makeEvent({ target_state: 'published' }));
+    const response = result as { statusCode: number; body: string };
+
+    expect(response.statusCode).toBe(409);
+    expect(JSON.parse(response.body).error_code).toBe('PUBLIC_ALERT_NOT_READY');
+    expect(acquirePublishDispatch).not.toHaveBeenCalled();
+    expect(dispatchChannels).not.toHaveBeenCalled();
+    expect(writePublishRecord).not.toHaveBeenCalled();
   });
 
   it('channel 失敗 → publish_failed 實際寫入，且稽核軌跡完整', async () => {
@@ -188,6 +213,7 @@ describe('PublishFn — channel 失敗時的 publish_failed 轉移', () => {
       readDecisionCoreStatus: async () => ({ exists: true, core_committed: true }),
       readPublishRecord: async (id) => store.getRecord(id) ?? null,
       readCmsCoreText: async () => 'cms',
+      readPublicAlertText: async () => ({ zh: '繁中民眾警示' }),
       acquirePublishDispatch: async () => 'ACQUIRED',
       // 模擬並發：寫入時版本已被別人推進
       writePublishRecord: async () => ({
@@ -221,6 +247,7 @@ describe('PublishFn — channel 失敗時的 publish_failed 轉移', () => {
       // therefore the only gate before the external side effect.
       readPublishRecord: async () => seed,
       readCmsCoreText: async () => 'cms',
+      readPublicAlertText: async () => ({ zh: '繁中民眾警示', en: 'Public alert' }),
       acquirePublishDispatch,
       writePublishRecord: (record, expectedVersion) =>
         applyPublishTransition(store, record, expectedVersion),

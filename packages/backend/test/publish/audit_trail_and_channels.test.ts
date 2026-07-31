@@ -242,9 +242,10 @@ describe('channels — payload 與一鍵複製/匯出', () => {
     updated_at: '2026-05-20 22:15',
   };
   const CMS_TEXT = '忠孝東路封閉，請改道 光復南路，預計延誤 78.6 分鐘';
+  const PUBLIC_ALERT_TEXT = { zh: '繁中民眾警示' };
 
   it('payload 取用決定性 cms_core_text，不改寫', () => {
-    const payload = buildPublishPayload(publishedRecord, CMS_TEXT);
+    const payload = buildPublishPayload(publishedRecord, CMS_TEXT, PUBLIC_ALERT_TEXT);
     expect(payload.cms_core_text).toBe(CMS_TEXT);
     expect(payload.decision_id).toBe(DECISION_ID);
     expect(payload.published_by).toBe(PUBLISHER);
@@ -253,7 +254,9 @@ describe('channels — payload 與一鍵複製/匯出', () => {
   });
 
   it('一鍵複製包含 CMS 訊息與發布資訊', () => {
-    const text = formatCopyText(buildPublishPayload(publishedRecord, CMS_TEXT));
+    const text = formatCopyText(
+      buildPublishPayload(publishedRecord, CMS_TEXT, PUBLIC_ALERT_TEXT),
+    );
     expect(text).toContain(CMS_TEXT);
     expect(text).toContain(DECISION_ID);
     expect(text).toContain(PUBLISHER);
@@ -270,7 +273,7 @@ describe('channels — payload 與一鍵複製/匯出', () => {
   });
 
   it('一鍵匯出為合法 JSON 且可還原 payload', () => {
-    const payload = buildPublishPayload(publishedRecord, CMS_TEXT);
+    const payload = buildPublishPayload(publishedRecord, CMS_TEXT, PUBLIC_ALERT_TEXT);
     expect(JSON.parse(formatExportJson(payload))).toEqual(payload);
   });
 });
@@ -290,6 +293,7 @@ describe('dispatchChannels — 模擬通道', () => {
     const result = dispatchChannels({
       record: publishedRecord,
       cmsCoreText: 'cms text',
+      publicAlertText: { zh: '繁中民眾警示' },
       logger: (m) => logs.push(m),
     });
 
@@ -309,7 +313,8 @@ describe('dispatchChannels — 模擬通道', () => {
     const logs: string[] = [];
     dispatchChannels({
       record: publishedRecord,
-      cmsCoreText: '長'.repeat(500),
+      cmsCoreText: 'CMS 核心文字',
+      publicAlertText: { zh: '長'.repeat(500) },
       logger: (m) => logs.push(m),
     });
     const smsLog = logs.find((m) => m.includes('[SMS_MOCK]'))!;
@@ -317,7 +322,7 @@ describe('dispatchChannels — 模擬通道', () => {
     expect(smsText).toHaveLength(160);
   });
 
-  it('SMS 優先發布多語 PublicAlert 的繁中內容', () => {
+  it('SMS 逐語言發布 PublicAlert，且不使用 CMS 核心文字', () => {
     const logs: string[] = [];
     dispatchChannels({
       record: publishedRecord,
@@ -328,16 +333,35 @@ describe('dispatchChannels — 模擬通道', () => {
       },
       logger: (m) => logs.push(m),
     });
-    const smsLog = logs.find((m) => m.includes('[SMS_MOCK]'))!;
+    const smsLogs = logs.filter((m) => m.includes('[SMS_MOCK]'));
 
-    expect(smsLog).toContain('多語 PublicAlert 繁中通報');
-    expect(smsLog).not.toContain('CMS 核心文字');
+    expect(smsLogs).toHaveLength(2);
+    expect(smsLogs.some((m) => m.includes('language=zh') && m.includes('多語 PublicAlert 繁中通報'))).toBe(true);
+    expect(smsLogs.some((m) => m.includes('language=en') && m.includes('English public alert'))).toBe(true);
+    expect(smsLogs.every((m) => !m.includes('CMS 核心文字'))).toBe(true);
+  });
+
+  it('PublicAlert 無可用文字時 SMS fail-closed，不退回 CMS', () => {
+    const logs: string[] = [];
+    const result = dispatchChannels({
+      record: publishedRecord,
+      cmsCoreText: '不可退回的 CMS 核心文字',
+      publicAlertText: {},
+      logger: (m) => logs.push(m),
+    });
+
+    expect(result.failedChannels).toContainEqual({
+      channelId: CHANNEL.SMS_MOCK,
+      reason: 'PUBLIC_ALERT_NOT_READY',
+    });
+    expect(logs.some((m) => m.includes('[SMS_MOCK]'))).toBe(false);
   });
 
   it('非 published 狀態 → 防禦性拒絕，不執行任何通道', () => {
     const result = dispatchChannels({
       record: { ...publishedRecord, publish_state: PublishStatus.approved },
       cmsCoreText: 'cms',
+      publicAlertText: { zh: '繁中民眾警示' },
     });
     expect(result.succeededChannels).toEqual([]);
     expect(result.failedChannels[0].channelId).toBe('ALL');
@@ -352,6 +376,7 @@ describe('evaluateChannelOutcome', () => {
       published_at: '2026-05-20 22:15',
       published_by: PUBLISHER,
       cms_core_text: 'cms',
+      public_alert_text: { zh: '繁中民眾警示' },
     },
     copyText: '',
     exportJson: '',

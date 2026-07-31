@@ -17,8 +17,10 @@
  * @module backend/publish/channels
  */
 
-import type { PublishRecord } from '@city-commander/shared-schemas';
+import type { PublicAlertPayload, PublishRecord } from '@city-commander/shared-schemas';
 import { PublishStatus } from '@city-commander/shared-schemas';
+
+export type PublicAlertText = PublicAlertPayload['public_alert_text'];
 
 // ─── Channel identifiers ──────────────────────────────────────────────────────
 
@@ -57,11 +59,8 @@ export interface PublishPayload {
   readonly published_by: string;
   /** CMS 核心文字（決定性，來自 DecisionCore.cms_core_text） */
   readonly cms_core_text: string;
-  /**
-   * 多語警示文字（選配，來自 DecisionNarrative PUBLIC_ALERT item）。
-   * 競賽版若尚未連接 read model，可為空或設為 pending。
-   */
-  readonly public_alert_text?: Partial<Record<string, string>>;
+  /** 多語警示文字（來自已完成的 DecisionNarrative PUBLIC_ALERT item）。 */
+  readonly public_alert_text: PublicAlertText;
   /** 核准者 */
   readonly approved_by?: string;
 }
@@ -98,23 +97,23 @@ export interface DispatchChannelsResult {
  *
  * 競賽版不依賴完整 DecisionReadModel（TASK-149）：
  * - cms_core_text 由呼叫端傳入（來自 DecisionCore 唯讀讀取）
- * - public_alert_text 選配，等 TASK-149 完成後可填充
+ * - public_alert_text 由呼叫端從已完成的 PUBLIC_ALERT narrative 提供
  *
  * @param record - 已達 `published` 狀態的 PublishRecord
  * @param cmsCoreText - 決定性 CMS 文字（來自 DecisionCore.cms_core_text）
- * @param publicAlertText - 多語警示文字（選配）
+ * @param publicAlertText - 多語警示文字
  */
 export function buildPublishPayload(
   record: PublishRecord,
   cmsCoreText: string,
-  publicAlertText?: Partial<Record<string, string>>,
+  publicAlertText: PublicAlertText,
 ): PublishPayload {
   return {
     decision_id: record.decision_id,
     published_at: record.updated_at,
     published_by: record.published_by ?? record.approved_by ?? 'unknown',
     cms_core_text: cmsCoreText,
-    ...(publicAlertText && { public_alert_text: publicAlertText }),
+    public_alert_text: publicAlertText,
     ...(record.approved_by && { approved_by: record.approved_by }),
   };
 }
@@ -208,13 +207,27 @@ function simulateSmsChannel(
   logger: (msg: string) => void = console.log,
 ): ChannelResult {
   try {
-    // SMS 優先發布繁中 PublicAlert；沒有警示文字時才回退 CMS 核心文字
-    const alertText = payload.public_alert_text?.zh ?? Object.values(payload.public_alert_text ?? {})[0];
-    const smsText = (alertText ?? payload.cms_core_text).slice(0, 160);
-    logger(
-      `[SMS_MOCK] 發布簡訊 | decision_id=${payload.decision_id} | ` +
-        `sms_text="${smsText}" | at=${payload.published_at}`,
-    );
+    const messages = Object.entries(payload.public_alert_text)
+      .filter((entry): entry is [string, string] =>
+        typeof entry[1] === 'string' && entry[1].trim().length > 0,
+      )
+      .sort(([left], [right]) => left.localeCompare(right));
+
+    if (messages.length === 0) {
+      return {
+        success: false,
+        channelId: CHANNEL.SMS_MOCK,
+        reason: 'PUBLIC_ALERT_NOT_READY',
+      };
+    }
+
+    for (const [language, text] of messages) {
+      const smsText = text.slice(0, 160);
+      logger(
+        `[SMS_MOCK] 發布簡訊 | decision_id=${payload.decision_id} | ` +
+          `language=${language} | sms_text="${smsText}" | at=${payload.published_at}`,
+      );
+    }
     return { success: true, channelId: CHANNEL.SMS_MOCK };
   } catch (err) {
     return {
@@ -235,8 +248,8 @@ export interface DispatchChannelsInput {
   readonly record: PublishRecord;
   /** 決定性 CMS 文字（來自 DecisionCore.cms_core_text，唯讀讀取） */
   readonly cmsCoreText: string;
-  /** 多語警示文字（選配，來自 DecisionNarrative，等 TASK-149 完成後填充） */
-  readonly publicAlertText?: Partial<Record<string, string>>;
+  /** 多語警示文字（來自已完成的 DecisionNarrative PUBLIC_ALERT item） */
+  readonly publicAlertText: PublicAlertText;
   /** 選配 logger（測試時可注入 mock） */
   readonly logger?: (msg: string) => void;
 }
