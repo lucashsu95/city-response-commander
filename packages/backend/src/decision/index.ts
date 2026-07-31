@@ -13,18 +13,16 @@ export type { CoreIdentityClassification, CoreIdentityMismatch } from './identit
 
 export { DefaultDomainPipelineAdapter, PENDING_PIPELINE_STEPS } from './domain_pipeline_adapter.js';
 
+export { DEFAULT_DECISION_COMPOSER } from './domain_pipeline_adapter.js';
+
 export type {
   DomainPipelineAdapter,
   DomainPipelineInput,
   DomainPipelineResult,
   DomainPipelinePorts,
-  PartialDecisionFacts,
-  SegmentAlignmentDiagnostic,
-  SnapshotAlignmentPort,
+  DecisionComposerPort,
+  DecisionFacts,
   IngestionPort,
-  RuleEnginePort,
-  TrafficRow,
-  AlignedTrafficRow,
 } from './domain_pipeline_adapter.js';
 
 export { runDecisionFn, DecisionFn } from './decision_fn.js';

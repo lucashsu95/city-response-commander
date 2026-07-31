@@ -1,5 +1,5 @@
 /**
- * DecisionFn — the deterministic Fast Path handler (design §6, §8, §15.2;
+ * DecisionFn ??the deterministic Fast Path handler (design §6, §8, §15.2;
  * TASK-099).
  *
  * Orchestration only. It owns three invariants and no rule semantics:
@@ -27,9 +27,9 @@ import type { PersistCoreOutcome } from './decision_core_writer.js';
 import type { LatencyTrace } from '../metrics/latency_trace.js';
 import type { Telemetry } from '../metrics/telemetry_facade.js';
 import type {
+  DecisionFacts,
   DomainPipelineAdapter,
   DomainPipelineResult,
-  PartialDecisionFacts,
 } from './domain_pipeline_adapter.js';
 
 /** Handler input, taken from the Step Functions workflow INPUT (§10.11e). */
@@ -40,7 +40,7 @@ export interface DecisionFnInput {
   readonly eventId: string;
   /** Per-injection execution id. Excluded from `core_hash` (§10.11a-1). */
   readonly injectionRunId: string;
-  /** Traceability only — never used for dedup or recovery (§15.2). */
+  /** Traceability only ??never used for dedup or recovery (§15.2). */
   readonly workflowExecutionName?: string;
   readonly traceId: string;
 }
@@ -53,7 +53,7 @@ export interface DecisionFnInput {
  */
 export interface DecisionCoreBuilderPort {
   build(input: {
-    readonly facts: PartialDecisionFacts;
+    readonly facts: DecisionFacts;
     readonly decisionId: string;
     readonly idempotencyKey: string;
     readonly injectionRunId: string;
@@ -66,7 +66,7 @@ export interface DecisionCoreBuilderPort {
  * Latency instrumentation for the production path (TASK-104/154/158).
  *
  * Optional so unit tests need no clock or EMF sink, but it must be supplied in
- * deployed code — without it `FastPathLatencyMs` is never produced and the §20
+ * deployed code ??without it `FastPathLatencyMs` is never produced and the §20
  * budget cannot be verified at all. That was the gap this option closes:
  * `LatencyTrace` existed and was tested, but nothing on the production path ever
  * called it.
@@ -99,7 +99,7 @@ export type DecisionFnResult =
       readonly source_manifest_hash: string;
       readonly pending_steps: readonly string[];
       /** Facts computed before the stop, for disclosure. `null` if none. */
-      readonly facts: PartialDecisionFacts | null;
+      readonly facts: DecisionFacts | null;
     }
   | {
       readonly data_status: 'ready';
@@ -112,14 +112,14 @@ export type DecisionFnResult =
 /**
  * Run the deterministic decision and persist the core.
  *
- * @throws TableReadError on a DynamoDB fault — a transient failure is never
+ * @throws TableReadError on a DynamoDB fault ??a transient failure is never
  *         reported as `insufficient_data`, because that would look like a data gap
  *
  * @example Step Functions DecisionFn task
  * ```ts
  * const result = await runDecisionFn(ports, input);
  * if (result.data_status === 'insufficient_data') return result;      // no core, no push
- * return { core_write_status: result.core_write_status };             // → Choice Gate
+ * return { core_write_status: result.core_write_status };             // ??Choice Gate
  * ```
  */
 export async function runDecisionFn(
@@ -128,9 +128,9 @@ export async function runDecisionFn(
 ): Promise<DecisionFnResult> {
   const latency = ports.latency;
 
-  // Steps 1–3: source gate, ingestion, Strategy A alignment, rule engine.
-  // `measure` records the stage even when the pipeline throws — a failed stage
-  // still consumed budget — and never lets an instrumentation fault surface in
+  // Steps 1??: source gate, ingestion, Strategy A alignment, rule engine.
+  // `measure` records the stage even when the pipeline throws ??a failed stage
+  // still consumed budget ??and never lets an instrumentation fault surface in
   // place of the pipeline's own error.
   const pipeline: DomainPipelineResult =
     latency === undefined
@@ -175,7 +175,7 @@ export async function runDecisionFn(
     // payload is ready to push. `publishFastPathReady` (TASK-103) marks the same
     // trace again at the actual push; that later value is the accurate one and
     // correctly overwrites this one. Marking here means a `fast_path_ms` still
-    // gets emitted when DecisionFn is the last step in the process — which is the
+    // gets emitted when DecisionFn is the last step in the process ??which is the
     // case under `orchestration.mode=lambda_direct`.
     latency.trace.markFastPathReady(latency.now());
     latency.telemetry?.recordLatency(latency.trace.snapshot());
