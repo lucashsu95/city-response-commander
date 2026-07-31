@@ -16,6 +16,7 @@ import { describe, it, expect } from 'vitest';
 import {
   EXIT_CODES,
   EXIT_CODE_BAD_INPUT,
+  TEAM_TARGET_FAILURE_EXIT_CODE,
   LatencySlaInputError,
   evaluateLatencySla,
   parseLatencySamples,
@@ -320,13 +321,14 @@ describe('compliant runs', () => {
 // ─── Violations ────────────────────────────────────────────
 
 describe('the team 5s target is judged on a percentile', () => {
-  it('fails when p95 exceeds the target', () => {
+  it('reports TEAM_TARGET_MISSED when p95 exceeds the target', () => {
     const report = evaluate(
       Array.from({ length: 20 }, () => sample({ fastPathMs: 6_000, endToEndMs: 30_000 })),
     );
 
-    expect(report.verdict).toBe('SLA_VIOLATION');
-    expect(report.exit_code).toBe(1);
+    // Not an official breach: the 60s deadline was still met.
+    expect(report.verdict).toBe('TEAM_TARGET_MISSED');
+    expect(report.exit_code).not.toBe(1);
   });
 
   it('tolerates a single cold-start outlier in a healthy population', () => {
@@ -350,7 +352,7 @@ describe('the team 5s target is judged on a percentile', () => {
       sample({ fastPathMs: 9_000, endToEndMs: 20_000 }),
     ];
 
-    expect(evaluate(samples, { targetPercentile: 100 }).verdict).toBe('SLA_VIOLATION');
+    expect(evaluate(samples, { targetPercentile: 100 }).verdict).toBe('TEAM_TARGET_MISSED');
   });
 
   it('reports which percentile value was compared', () => {
@@ -359,6 +361,102 @@ describe('the team 5s target is judged on a percentile', () => {
     );
 
     expect(report.fast_path.evaluated_ms).toBe(95);
+  });
+});
+
+describe('the two budgets are assessed independently (audit fix 2)', () => {
+  it('reports an official breach even when NO Fast Path samples exist', () => {
+    const report = evaluate([sample({ fastPathMs: null, endToEndMs: 61_000 })]);
+
+    // The bug this pins: the Fast Path population being empty used to force
+    // INSUFFICIENT_DATA, burying a 60s breach that was sitting in the same file.
+    expect(report.verdict).toBe('OFFICIAL_SLA_VIOLATION');
+    expect(report.exit_code).toBe(1);
+    expect(report.violations).toHaveLength(1);
+  });
+
+  it('reports an official breach even when Fast Path samples are below minSamples', () => {
+    const report = evaluate(
+      [
+        sample({ fastPathMs: 2_000, endToEndMs: 20_000 }),
+        sample({ fastPathMs: null, endToEndMs: 61_000 }),
+        sample({ fastPathMs: null, endToEndMs: 30_000 }),
+      ],
+      { minSamples: 3 },
+    );
+
+    expect(report.verdict).toBe('OFFICIAL_SLA_VIOLATION');
+  });
+
+  it('still records that the Fast Path could not be assessed', () => {
+    const report = evaluate([sample({ fastPathMs: null, endToEndMs: 61_000 })]);
+
+    expect(report.fast_path.assessable).toBe(false);
+    expect(report.end_to_end.assessable).toBe(true);
+    expect(report.insufficient_data_reason).toContain('FastPathLatencyMs');
+  });
+
+  it('applies minSamples to each population separately', () => {
+    const report = evaluate(
+      [
+        sample({ fastPathMs: 2_000, endToEndMs: 20_000 }),
+        sample({ fastPathMs: 2_100, endToEndMs: null }),
+      ],
+      { minSamples: 2 },
+    );
+
+    expect(report.fast_path.assessable).toBe(true);
+    expect(report.end_to_end.assessable).toBe(false);
+    expect(report.verdict).toBe('INSUFFICIENT_DATA');
+  });
+
+  it('returns INSUFFICIENT_DATA when the official budget alone is unmeasurable', () => {
+    const report = evaluate([sample({ fastPathMs: 2_000, endToEndMs: null })]);
+
+    // The graded requirement cannot be certified, so this is not a pass.
+    expect(report.verdict).toBe('INSUFFICIENT_DATA');
+    expect(report.exit_code).toBe(2);
+  });
+});
+
+describe('a missed team target is separated from an official breach (audit fix 2)', () => {
+  it('returns TEAM_TARGET_MISSED when only the 5s target is missed', () => {
+    const report = evaluate([sample({ fastPathMs: 9_000, endToEndMs: 30_000 })]);
+
+    expect(report.verdict).toBe('TEAM_TARGET_MISSED');
+  });
+
+  it('does not fail the build by default, since 5s is not an official indicator', () => {
+    const report = evaluate([sample({ fastPathMs: 9_000, endToEndMs: 30_000 })]);
+
+    expect(report.exit_code).toBe(0);
+  });
+
+  it('becomes fatal with a distinct exit code when failOnTeamTarget is set', () => {
+    const report = evaluate([sample({ fastPathMs: 9_000, endToEndMs: 30_000 })], {
+      failOnTeamTarget: true,
+    });
+
+    // Distinct from 1, so CI can still tell it apart from an official breach.
+    expect(report.verdict).toBe('TEAM_TARGET_MISSED');
+    expect(report.exit_code).toBe(TEAM_TARGET_FAILURE_EXIT_CODE);
+    expect(report.exit_code).not.toBe(1);
+  });
+
+  it('prefers OFFICIAL_SLA_VIOLATION when both budgets are missed', () => {
+    const report = evaluate([sample({ fastPathMs: 9_000, endToEndMs: 70_000 })]);
+
+    // The graded failure is the one that must drive the exit code.
+    expect(report.verdict).toBe('OFFICIAL_SLA_VIOLATION');
+    expect(report.exit_code).toBe(1);
+  });
+
+  it('keeps failOnTeamTarget from downgrading an official breach', () => {
+    const report = evaluate([sample({ fastPathMs: 9_000, endToEndMs: 70_000 })], {
+      failOnTeamTarget: true,
+    });
+
+    expect(report.exit_code).toBe(1);
   });
 });
 
@@ -373,7 +471,7 @@ describe('the official 60s deadline is judged on the worst case', () => {
 
     // 60s is a per-decision official requirement, not an average. One decision
     // over the line is one decision that missed it.
-    expect(report.verdict).toBe('SLA_VIOLATION');
+    expect(report.verdict).toBe('OFFICIAL_SLA_VIOLATION');
     expect(report.end_to_end.evaluated_ms).toBe(61_000);
   });
 
@@ -405,7 +503,7 @@ describe('the official 60s deadline is judged on the worst case', () => {
   it('honours an overridden deadline', () => {
     const report = evaluate([sample({ endToEndMs: 30_000 })], { officialDeadlineMs: 20_000 });
 
-    expect(report.verdict).toBe('SLA_VIOLATION');
+    expect(report.verdict).toBe('OFFICIAL_SLA_VIOLATION');
   });
 });
 
@@ -420,11 +518,36 @@ describe('CLI', () => {
     expect(result.stderr).toBe('');
   });
 
-  it('exits 1 on an SLA violation', async () => {
+  it('exits 1 on an official SLA violation', async () => {
     const result = await cli(['--input', 'latency.json'], JSON.stringify([emfLine(9_000, 70_000)]));
 
     expect(result.exitCode).toBe(1);
-    expect(result.stderr).toContain('violated');
+    expect(result.stderr).toContain('OFFICIAL');
+  });
+
+  it('exits 0 with a warning when only the team target was missed', async () => {
+    const result = await cli(['--input', 'latency.json'], JSON.stringify([emfLine(9_000, 30_000)]));
+
+    expect(result.exitCode).toBe(0);
+    expect(result.stderr).toContain('WARNING');
+    expect(result.stderr).toContain('TEAM_TARGET');
+  });
+
+  it('makes a missed team target fatal with --fail-on-team-target', async () => {
+    const result = await cli(
+      ['--input', 'latency.json', '--fail-on-team-target'],
+      JSON.stringify([emfLine(9_000, 30_000)]),
+    );
+
+    expect(result.exitCode).toBe(TEAM_TARGET_FAILURE_EXIT_CODE);
+  });
+
+  it('accepts LATENCY_FAIL_ON_TEAM_TARGET from the environment', async () => {
+    const result = await cli([], JSON.stringify([emfLine(9_000, 30_000)]), {
+      LATENCY_FAIL_ON_TEAM_TARGET: 'true',
+    });
+
+    expect(result.exitCode).toBe(TEAM_TARGET_FAILURE_EXIT_CODE);
   });
 
   it('exits 2 when there is nothing to measure', async () => {
@@ -446,7 +569,7 @@ describe('CLI', () => {
       JSON.stringify([emfLine(3_000, 30_000)]),
     );
 
-    expect(result.exitCode).toBe(1);
+    expect(JSON.parse(result.stdout).verdict).toBe('TEAM_TARGET_MISSED');
   });
 
   it('accepts thresholds from the environment', async () => {
@@ -454,7 +577,7 @@ describe('CLI', () => {
       FASTPATH_TARGET_MS: '2000',
     });
 
-    expect(result.exitCode).toBe(1);
+    expect(JSON.parse(result.stdout).verdict).toBe('TEAM_TARGET_MISSED');
   });
 
   it('lets a flag win over the environment', async () => {

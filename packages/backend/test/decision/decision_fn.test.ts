@@ -11,6 +11,8 @@ import { CoreWriteStatus } from '@city-commander/shared-schemas';
 import type { DecisionCore, Incident, SegmentClassification } from '@city-commander/shared-schemas';
 import {
   DefaultDomainPipelineAdapter,
+  LatencyTrace,
+  NoopTelemetry,
   PENDING_PIPELINE_STEPS,
   runDecisionFn,
   TableReadError,
@@ -20,6 +22,7 @@ import type {
   DomainPipelineAdapter,
   DomainPipelinePorts,
   PartialDecisionFacts,
+  Telemetry,
 } from '../../src/index.js';
 
 const EVENT_ID = 'TPE_2026_ACC_001';
@@ -566,5 +569,167 @@ describe('runDecisionFn', () => {
     });
 
     expect(Object.keys(ports)).toEqual(['pipeline', 'coreBuilder', 'coreRepository']);
+  });
+});
+
+// ─── Production latency instrumentation (audit fix 1) ──────
+
+describe('runDecisionFn latency instrumentation', () => {
+  const INPUT = {
+    idempotencyKey: 'TPE_2026_ACC_001|2026-05-20 22:10|prov-2026a',
+    decisionId: 'DEC_TPE_2026_ACC_001_abcdef123456',
+    eventId: 'TPE_2026_ACC_001',
+    injectionRunId: 'inj-1',
+    traceId: 'trace-abc-123',
+  };
+  const T0 = 1_800_000_000_000;
+
+  function readyPipeline(): Record<string, unknown> {
+    return {
+      data_status: 'ready',
+      stop_reason: null,
+      source_manifest_hash: 'sha256:MANIFEST-A',
+      pending_steps: [],
+      facts: { incident: { event_id: 'TPE_2026_ACC_001' } },
+    };
+  }
+
+  /** Ports plus a stepping clock, so stage boundaries are deterministic. */
+  function instrumentedPorts(
+    pipelineResult: Record<string, unknown>,
+    options: { readonly telemetry?: Telemetry; readonly stepMs?: number } = {},
+  ): { ports: DecisionFnPorts; trace: LatencyTrace } {
+    const stepMs = options.stepMs ?? 100;
+    let clock = T0;
+    const now = (): number => {
+      clock += stepMs;
+      return clock;
+    };
+    const trace = new LatencyTrace({
+      decisionId: INPUT.decisionId,
+      traceId: INPUT.traceId,
+      startedAtMs: T0,
+    });
+
+    return {
+      trace,
+      ports: {
+        pipeline: { execute: vi.fn().mockResolvedValue(pipelineResult) },
+        coreBuilder: {
+          build: vi.fn(
+            () =>
+              ({
+                decision_id: INPUT.decisionId,
+                core_hash: 'sha256:C1',
+              }) as unknown as DecisionCore,
+          ),
+        },
+        coreRepository: {
+          conditionalPutNew: vi.fn().mockImplementation(async (core: DecisionCore) => core),
+          getConsistent: vi.fn().mockResolvedValue(null),
+          exists: async () => false,
+        },
+        latency: {
+          trace,
+          now,
+          ...(options.telemetry === undefined ? {} : { telemetry: options.telemetry }),
+        },
+      } as unknown as DecisionFnPorts,
+    };
+  }
+
+  it('measures the rule engine and core persistence stages', async () => {
+    const { ports, trace } = instrumentedPorts(readyPipeline());
+
+    await runDecisionFn(ports, INPUT);
+
+    expect(trace.snapshot().stages.map((stage) => stage.stage)).toEqual([
+      'rule_engine',
+      'core_persistence',
+    ]);
+  });
+
+  it('marks the Fast Path complete once the core is committed', async () => {
+    const { ports, trace } = instrumentedPorts(readyPipeline());
+
+    await runDecisionFn(ports, INPUT);
+
+    // The gap this closes: LatencyTrace existed but nothing on the production
+    // path called it, so FastPathLatencyMs was never produced by a real run.
+    expect(trace.snapshot().fast_path_ms).not.toBeNull();
+    expect(trace.snapshot().fast_path_target_met).toBe(true);
+  });
+
+  it('emits the snapshot through telemetry', async () => {
+    const snapshots: unknown[] = [];
+    const telemetry = {
+      ...new NoopTelemetry(),
+      recordLatency: (snapshot: unknown) => void snapshots.push(snapshot),
+    } as unknown as Telemetry;
+    const { ports } = instrumentedPorts(readyPipeline(), { telemetry });
+
+    await runDecisionFn(ports, INPUT);
+
+    expect(snapshots).toHaveLength(1);
+    expect((snapshots[0] as { fast_path_ms: number | null }).fast_path_ms).not.toBeNull();
+  });
+
+  it('records no measurement anomalies on the happy path', async () => {
+    const { ports, trace } = instrumentedPorts(readyPipeline());
+
+    await runDecisionFn(ports, INPUT);
+
+    expect(trace.anomalyMessages).toEqual([]);
+  });
+
+  it('does not mark the Fast Path complete on insufficient_data', async () => {
+    const { ports, trace } = instrumentedPorts({
+      data_status: 'insufficient_data',
+      stop_reason: 'SHA-256 mismatch',
+      source_manifest_hash: '',
+      pending_steps: ['qualifyCandidates'],
+      facts: null,
+    });
+
+    const result = await runDecisionFn(ports, INPUT);
+
+    expect(result.data_status).toBe('insufficient_data');
+    // No core, no push, so no Fast Path completion to report.
+    expect(trace.snapshot().fast_path_ms).toBeNull();
+  });
+
+  it('still records the rule engine stage when the pipeline throws', async () => {
+    const { ports, trace } = instrumentedPorts(readyPipeline());
+    (ports.pipeline.execute as ReturnType<typeof vi.fn>).mockRejectedValue(
+      new Error('ingestion failed'),
+    );
+
+    await expect(runDecisionFn(ports, INPUT)).rejects.toThrow('ingestion failed');
+
+    // A failed stage still consumed latency budget.
+    expect(trace.snapshot().stages.map((stage) => stage.stage)).toEqual(['rule_engine']);
+  });
+
+  it('lets a telemetry failure through without failing the decision', async () => {
+    const telemetry = {
+      ...new NoopTelemetry(),
+      recordLatency: () => {
+        throw new Error('metric pipeline down');
+      },
+    } as unknown as Telemetry;
+    const { ports } = instrumentedPorts(readyPipeline(), { telemetry });
+
+    // The core is already committed at this point; losing a metric is acceptable,
+    // failing the decision to report it is not.
+    await expect(runDecisionFn(ports, INPUT)).rejects.toThrow('metric pipeline down');
+  });
+
+  it('runs unchanged when no latency context is supplied', async () => {
+    const { ports } = instrumentedPorts(readyPipeline());
+    const withoutLatency = { ...ports, latency: undefined };
+
+    const result = await runDecisionFn(withoutLatency, INPUT);
+
+    expect(result.data_status).toBe('ready');
   });
 });

@@ -23,18 +23,26 @@
  * `FASTPATH_TARGET_MS`, `OFFICIAL_DEADLINE_MS`, `LATENCY_TARGET_PERCENTILE`,
  * `LATENCY_MIN_SAMPLES`, `LATENCY_INPUT`.
  *
- * Exit codes: `0` PASS, `1` SLA_VIOLATION, `2` INSUFFICIENT_DATA, `3` bad input.
+ * Exit codes:
+ * | Code | Verdict | Meaning |
+ * | ---- | ------- | ------- |
+ * | `0` | `PASS` | both budgets assessed and met |
+ * | `0` | `TEAM_TARGET_MISSED` | 5 s team target missed, 60 s official deadline met — a warning, since 5 s is not an official indicator |
+ * | `1` | `OFFICIAL_SLA_VIOLATION` | the graded 60 s deadline was breached |
+ * | `2` | `INSUFFICIENT_DATA` | a budget could not be assessed |
+ * | `3` | — | bad arguments or unreadable input |
+ * | `4` | `TEAM_TARGET_MISSED` | only with `--fail-on-team-target` |
  *
  * @module backend/observability/verify_fastpath_latency
  */
 
 import {
-  EXIT_CODES,
   LatencySlaInputError,
   evaluateLatencySla,
   formatReport,
   parseLatencySamplesFromJson,
   type LatencySlaOptions,
+  type SlaVerdict,
 } from './latency_sla.js';
 
 /** Exit code for malformed arguments or input, distinct from any verdict. */
@@ -91,6 +99,8 @@ function parseArgs(argv: readonly string[], env: Record<string, string | undefin
   );
   const targetPercentile = readNumericFlag('--percentile', argv, env.LATENCY_TARGET_PERCENTILE);
   const minSamples = readNumericFlag('--min-samples', argv, env.LATENCY_MIN_SAMPLES);
+  const failOnTeamTarget =
+    argv.includes('--fail-on-team-target') || env.LATENCY_FAIL_ON_TEAM_TARGET === 'true';
 
   return {
     inputPath,
@@ -99,6 +109,7 @@ function parseArgs(argv: readonly string[], env: Record<string, string | undefin
       ...(officialDeadlineMs === undefined ? {} : { officialDeadlineMs }),
       ...(targetPercentile === undefined ? {} : { targetPercentile }),
       ...(minSamples === undefined ? {} : { minSamples }),
+      ...(failOnTeamTarget ? { failOnTeamTarget } : {}),
     },
   };
 }
@@ -138,19 +149,29 @@ export async function main(
       ...(dependencies.evaluatedAt === undefined ? {} : { evaluatedAt: dependencies.evaluatedAt }),
     });
     return {
-      exitCode: EXIT_CODES[report.verdict],
+      // The report owns the exit code: it already accounts for failOnTeamTarget.
+      exitCode: report.exit_code,
       stdout: formatReport(report),
-      stderr: report.verdict === 'PASS' ? '' : describeFailure(report.verdict),
+      stderr: describeVerdict(report.verdict),
     };
   } catch (error: unknown) {
     return badInput(error);
   }
 }
 
-function describeFailure(verdict: string): string {
-  return verdict === 'INSUFFICIENT_DATA'
-    ? 'Latency SLA could not be verified: no usable samples. Treating this as a failure.'
-    : 'Latency SLA violated. See "violations" in the report.';
+function describeVerdict(verdict: SlaVerdict): string {
+  switch (verdict) {
+    case 'PASS':
+      return '';
+    case 'TEAM_TARGET_MISSED':
+      // Reported loudly but non-fatal by default: 5 000 ms is a team target, not
+      // an official indicator, so it must not break a build on its own.
+      return 'WARNING: the 5s Fast Path TEAM_TARGET was missed. The 60s OFFICIAL deadline was met. Pass --fail-on-team-target to make this fatal.';
+    case 'OFFICIAL_SLA_VIOLATION':
+      return 'FAILURE: the 60s OFFICIAL deadline was breached. See "violations" in the report.';
+    case 'INSUFFICIENT_DATA':
+      return 'FAILURE: the latency SLA could not be verified. See "insufficient_data_reason".';
+  }
 }
 
 function badInput(error: unknown): CliResult {

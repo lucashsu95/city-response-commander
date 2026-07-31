@@ -462,3 +462,57 @@ describe('observeIfThrottled', () => {
     expect(observeIfThrottled(spy.telemetry, error, 'DYNAMODB')).toBe(false);
   });
 });
+
+// ─── Production latency wiring (audit fix 1) ───────────────
+
+describe('production latency emission', () => {
+  /**
+   * The gap this covers: `LatencyTrace` was tested but nothing on the production
+   * path ever called it, so `FastPathLatencyMs` was never produced by a real
+   * execution. These tests assert the two call sites that close it.
+   */
+
+  it('emits FastPathLatencyMs once DecisionFn marks the Fast Path complete', async () => {
+    const { sink, lines } = recordingSink();
+    const telemetry = newTelemetry(sink);
+    const trace = new LatencyTrace({ decisionId: DECISION, traceId: TRACE, startedAtMs: T0 });
+
+    // What runDecisionFn does after persistDecisionCore succeeds.
+    trace.markFastPathReady(T0 + 3_400);
+    telemetry.recordLatency(trace.snapshot());
+
+    expect(lines).toHaveLength(1);
+    expect(lines[0]?.FastPathLatencyMs).toBe(3_400);
+    expect(lines[0]?.FastPathTargetMet).toBe(1);
+  });
+
+  it('lets the publisher overwrite an earlier mark with the accurate value', () => {
+    const { sink, lines } = recordingSink();
+    const telemetry = newTelemetry(sink);
+    const trace = new LatencyTrace({ decisionId: DECISION, traceId: TRACE, startedAtMs: T0 });
+
+    // DecisionFn marks at core-committed; the publisher marks again at the push.
+    trace.markFastPathReady(T0 + 3_400);
+    trace.markFastPathReady(T0 + 4_100);
+    telemetry.recordLatency(trace.snapshot());
+
+    // The budget runs to the push, so the later value is the correct one.
+    expect(lines[0]?.FastPathLatencyMs).toBe(4_100);
+  });
+
+  it('carries the stage durations DecisionFn measured', () => {
+    const { sink, lines } = recordingSink();
+    const telemetry = newTelemetry(sink);
+    const trace = new LatencyTrace({ decisionId: DECISION, traceId: TRACE, startedAtMs: T0 });
+
+    trace.begin('rule_engine', T0 + 100);
+    trace.end('rule_engine', T0 + 900);
+    trace.begin('core_persistence', T0 + 900);
+    trace.end('core_persistence', T0 + 1_200);
+    trace.markFastPathReady(T0 + 1_300);
+    telemetry.recordLatency(trace.snapshot());
+
+    expect(lines[0]?.stage_rule_engine_ms).toBe(800);
+    expect(lines[0]?.stage_core_persistence_ms).toBe(300);
+  });
+});

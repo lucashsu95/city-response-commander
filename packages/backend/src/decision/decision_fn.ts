@@ -24,6 +24,8 @@ import type { DecisionCore } from '@city-commander/shared-schemas';
 import type { DecisionCorePort } from '../repository/decision_core_repository.js';
 import { persistDecisionCore } from './decision_core_writer.js';
 import type { PersistCoreOutcome } from './decision_core_writer.js';
+import type { LatencyTrace } from '../metrics/latency_trace.js';
+import type { Telemetry } from '../metrics/telemetry_facade.js';
 import type {
   DomainPipelineAdapter,
   DomainPipelineResult,
@@ -60,11 +62,29 @@ export interface DecisionCoreBuilderPort {
   }): DecisionCore;
 }
 
+/**
+ * Latency instrumentation for the production path (TASK-104/154/158).
+ *
+ * Optional so unit tests need no clock or EMF sink, but it must be supplied in
+ * deployed code — without it `FastPathLatencyMs` is never produced and the §20
+ * budget cannot be verified at all. That was the gap this option closes:
+ * `LatencyTrace` existed and was tested, but nothing on the production path ever
+ * called it.
+ */
+export interface DecisionFnLatencyContext {
+  readonly trace: LatencyTrace;
+  /** Epoch ms. Injected so stage boundaries stay assertable. */
+  readonly now: () => number;
+  /** Receives the snapshot once the core is committed. */
+  readonly telemetry?: Telemetry;
+}
+
 /** Ports `DecisionFn` depends on. Deliberately no IdempotencyTable writer. */
 export interface DecisionFnPorts {
   readonly pipeline: DomainPipelineAdapter;
   readonly coreBuilder: DecisionCoreBuilderPort;
   readonly coreRepository: DecisionCorePort;
+  readonly latency?: DecisionFnLatencyContext;
 }
 
 /** Handler outcome, consumed by the Step Functions Choice Gate. */
@@ -106,8 +126,18 @@ export async function runDecisionFn(
   ports: DecisionFnPorts,
   input: DecisionFnInput,
 ): Promise<DecisionFnResult> {
+  const latency = ports.latency;
+
   // Steps 1–3: source gate, ingestion, Strategy A alignment, rule engine.
-  const pipeline: DomainPipelineResult = await ports.pipeline.execute({ eventId: input.eventId });
+  // `measure` records the stage even when the pipeline throws — a failed stage
+  // still consumed budget — and never lets an instrumentation fault surface in
+  // place of the pipeline's own error.
+  const pipeline: DomainPipelineResult =
+    latency === undefined
+      ? await ports.pipeline.execute({ eventId: input.eventId })
+      : await latency.trace.measure('rule_engine', latency.now, () =>
+          ports.pipeline.execute({ eventId: input.eventId }),
+        );
 
   if (pipeline.data_status === 'insufficient_data' || pipeline.facts === null) {
     // Disclose and stop. buildDecisionCore is NOT called.
@@ -133,7 +163,23 @@ export async function runDecisionFn(
   });
 
   // Step 5: immutable conditional Put + identity classification (TASK-100/101).
-  const outcome = await persistDecisionCore(ports.coreRepository, core);
+  const outcome =
+    latency === undefined
+      ? await persistDecisionCore(ports.coreRepository, core)
+      : await latency.trace.measure('core_persistence', latency.now, () =>
+          persistDecisionCore(ports.coreRepository, core),
+        );
+
+  if (latency !== undefined) {
+    // The core is committed, so the deterministic Fast Path is complete and its
+    // payload is ready to push. `publishFastPathReady` (TASK-103) marks the same
+    // trace again at the actual push; that later value is the accurate one and
+    // correctly overwrites this one. Marking here means a `fast_path_ms` still
+    // gets emitted when DecisionFn is the last step in the process — which is the
+    // case under `orchestration.mode=lambda_direct`.
+    latency.trace.markFastPathReady(latency.now());
+    latency.telemetry?.recordLatency(latency.trace.snapshot());
+  }
 
   return {
     data_status: 'ready',

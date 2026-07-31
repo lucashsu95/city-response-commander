@@ -65,17 +65,52 @@ describe('stage measurement', () => {
     expect(trace.snapshot().stages.map((s) => s.stage)).toEqual(['ingestion', 'rule_engine']);
   });
 
-  it('rejects ending a stage that was never started', () => {
+  it('records an anomaly instead of throwing when a stage was never started', () => {
     const trace = newTrace();
 
-    expect(() => trace.end('rule_engine', T0)).toThrow(LatencyTraceUsageError);
+    // Instrumentation must never abort a decision, so misuse is reported rather
+    // than thrown — but it is not swallowed either.
+    expect(trace.end('rule_engine', T0)).toBeNull();
+    expect(trace.anomalyMessages).toEqual(['Stage "rule_engine" was ended without being started.']);
+    expect(trace.snapshot().stages).toEqual([]);
   });
 
-  it('rejects opening the same stage twice', () => {
+  it('records an anomaly instead of throwing when a stage is opened twice', () => {
     const trace = newTrace();
     trace.begin('rule_engine', T0);
+    trace.begin('rule_engine', T0 + 10);
+    trace.end('rule_engine', T0 + 100);
 
-    expect(() => trace.begin('rule_engine', T0 + 10)).toThrow(LatencyTraceUsageError);
+    expect(trace.anomalyMessages).toEqual([
+      'Stage "rule_engine" was opened twice; kept the first start time.',
+    ]);
+    // The first start is kept, giving the longer and more conservative duration.
+    expect(trace.snapshot().stages[0]?.duration_ms).toBe(100);
+  });
+
+  it('surfaces anomalies in the snapshot so suspect timings cannot hide', () => {
+    const trace = newTrace();
+    trace.end('ingestion', T0);
+
+    expect(trace.snapshot().measurement_anomalies).toHaveLength(1);
+  });
+
+  it('reports a clean measurement as having no anomalies', () => {
+    const trace = newTrace();
+    trace.begin('ingestion', T0);
+    trace.end('ingestion', T0 + 40);
+
+    expect(trace.snapshot().measurement_anomalies).toEqual([]);
+  });
+
+  it('ignores a non-finite stage timestamp rather than emitting NaN', () => {
+    const trace = newTrace();
+    trace.begin('ingestion', Number.NaN);
+    trace.end('ingestion', T0);
+
+    // A NaN duration would poison every percentile downstream.
+    expect(trace.snapshot().stages).toEqual([]);
+    expect(trace.anomalyMessages).toHaveLength(2);
   });
 
   it('exposes stages left open so they are not silently dropped', () => {
@@ -124,6 +159,51 @@ describe('measure()', () => {
 
     expect(trace.snapshot().stages[0]).toMatchObject({ stage: 'enrichment', duration_ms: 400 });
     expect(trace.openStages).toEqual([]);
+  });
+
+  it('does not let a broken clock replace the business exception', async () => {
+    const trace = newTrace();
+    let calls = 0;
+    const now = (): number => {
+      calls += 1;
+      // Fails on the closing call, i.e. inside the `finally`.
+      if (calls > 1) throw new Error('clock unavailable');
+      return T0;
+    };
+
+    // A `finally` that throws REPLACES the in-flight exception. If that happened
+    // here, the operator would see "clock unavailable" and never learn that
+    // Bedrock timed out.
+    await expect(
+      trace.measure('enrichment', now, async () => {
+        throw new Error('bedrock timeout');
+      }),
+    ).rejects.toThrow('bedrock timeout');
+
+    expect(trace.anomalyMessages[0]).toContain('clock unavailable');
+  });
+
+  it('does not let a broken clock fail an otherwise successful block', async () => {
+    const trace = newTrace();
+    let calls = 0;
+    const now = (): number => {
+      calls += 1;
+      if (calls > 1) throw new Error('clock unavailable');
+      return T0;
+    };
+
+    await expect(trace.measure('ingestion', now, async () => 'ok')).resolves.toBe('ok');
+    expect(trace.anomalyMessages).toHaveLength(1);
+  });
+
+  it('does not throw when the opening clock call fails', async () => {
+    const trace = newTrace();
+    const now = (): number => {
+      throw new Error('clock unavailable');
+    };
+
+    await expect(trace.measure('ingestion', now, async () => 'ok')).resolves.toBe('ok');
+    expect(trace.anomalyMessages).toHaveLength(2);
   });
 });
 

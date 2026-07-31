@@ -27,6 +27,8 @@
  */
 
 import type { DecisionCore } from '@city-commander/shared-schemas';
+import type { LatencyTrace } from '../metrics/latency_trace.js';
+import type { Telemetry } from '../metrics/telemetry_facade.js';
 
 /** WebSocket event name (§13). */
 export const FAST_PATH_READY_EVENT = 'decision.fast_path_ready' as const;
@@ -193,6 +195,17 @@ export async function publishFastPathReady(
     readonly traceId: string;
     readonly policyVersion: string | null;
     readonly coreCommittedGate: CoreCommittedGate;
+    /**
+     * Latency instrumentation (TASK-104/154). Optional, but this is the
+     * AUTHORITATIVE point at which the Fast Path completes: the budget runs from
+     * detection to this push, so a `fast_path_ms` measured earlier understates it
+     * by the MARK_CORE_COMMITTED checkpoint plus the push itself.
+     */
+    readonly latency?: {
+      readonly trace: LatencyTrace;
+      readonly now: () => number;
+      readonly telemetry?: Telemetry;
+    };
   },
 ): Promise<FastPathReadyPublishResult> {
   if (input.coreCommittedGate !== 'APPLIED' && input.coreCommittedGate !== 'ALREADY_APPLIED') {
@@ -219,6 +232,16 @@ export async function publishFastPathReady(
       }
     }),
   );
+
+  if (input.latency !== undefined) {
+    // Marked after the fan-out, and unconditionally: the Fast Path is complete
+    // once the broadcast has been attempted. Gating this on `delivered > 0` would
+    // silently drop the measurement whenever no dashboard happened to be
+    // connected, which is exactly when latency data is least likely to be looked
+    // at and most likely to be needed later.
+    input.latency.trace.markFastPathReady(input.latency.now());
+    input.latency.telemetry?.recordLatency(input.latency.trace.snapshot());
+  }
 
   return {
     event,

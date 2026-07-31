@@ -79,6 +79,13 @@ export interface LatencyTraceSnapshot {
   readonly stages: readonly StageMeasurement[];
   readonly fast_path_target_ms: number;
   readonly official_deadline_ms: number;
+  /**
+   * Measurement problems (double-open, unmatched close, bad clock).
+   *
+   * Surfaced rather than thrown, so a broken measurement cannot fail a decision
+   * yet also cannot hide: a non-empty list means the durations are suspect.
+   */
+  readonly measurement_anomalies: readonly string[];
 }
 
 /** Structured log line for CloudWatch Insights (§19). */
@@ -118,6 +125,7 @@ export class LatencyTrace {
   private readonly measurements: StageMeasurement[] = [];
   private fastPathReadyAtMs: number | null = null;
   private enrichedAtMs: number | null = null;
+  private readonly anomalies: string[] = [];
 
   constructor(input: {
     readonly decisionId: string;
@@ -133,10 +141,24 @@ export class LatencyTrace {
     this.startedAtMs = input.startedAtMs;
   }
 
-  /** Open a stage. */
+  /**
+   * Open a stage.
+   *
+   * Misuse is recorded as an anomaly, never thrown. Instrumentation that can
+   * abort a decision is worse than no instrumentation — and a thrown
+   * `LatencyTraceUsageError` here would kill a decision that was otherwise fine.
+   * The anomaly makes the misuse loud in tests and visible in CloudWatch without
+   * being fatal in production.
+   */
   begin(stage: LatencyStage, atMs: number): void {
     if (this.open.has(stage)) {
-      throw new LatencyTraceUsageError(`Stage "${stage}" is already open.`);
+      // Keep the earlier start: it yields the longer, more conservative duration.
+      this.anomalies.push(`Stage "${stage}" was opened twice; kept the first start time.`);
+      return;
+    }
+    if (!Number.isFinite(atMs)) {
+      this.anomalies.push(`Stage "${stage}" was opened with a non-finite timestamp.`);
+      return;
     }
     this.open.set(stage, atMs);
   }
@@ -144,13 +166,18 @@ export class LatencyTrace {
   /**
    * Close a stage and record its duration.
    *
-   * @throws LatencyTraceUsageError when the stage was never opened — silently
-   *         dropping it would understate total latency
+   * @returns the measurement, or `null` when the stage was never opened (recorded
+   *   as an anomaly rather than thrown, for the reason given on {@link begin})
    */
-  end(stage: LatencyStage, atMs: number): StageMeasurement {
+  end(stage: LatencyStage, atMs: number): StageMeasurement | null {
     const startedAt = this.open.get(stage);
     if (startedAt === undefined) {
-      throw new LatencyTraceUsageError(`Stage "${stage}" was ended without being started.`);
+      this.anomalies.push(`Stage "${stage}" was ended without being started.`);
+      return null;
+    }
+    if (!Number.isFinite(atMs)) {
+      this.anomalies.push(`Stage "${stage}" was ended with a non-finite timestamp.`);
+      return null;
     }
     this.open.delete(stage);
 
@@ -168,27 +195,68 @@ export class LatencyTrace {
    * Time a block, recording the stage even if it throws.
    *
    * A failed stage still consumed latency budget, so it must still be measured.
+   *
+   * The `finally` is itself guarded: a `finally` block that throws REPLACES the
+   * in-flight exception, so an instrumentation fault would surface instead of the
+   * business error that actually caused the failure — and the real cause would be
+   * lost. `end()` no longer throws, and the `catch` keeps that guarantee true even
+   * if a future change reintroduces one.
    */
   async measure<T>(
     stage: LatencyStage,
     now: () => number,
     operation: () => Promise<T>,
   ): Promise<T> {
-    this.begin(stage, now());
+    this.safely(() => this.begin(stage, now()));
     try {
       return await operation();
     } finally {
-      this.end(stage, now());
+      this.safely(() => this.end(stage, now()));
     }
   }
 
-  /** Record the `decision.fast_path_ready` push (TASK-103). */
+  /** Measurement anomalies. Non-empty means the timing data is suspect. */
+  get anomalyMessages(): readonly string[] {
+    return [...this.anomalies];
+  }
+
+  /**
+   * Run an instrumentation step, absorbing anything it throws.
+   *
+   * Also covers a throwing injected `now()`, which no amount of care inside this
+   * class could otherwise contain.
+   */
+  private safely(step: () => void): void {
+    try {
+      step();
+    } catch (error: unknown) {
+      this.anomalies.push(
+        `Measurement step failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
+
+  /**
+   * Record the `decision.fast_path_ready` push (TASK-103).
+   *
+   * Idempotent and last-write-wins. Both `DecisionFn` (which knows the core is
+   * committed) and the publisher (which knows the push happened) may call it; the
+   * publisher's later value is the accurate one and correctly overwrites.
+   */
   markFastPathReady(atMs: number): void {
+    if (!Number.isFinite(atMs)) {
+      this.anomalies.push('markFastPathReady received a non-finite timestamp; ignored.');
+      return;
+    }
     this.fastPathReadyAtMs = atMs;
   }
 
   /** Record the `decision.enriched` push (TASK-119). */
   markEnriched(atMs: number): void {
+    if (!Number.isFinite(atMs)) {
+      this.anomalies.push('markEnriched received a non-finite timestamp; ignored.');
+      return;
+    }
     this.enrichedAtMs = atMs;
   }
 
@@ -213,6 +281,7 @@ export class LatencyTrace {
       stages: [...this.measurements],
       fast_path_target_ms: FAST_PATH_TARGET_MS,
       official_deadline_ms: OFFICIAL_DEADLINE_MS,
+      measurement_anomalies: [...this.anomalies],
     };
   }
 

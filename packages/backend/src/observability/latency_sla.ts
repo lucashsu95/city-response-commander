@@ -41,21 +41,40 @@ export { FAST_PATH_TARGET_MS, OFFICIAL_DEADLINE_MS };
 /** Percentile used for the team Fast Path target unless overridden. */
 export const DEFAULT_TARGET_PERCENTILE = 95;
 
-/** Verdict of an SLA evaluation. */
+/**
+ * Verdict of an SLA evaluation.
+ *
+ * The two budgets get separate verdicts because they carry different authority.
+ * A single `SLA_VIOLATION` would make a missed internal goal indistinguishable
+ * from a breach of the graded official requirement, and a release gate cannot act
+ * differently on things it cannot tell apart.
+ */
 export type SlaVerdict =
-  /** Both budgets met, with enough samples to mean it. */
+  /** Both budgets assessed and met. */
   | 'PASS'
-  /** At least one budget was missed. */
-  | 'SLA_VIOLATION'
-  /** Nothing to measure, or fewer samples than `minSamples`. Never a pass. */
+  /** The 5 s team target was missed. The OFFICIAL deadline was still met. */
+  | 'TEAM_TARGET_MISSED'
+  /** The 60 s official deadline was breached. The one that is graded. */
+  | 'OFFICIAL_SLA_VIOLATION'
+  /** A budget could not be assessed. Never a pass. */
   | 'INSUFFICIENT_DATA';
 
-/** Exit codes, distinct so CI can tell a real regression from a bad query. */
+/**
+ * Default exit codes.
+ *
+ * `TEAM_TARGET_MISSED` is `0` by design: 5 000 ms is a team goal, not an official
+ * indicator, so it must not break a build on its own. It is reported loudly on
+ * stderr and can be made fatal with `failOnTeamTarget`.
+ */
 export const EXIT_CODES: Readonly<Record<SlaVerdict, number>> = {
   PASS: 0,
-  SLA_VIOLATION: 1,
+  TEAM_TARGET_MISSED: 0,
+  OFFICIAL_SLA_VIOLATION: 1,
   INSUFFICIENT_DATA: 2,
 };
+
+/** Exit code used when `failOnTeamTarget` is set. */
+export const TEAM_TARGET_FAILURE_EXIT_CODE = 4;
 
 /** One measured decision. `null` means "not measured", never "zero". */
 export interface LatencySample {
@@ -101,6 +120,8 @@ export interface LatencySlaReport {
     /** Percentile value compared against the target; `null` with no samples. */
     readonly evaluated_ms: number | null;
     readonly compliant: boolean | null;
+    /** Whether this budget had enough samples to be judged at all. */
+    readonly assessable: boolean;
   };
   readonly end_to_end: {
     readonly metric: string;
@@ -108,9 +129,14 @@ export interface LatencySlaReport {
     /** Worst case compared against the official deadline. */
     readonly evaluated_ms: number | null;
     readonly compliant: boolean | null;
+    /** Judged independently of the Fast Path population. */
+    readonly assessable: boolean;
   };
   readonly violations: readonly SlaViolation[];
-  /** Populated only for INSUFFICIENT_DATA, explaining what was missing. */
+  /**
+   * Which budgets could not be assessed, and why. Populated whenever either
+   * population fell short, even when the verdict is a confirmed violation.
+   */
   readonly insufficient_data_reason: string | null;
   readonly sample_count: number;
 }
@@ -120,8 +146,13 @@ export interface LatencySlaOptions {
   readonly fastPathTargetMs?: number;
   readonly officialDeadlineMs?: number;
   readonly targetPercentile?: number;
-  /** Minimum Fast Path samples required before a PASS is believable. */
+  /**
+   * Minimum samples required per budget before a PASS is believable. Applied to
+   * each population independently.
+   */
   readonly minSamples?: number;
+  /** Make a missed 5 s team target fatal. Off by default: it is not official. */
+  readonly failOnTeamTarget?: boolean;
   /** Injected for deterministic reports. */
   readonly evaluatedAt?: string;
 }
@@ -330,22 +361,31 @@ export function evaluateLatencySla(
   const officialCompliant =
     endToEndEvaluated === null ? null : endToEndEvaluated <= officialDeadlineMs;
 
-  const insufficientDataReason = describeInsufficientData(
-    samples.length,
-    fastPathValues.length,
-    minSamples,
-  );
+  // Each budget is assessed against its OWN population. Coupling them meant a run
+  // with no Fast Path samples returned INSUFFICIENT_DATA and buried a confirmed
+  // 60 s breach that was sitting right there in the data.
+  const fastPathAssessable = fastPathValues.length > 0 && fastPathValues.length >= minSamples;
+  const officialAssessable = endToEndValues.length > 0 && endToEndValues.length >= minSamples;
 
-  const verdict: SlaVerdict =
-    insufficientDataReason !== null
-      ? 'INSUFFICIENT_DATA'
-      : fastPathCompliant === false || officialCompliant === false
-        ? 'SLA_VIOLATION'
-        : 'PASS';
+  const insufficientDataReason = describeInsufficientData({
+    sampleCount: samples.length,
+    fastPathCount: fastPathValues.length,
+    endToEndCount: endToEndValues.length,
+    minSamples,
+    fastPathAssessable,
+    officialAssessable,
+  });
+
+  const verdict = decideVerdict({
+    officialAssessable,
+    officialCompliant,
+    fastPathAssessable,
+    fastPathCompliant,
+  });
 
   return {
     verdict,
-    exit_code: EXIT_CODES[verdict],
+    exit_code: exitCodeFor(verdict, options.failOnTeamTarget === true),
     evaluated_at: evaluatedAt,
     thresholds: {
       fast_path_target_ms: fastPathTargetMs,
@@ -358,12 +398,14 @@ export function evaluateLatencySla(
       statistics: fastPathStats,
       evaluated_ms: fastPathEvaluated,
       compliant: fastPathCompliant,
+      assessable: fastPathAssessable,
     },
     end_to_end: {
       metric: LATENCY_METRIC_NAMES.END_TO_END_LATENCY_MS,
       statistics: endToEndStats,
       evaluated_ms: endToEndEvaluated,
       compliant: officialCompliant,
+      assessable: officialAssessable,
     },
     violations,
     insufficient_data_reason: insufficientDataReason,
@@ -371,21 +413,69 @@ export function evaluateLatencySla(
   };
 }
 
-function describeInsufficientData(
-  sampleCount: number,
-  fastPathCount: number,
-  minSamples: number,
-): string | null {
-  if (sampleCount === 0) {
+/**
+ * Resolve the verdict.
+ *
+ * Precedence is the fix: **a confirmed breach of the official deadline outranks
+ * missing data anywhere else.** Evidence of failure that is present in the data
+ * must never be masked by the absence of some other measurement — which is
+ * exactly what happened when a run with zero Fast Path samples reported
+ * INSUFFICIENT_DATA while a 60 s breach sat in the same file.
+ */
+function decideVerdict(input: {
+  readonly officialAssessable: boolean;
+  readonly officialCompliant: boolean | null;
+  readonly fastPathAssessable: boolean;
+  readonly fastPathCompliant: boolean | null;
+}): SlaVerdict {
+  if (input.officialAssessable && input.officialCompliant === false) {
+    return 'OFFICIAL_SLA_VIOLATION';
+  }
+  // A team-target miss is positive evidence too, so it also outranks missing
+  // data — but it is not fatal, because 5 000 ms is not an official indicator.
+  if (input.fastPathAssessable && input.fastPathCompliant === false) {
+    return 'TEAM_TARGET_MISSED';
+  }
+  if (!input.officialAssessable || !input.fastPathAssessable) {
+    return 'INSUFFICIENT_DATA';
+  }
+  return 'PASS';
+}
+
+function exitCodeFor(verdict: SlaVerdict, failOnTeamTarget: boolean): number {
+  if (verdict === 'TEAM_TARGET_MISSED' && failOnTeamTarget) {
+    return TEAM_TARGET_FAILURE_EXIT_CODE;
+  }
+  return EXIT_CODES[verdict];
+}
+
+/** Name every budget that could not be judged, independently of the verdict. */
+function describeInsufficientData(input: {
+  readonly sampleCount: number;
+  readonly fastPathCount: number;
+  readonly endToEndCount: number;
+  readonly minSamples: number;
+  readonly fastPathAssessable: boolean;
+  readonly officialAssessable: boolean;
+}): string | null {
+  if (input.sampleCount === 0) {
     return 'No latency samples were found. An empty result set cannot demonstrate compliance.';
   }
-  if (fastPathCount === 0) {
-    return `Found ${String(sampleCount)} sample(s) but none carried ${LATENCY_METRIC_NAMES.FAST_PATH_LATENCY_MS}.`;
+
+  const missing: string[] = [];
+  if (!input.fastPathAssessable) {
+    missing.push(
+      `${LATENCY_METRIC_NAMES.FAST_PATH_LATENCY_MS}: ${String(input.fastPathCount)} sample(s), ` +
+        `minSamples=${String(input.minSamples)}`,
+    );
   }
-  if (fastPathCount < minSamples) {
-    return `Found ${String(fastPathCount)} Fast Path sample(s); minSamples=${String(minSamples)} required.`;
+  if (!input.officialAssessable) {
+    missing.push(
+      `${LATENCY_METRIC_NAMES.END_TO_END_LATENCY_MS}: ${String(input.endToEndCount)} sample(s), ` +
+        `minSamples=${String(input.minSamples)}`,
+    );
   }
-  return null;
+  return missing.length === 0 ? null : `Not assessable — ${missing.join('; ')}.`;
 }
 
 /** Serialise the report as the script's stdout payload. */

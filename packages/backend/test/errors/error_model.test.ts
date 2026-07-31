@@ -27,6 +27,7 @@ import {
   WorkflowStartFailedError,
   isDomainError,
   mapToDomainError,
+  redactClientMessage,
   toErrorResponse,
   toHttpErrorResult,
 } from '../../src/index.js';
@@ -436,5 +437,124 @@ describe('scope boundary (design §12 / §21)', () => {
 
     expect(codes).not.toContain('FENCED_STALE_EXECUTION');
     expect(codes).not.toContain('ALREADY_APPLIED');
+  });
+});
+
+// ─── Client message redaction (audit fix 3b) ───────────────
+
+describe('redactClientMessage', () => {
+  /**
+   * `toErrorResponse` copies `DomainError.message` straight into the HTTP body, so
+   * whatever a repository or the AWS SDK wrote into a message is externally
+   * visible. These tests pin what must never get out.
+   */
+
+  it('removes an ARN', () => {
+    const redacted = redactClientMessage(
+      'StartExecution failed for arn:aws:states:ap-northeast-1:123456789012:stateMachine:Wf',
+    );
+
+    expect(redacted).not.toContain('123456789012');
+    expect(redacted).not.toContain('arn:aws');
+    expect(redacted).toContain('<arn>');
+  });
+
+  it('removes a DynamoDB table name', () => {
+    const redacted = redactClientMessage('IdempotencyTable UpdateItem failed');
+
+    expect(redacted).not.toContain('IdempotencyTable');
+    expect(redacted).toContain('<table>');
+  });
+
+  it('removes a quoted idempotency_key', () => {
+    const redacted = redactClientMessage(
+      'Conditional check failed for "TPE_2026_ACC_001|2026-05-20 22:10|prov-2026a"',
+    );
+
+    // The key embeds event_id, the official event timestamp and the policy version.
+    expect(redacted).not.toContain('TPE_2026_ACC_001');
+    expect(redacted).not.toContain('prov-2026a');
+  });
+
+  it('removes an unquoted idempotency_key', () => {
+    const redacted = redactClientMessage(
+      'lease lost: TPE_2026_ACC_001|2026-05-20T22:10|prov-2026a rejected',
+    );
+
+    expect(redacted).not.toContain('prov-2026a');
+  });
+
+  it('removes an AWS request id', () => {
+    expect(redactClientMessage('failed, RequestId: 8QF1V2ABCDEF3GHI')).not.toContain(
+      '8QF1V2ABCDEF3GHI',
+    );
+  });
+
+  it('removes node_modules stack frames', () => {
+    const redacted = redactClientMessage(
+      'boom at Object.send (/var/task/node_modules/@aws-sdk/client-dynamodb/index.js:1:1)',
+    );
+
+    expect(redacted).not.toContain('node_modules');
+  });
+
+  it('truncates a message long enough to be a dump', () => {
+    expect(redactClientMessage('x'.repeat(5_000)).length).toBeLessThanOrEqual(200);
+  });
+
+  it('leaves a clean message intact', () => {
+    expect(redactClientMessage('Authentication required.')).toBe('Authentication required.');
+  });
+});
+
+describe('mapToDomainError redaction', () => {
+  it('does not leak the table name or key from a repository failure', () => {
+    const cause = new IdempotencyRepositoryError(
+      'IdempotencyTable UpdateItem failed for "TPE_2026_ACC_001|2026-05-20 22:10|prov-2026a": boom',
+      'conditionalUpdateState',
+      'TPE_2026_ACC_001|2026-05-20 22:10|prov-2026a',
+    );
+
+    const mapped = mapToDomainError(cause, { traceId: 'trace-1' });
+
+    expect(mapped.httpStatus).toBe(500);
+    expect(mapped.message).not.toContain('IdempotencyTable');
+    expect(mapped.message).not.toContain('TPE_2026_ACC_001');
+    // The operation name is safe and useful.
+    expect(mapped.message).toContain('conditionalUpdateState');
+  });
+
+  it('keeps the unredacted cause for the structured log', () => {
+    const cause = new IdempotencyRepositoryError(
+      'IdempotencyTable UpdateItem failed',
+      'conditionalUpdateState',
+      'key-1',
+    );
+
+    const mapped = mapToDomainError(cause);
+
+    // Operators still need the real text; it just belongs in the log, not the body.
+    expect((mapped as { cause?: unknown }).cause).toBe(cause);
+  });
+
+  it('does not leak an ARN through the HTTP body', () => {
+    const mapped = mapToDomainError(
+      new Error('failed at arn:aws:states:ap-northeast-1:123456789012:stateMachine:Wf'),
+    );
+
+    const body = JSON.parse(toHttpErrorResult(mapped, 'trace-1').body) as { message: string };
+
+    expect(body.message).not.toContain('123456789012');
+  });
+
+  it('redacts a throttling message too', () => {
+    const throttle = Object.assign(new Error('Throughput exceeded for IdempotencyTable'), {
+      name: 'ProvisionedThroughputExceededException',
+    });
+
+    const mapped = mapToDomainError(throttle);
+
+    expect(mapped.httpStatus).toBe(429);
+    expect(mapped.message).not.toContain('IdempotencyTable');
   });
 });

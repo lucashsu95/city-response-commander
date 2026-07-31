@@ -1,5 +1,5 @@
 /**
- * TASK-103 — decision.fast_path_ready WebSocket push unit tests.
+ * TASK-103 ??decision.fast_path_ready WebSocket push unit tests.
  *
  * Verifies the MARK_CORE_COMMITTED gate, the `ready_event_id` dedup key, that the
  * payload carries deterministic facts only, and that a delivery failure never
@@ -15,8 +15,10 @@ import {
   publishFastPathReady,
   FastPathGateNotSatisfiedError,
   FAST_PATH_READY_EVENT,
+  LatencyTrace,
+  NoopTelemetry,
 } from '../../src/index.js';
-import type { ConnectionPublisherPort } from '../../src/index.js';
+import type { ConnectionPublisherPort, Telemetry } from '../../src/index.js';
 
 const DECISION = 'DEC_TPE_2026_ACC_001_abcdef123456';
 const TRACE = 'trace-abc-123';
@@ -38,7 +40,7 @@ function core(overrides: Partial<DecisionCore> = {}): DecisionCore {
     primary_evacuation: 'RD_TPE_004',
     secondary_evacuation: ['RD_TPE_005'],
     ete: { ete_minutes: 78.6 },
-    cms_core_text: '光復南路封閉，請改道 市民大道四段，預計延誤 78.6 分鐘',
+    cms_core_text: '?�復?�路封�?，�??��? 市�?大�??�段，�?計延�?78.6 ?��?',
     multilingual_required: true,
     ...overrides,
   } as unknown as DecisionCore;
@@ -69,7 +71,7 @@ const publishInput = {
   coreCommittedGate: 'APPLIED',
 } as const;
 
-// ─── ready_event_id ────────────────────────────────────────
+// ?�?�?� ready_event_id ?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�
 
 describe('buildReadyEventId', () => {
   it('builds decision_id|event_type|core_version_ref', () => {
@@ -96,7 +98,7 @@ describe('buildReadyEventId', () => {
   });
 });
 
-// ─── Payload ───────────────────────────────────────────────
+// ?�?�?� Payload ?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�
 
 describe('buildFastPathReadyEvent', () => {
   it('carries the event type and dedup key', () => {
@@ -120,7 +122,7 @@ describe('buildFastPathReadyEvent', () => {
       secondary_evacuation: ['RD_TPE_005'],
       ete_minutes: 78.6,
       multilingual_required: true,
-      cms_core_text: '光復南路封閉，請改道 市民大道四段，預計延誤 78.6 分鐘',
+      cms_core_text: '?�復?�路封�?，�??��? 市�?大�??�段，�?計延�?78.6 ?��?',
     });
     // Narrative text arrives later via decision.enriched.
     expect(JSON.stringify(event)).not.toContain('report_text');
@@ -150,7 +152,7 @@ describe('buildFastPathReadyEvent', () => {
   });
 });
 
-// ─── MARK_CORE_COMMITTED gate ──────────────────────────────
+// ?�?�?� MARK_CORE_COMMITTED gate ?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�
 
 describe('MARK_CORE_COMMITTED gate', () => {
   it('publishes when the checkpoint returned APPLIED', async () => {
@@ -187,7 +189,7 @@ describe('MARK_CORE_COMMITTED gate', () => {
   });
 });
 
-// ─── Broadcast ─────────────────────────────────────────────
+// ?�?�?� Broadcast ?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�
 
 describe('broadcast', () => {
   it('sends the same serialized payload to every connection', async () => {
@@ -260,7 +262,7 @@ describe('broadcast', () => {
   });
 });
 
-// ─── Stale detection ───────────────────────────────────────
+// ?�?�?� Stale detection ?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�
 
 describe('isStaleConnectionError', () => {
   it('detects GoneException by name', () => {
@@ -281,5 +283,125 @@ describe('isStaleConnectionError', () => {
       isStaleConnectionError(Object.assign(new Error('x'), { $metadata: { httpStatusCode: 429 } })),
     ).toBe(false);
     expect(isStaleConnectionError(null)).toBe(false);
+  });
+});
+
+// ?�?�?� Authoritative Fast Path measurement (audit fix 1) ?�?�?�?�?�
+
+describe('publishFastPathReady latency measurement', () => {
+  const T0 = 1_800_000_000_000;
+
+  function newTrace(): LatencyTrace {
+    return new LatencyTrace({
+      decisionId: 'DEC_TPE_2026_ACC_001_abcdef123456',
+      traceId: 'trace-abc-123',
+      startedAtMs: T0,
+    });
+  }
+
+  function publisher(connectionIds: readonly string[]): ConnectionPublisherPort {
+    return {
+      listConnectionIds: async () => [...connectionIds],
+      postToConnection: async () => undefined,
+    };
+  }
+
+  it('marks the Fast Path complete at the push, the authoritative point', async () => {
+    const trace = newTrace();
+
+    await publishFastPathReady(publisher(['c1']), {
+      core: core(),
+      traceId: 'trace-abc-123',
+      policyVersion: 'prov-2026a',
+      coreCommittedGate: 'APPLIED',
+      latency: { trace, now: () => T0 + 4_200 },
+    });
+
+    // The budget runs from detection to this push, so a value marked earlier
+    // understates it by the checkpoint plus the broadcast.
+    expect(trace.snapshot().fast_path_ms).toBe(4_200);
+  });
+
+  it('overwrites an earlier DecisionFn mark with the later, accurate value', async () => {
+    const trace = newTrace();
+    trace.markFastPathReady(T0 + 3_400);
+
+    await publishFastPathReady(publisher(['c1']), {
+      core: core(),
+      traceId: 'trace-abc-123',
+      policyVersion: null,
+      coreCommittedGate: 'APPLIED',
+      latency: { trace, now: () => T0 + 4_200 },
+    });
+
+    expect(trace.snapshot().fast_path_ms).toBe(4_200);
+  });
+
+  it('measures even when no dashboard is connected', async () => {
+    const trace = newTrace();
+
+    const result = await publishFastPathReady(publisher([]), {
+      core: core(),
+      traceId: 'trace-abc-123',
+      policyVersion: null,
+      coreCommittedGate: 'APPLIED',
+      latency: { trace, now: () => T0 + 4_200 },
+    });
+
+    // Gating the measurement on delivery would drop it exactly when nobody was
+    // watching ??which is when the data is most likely to be needed later.
+    expect(result.delivered).toBe(0);
+    expect(trace.snapshot().fast_path_ms).toBe(4_200);
+  });
+
+  it('emits the snapshot through telemetry', async () => {
+    const trace = newTrace();
+    const snapshots: unknown[] = [];
+
+    await publishFastPathReady(publisher(['c1']), {
+      core: core(),
+      traceId: 'trace-abc-123',
+      policyVersion: null,
+      coreCommittedGate: 'APPLIED',
+      latency: {
+        trace,
+        now: () => T0 + 4_200,
+        telemetry: {
+          ...new NoopTelemetry(),
+          recordLatency: (snapshot: unknown) => void snapshots.push(snapshot),
+        } as unknown as Telemetry,
+      },
+    });
+
+    expect(snapshots).toHaveLength(1);
+    expect((snapshots[0] as { fast_path_ms: number | null }).fast_path_ms).toBe(4_200);
+  });
+
+  it('does not measure when the gate rejects the push', async () => {
+    const trace = newTrace();
+
+    await expect(
+      publishFastPathReady(publisher(['c1']), {
+        core: core(),
+        traceId: 'trace-abc-123',
+        policyVersion: null,
+        coreCommittedGate: 'FENCED_STALE_EXECUTION' as unknown as 'APPLIED',
+        latency: { trace, now: () => T0 + 4_200 },
+      }),
+    ).rejects.toThrow();
+
+    // A fenced execution never announced anything, so it has no Fast Path to time.
+    expect(trace.snapshot().fast_path_ms).toBeNull();
+  });
+
+  it('runs unchanged without a latency context', async () => {
+    const result = await publishFastPathReady(publisher(['c1']), {
+      core: core(),
+      traceId: 'trace-abc-123',
+      policyVersion: null,
+      coreCommittedGate: 'APPLIED',
+    });
+
+    expect(result.delivered).toBe(1);
   });
 });
