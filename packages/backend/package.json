@@ -19,6 +19,7 @@
     "@city-commander/config": "*"
   },
   "devDependencies": {
+    "fast-check": "^3.19.0",
     "typescript": "^5.4.0"
   }
 }

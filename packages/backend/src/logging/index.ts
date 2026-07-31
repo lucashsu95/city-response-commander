@@ -9,6 +9,7 @@ export {
   redactSensitive,
   consoleLogSink,
   REDACTED,
+  RESERVED_LOG_KEYS,
 } from './structured_logger.js';
 
 export type {

@@ -7,7 +7,7 @@
  */
 
 import { describe, it, expect, vi } from 'vitest';
-import { StructuredLogger, REDACTED, redactSensitive } from '../../src/index.js';
+import { StructuredLogger, REDACTED, RESERVED_LOG_KEYS, redactSensitive } from '../../src/index.js';
 import type { LogLevel, LogSink, StructuredLogRecord } from '../../src/index.js';
 
 const TRACE = 'trace-abc-123';
@@ -306,5 +306,133 @@ describe('domain helpers', () => {
     // Correlation is still present on the audit line.
     expect(record.trace_id).toBe(TRACE);
     expect(record.decision_id).toBe(DECISION);
+  });
+});
+
+// ─── Reserved field protection (audit fix) ─────────────────
+
+describe('reserved fields cannot be overwritten from context', () => {
+  /**
+   * The bug this pins: `log()` used to spread the caller's context last, so a
+   * context key could overwrite the severity or the event discriminator. The
+   * sink still received the true level, so the line went to the right stream —
+   * but the JSON carried the caller's value, and a metric filter matching on
+   * `$.level` would silently never fire.
+   */
+
+  function loggerWith(): { logger: StructuredLogger; written: StructuredLogRecord[] } {
+    const written: StructuredLogRecord[] = [];
+    return {
+      written,
+      logger: new StructuredLogger({
+        correlation: { trace_id: 'trace-authoritative', decision_id: 'DEC_AUTHORITATIVE' },
+        now: () => 1_800_000_000_000,
+        sink: { write: (_level, record) => void written.push(record) },
+      }),
+    };
+  }
+
+  it('keeps the native level and event when context tries to override them', () => {
+    const { logger } = loggerWith();
+
+    const record = logger.log('CRITICAL_SECURITY_ALERT', 'audit.decision_execution', 'boom', {
+      level: 'DEBUG',
+      event: 'fake',
+    });
+
+    expect(record.level).toBe('CRITICAL_SECURITY_ALERT');
+    expect(record.event).toBe('audit.decision_execution');
+  });
+
+  it('keeps the level in the SERIALIZED line, which is what alarms match on', () => {
+    const { logger, written } = loggerWith();
+
+    logger.log('CRITICAL_SECURITY_ALERT', 'audit.decision_execution', 'boom', {
+      level: 'DEBUG',
+    });
+
+    // `{ $.level = "CRITICAL_SECURITY_ALERT" }` must still match.
+    expect(JSON.parse(JSON.stringify(written[0])).level).toBe('CRITICAL_SECURITY_ALERT');
+  });
+
+  it('protects the message and timestamp', () => {
+    const { logger } = loggerWith();
+
+    const record = logger.log('WARN', 'diagnostic', 'the real message', {
+      message: 'spoofed',
+      timestamp: '1999-01-01T00:00:00+08:00',
+    });
+
+    expect(record.message).toBe('the real message');
+    expect(record.timestamp).not.toBe('1999-01-01T00:00:00+08:00');
+  });
+
+  it('protects every correlation id', () => {
+    const { logger } = loggerWith();
+
+    const record = logger.log('INFO', 'diagnostic', 'msg', {
+      trace_id: 'spoofed-trace',
+      decision_id: 'DEC_SPOOFED',
+      idempotency_key: 'spoofed-key',
+      attempt_count: 999,
+      workflow_execution_arn: 'arn:spoofed',
+    });
+
+    // An overwritten trace_id breaks the correlation §19 requires, quietly.
+    expect(record.trace_id).toBe('trace-authoritative');
+    expect(record.decision_id).toBe('DEC_AUTHORITATIVE');
+    expect(record.idempotency_key).toBeUndefined();
+    expect(record.attempt_count).toBeUndefined();
+    expect(record.workflow_execution_arn).toBeUndefined();
+  });
+
+  it('names the dropped keys instead of discarding them silently', () => {
+    const { logger } = loggerWith();
+
+    const record = logger.log('INFO', 'diagnostic', 'msg', { level: 'DEBUG', event: 'fake' });
+
+    expect(record.reserved_context_keys_dropped).toEqual(['level', 'event']);
+  });
+
+  it('adds no marker when the context is well-behaved', () => {
+    const { logger } = loggerWith();
+
+    const record = logger.log('INFO', 'diagnostic', 'msg', { fenced_reason: 'RECORD_MISSING' });
+
+    expect(record.reserved_context_keys_dropped).toBeUndefined();
+    expect(record.fenced_reason).toBe('RECORD_MISSING');
+  });
+
+  it('still redacts credentials in the surviving context', () => {
+    const { logger } = loggerWith();
+
+    const record = logger.log('INFO', 'diagnostic', 'msg', {
+      level: 'DEBUG',
+      aws_secret_access_key: 'AKIAIOSFODNN7EXAMPLE',
+    });
+
+    // Reserved-key filtering must not bypass §17 redaction.
+    expect(record.aws_secret_access_key).toBe(REDACTED);
+    expect(record.level).toBe('INFO');
+  });
+
+  it('exposes the reserved set so callers can avoid the collision', () => {
+    expect(RESERVED_LOG_KEYS.has('level')).toBe(true);
+    expect(RESERVED_LOG_KEYS.has('trace_id')).toBe(true);
+    expect(RESERVED_LOG_KEYS.has('fenced_reason')).toBe(false);
+  });
+
+  it('does not let a domain helper be spoofed either', () => {
+    const { logger } = loggerWith();
+
+    // The helpers build their own context; this guards the shared path they use.
+    const record = logger.fencingIntercepted({
+      action: 'MARK_RUNNING',
+      reason: 'DIFFERENT_EXECUTION',
+      detail: 'arn mismatch',
+    });
+
+    expect(record.level).toBe('WARN');
+    expect(record.event).toBe('fencing.intercepted');
   });
 });

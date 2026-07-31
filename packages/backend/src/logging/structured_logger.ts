@@ -100,6 +100,32 @@ const REDACTED_KEY_FRAGMENTS: readonly string[] = [
 /** Placeholder written in place of a redacted value. */
 export const REDACTED = '[REDACTED]' as const;
 
+/**
+ * Field names a caller's `context` may never set.
+ *
+ * `log()` used to spread the context LAST, so any of these could be overwritten
+ * from outside. The consequence was not cosmetic: `sink.write(level, ...)` still
+ * received the true level, so a `CRITICAL_SECURITY_ALERT` went to stderr as
+ * expected — but the JSON carried whatever the caller passed. Member 3's metric
+ * filter matches on the FIELD (`{ $.level = "CRITICAL_SECURITY_ALERT" }`), so the
+ * alarm would silently never fire while everything looked healthy.
+ *
+ * The correlation keys are included for the same reason: an overwritten
+ * `trace_id` or `decision_id` breaks the very correlation §19 requires, and it
+ * breaks it quietly.
+ */
+export const RESERVED_LOG_KEYS: ReadonlySet<string> = new Set([
+  'level',
+  'event',
+  'message',
+  'timestamp',
+  'trace_id',
+  'decision_id',
+  'idempotency_key',
+  'attempt_count',
+  'workflow_execution_arn',
+]);
+
 function shouldRedact(key: string): boolean {
   const normalized = key.toLowerCase();
   return REDACTED_KEY_FRAGMENTS.some((fragment) => normalized.includes(fragment));
@@ -175,20 +201,53 @@ export class StructuredLogger {
     });
   }
 
-  /** Emit one line. Context is redacted before serialization. */
+  /**
+   * Emit one line.
+   *
+   * Context is redacted (§17) and then stripped of {@link RESERVED_LOG_KEYS}, so a
+   * caller cannot overwrite the severity, the event discriminator or the
+   * correlation ids that alarms and Insights queries bind to.
+   *
+   * A dropped key is reported in `reserved_context_keys_dropped` rather than being
+   * discarded silently — a caller colliding with a reserved name is a bug worth
+   * seeing, and it is exactly the kind of bug that otherwise surfaces as "the
+   * alarm never fired".
+   *
+   * The authoritative fields are also spread LAST. The filter alone would be
+   * enough; the ordering means a future hole in the filter still cannot corrupt
+   * them.
+   */
   log(
     level: LogLevel,
     event: LogEvent,
     message: string,
     context: Record<string, unknown> = {},
   ): StructuredLogRecord {
+    const redacted = redactSensitive(context) as Record<string, unknown>;
+
+    const safeContext: Record<string, unknown> = {};
+    const dropped: string[] = [];
+    for (const [key, value] of Object.entries(redacted)) {
+      if (RESERVED_LOG_KEYS.has(key)) {
+        dropped.push(key);
+        continue;
+      }
+      safeContext[key] = value;
+    }
+
     const record: StructuredLogRecord = {
+      ...safeContext,
+      ...(dropped.length > 0 ? { reserved_context_keys_dropped: dropped } : {}),
       level,
       event,
+      // NOT passed through message redaction: CloudWatch Logs is the internal
+      // diagnostic channel, and `map_error.ts` deliberately keeps the unredacted
+      // cause for exactly this line. Stripping table names here would remove the
+      // only place an operator can see them. Credential-shaped VALUES are already
+      // handled by `redactSensitive`.
       message,
       timestamp: formatTaipeiIso(this.now()),
       ...this.correlation,
-      ...(redactSensitive(context) as Record<string, unknown>),
     };
     this.sink.write(level, record);
     return record;
