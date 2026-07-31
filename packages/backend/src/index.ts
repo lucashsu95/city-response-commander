@@ -1,2 +1,3 @@
 // @city-commander/backend — 後端 API (Lambda + API Gateway)
-export {};
+
+export * from './repository/index.js';
