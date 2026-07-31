@@ -33,10 +33,7 @@ import type {
   SopCitation,
 } from '@city-commander/shared-schemas';
 
-import type {
-  IngestionDataStatus,
-  IngestionResult,
-} from '../ingestion/data_ingestion_service.js';
+import type { IngestionDataStatus, IngestionResult } from '../ingestion/data_ingestion_service.js';
 import { normalizeTimestamp } from '../ingestion/timestamp_normalizer.js';
 import {
   createPolicyStrategyBundle,
@@ -56,10 +53,7 @@ import { ARTICLE4_STATION_ID, evaluateArticle4 } from './article4.js';
 import { evaluateArticle5, isArticle5Triggered } from './article5.js';
 import { evaluateArticle6 } from './article6.js';
 import { selectEvacuation } from './evacuation_selector.js';
-import {
-  aggregateArticles,
-  type ArticleEvaluationSummary,
-} from './article_aggregation.js';
+import { aggregateArticles, type ArticleEvaluationSummary } from './article_aggregation.js';
 import { calculateEte, type EteCalculationResult } from '../ete/ete_calculator.js';
 import { buildEvidenceTrace } from '../evidence/evidence_trace_builder.js';
 
