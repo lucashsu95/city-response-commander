@@ -1,2 +1,6 @@
-// @city-commander/rag — RAG 檢索與 SOP 知識庫整合
-export {};
+/**
+ * @city-commander/rag — RAG 檢索與 SOP 知識庫整合
+ */
+
+// ─── Citation Article Set (TASK-110) ─────────────────────
+export { buildCitationArticleSet } from './citation_article_set.js';
