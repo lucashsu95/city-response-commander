@@ -29,6 +29,7 @@ import {
   allowedNextStates,
 } from './publish_transitions.js';
 import { appendAuditEntry } from './audit_trail.js';
+import { checkPublishIdempotency, shouldEmitPublicAlertReady } from './publish_idempotency.js';
 
 // ─── Publish result type ──────────────────────────────────────────────────────
 
@@ -307,7 +308,36 @@ export function createPublishHandler(
         );
       }
 
-      // ── 5. publish_failed 必須提供 failure_reason ────────────────────────
+      // ── 5. 冪等檢查（§15.2）—— retry 不重複發布 ─────────────────────────
+      const idempotencyResult = checkPublishIdempotency(existing, targetState, currentVersion);
+
+      if (idempotencyResult.kind === 'ALREADY_PUBLISHED') {
+        // 完全相同的 retry，直接回傳現有 record，不觸發任何副作用
+        return jsonResponse(200, {
+          schema_version: SCHEMA_VERSION,
+          decision_id: decisionId,
+          publish_state: idempotencyResult.record.publish_state,
+          audit_trail: idempotencyResult.record.audit_trail,
+          version: idempotencyResult.record.version,
+          updated_at: idempotencyResult.record.updated_at,
+          idempotent: true,
+        });
+      }
+
+      if (idempotencyResult.kind === 'VERSION_DRIFT') {
+        // 目標狀態已達成但 version 偏移（另一個請求搶先達成同一目標狀態）。
+        // 目標已達成 → 回 200 帶目前的狀態資訊，不視為錯誤（非客戶端錯誤）
+        return jsonResponse(200, {
+          schema_version: SCHEMA_VERSION,
+          decision_id: decisionId,
+          publish_state: idempotencyResult.currentState,
+          current_version: idempotencyResult.currentVersion,
+          idempotent: true,
+          note: '目標狀態已達成，version 已由並發請求更新，請重新讀取以取得最新 audit_trail。',
+        });
+      }
+
+      // ── 6. publish_failed 必須提供 failure_reason ────────────────────────
       if (targetState === PublishStatus.publish_failed && parsedBody.failure_reason === null) {
         return errorResponse(
           400,
@@ -316,7 +346,7 @@ export function createPublishHandler(
         );
       }
 
-      // ── 6. 驗證狀態轉移合法性 ────────────────────────────────────────────
+      // ── 7. 驗證狀態轉移合法性 ────────────────────────────────────────────
       if (!isLegalPublishTransition(currentState, targetState)) {
         return errorResponse(
           409,
@@ -326,7 +356,7 @@ export function createPublishHandler(
         );
       }
 
-      // ── 7. 組裝新的 PublishRecord（含 append-only audit trail）─────────
+      // ── 8. 組裝新的 PublishRecord（含 append-only audit trail）─────────
       // audit_trail entry 建立與 approved_by/published_by/failure_reason 填寫
       // 集中在 audit_trail.ts（TASK-147 SINGLE SOURCE OF TRUTH）
       const newRecord: PublishRecord = appendAuditEntry({
@@ -337,7 +367,7 @@ export function createPublishHandler(
         failureReason: parsedBody.failure_reason,
       });
 
-      // ── 8. 委派狀態機寫入（TASK-145）────────────────────────────────────
+      // ── 9. 委派狀態機寫入（TASK-145）────────────────────────────────────
       const writeResult = await writePublishRecord(newRecord, currentVersion);
 
       if (!writeResult.success) {
@@ -362,7 +392,12 @@ export function createPublishHandler(
         );
       }
 
-      // ── 9. 回傳成功結果 ───────────────────────────────────────────────────
+      // ── 10. 回傳成功結果（§15.2：只有 PROCEED 才可能觸發 alert）─────────
+      // shouldEmitPublicAlertReady 為 TASK-148 的觸發點（WebSocket 推送）
+      // 實際推送邏輯在 publish_status_changed.ts，此處僅計算 flag
+      const _shouldEmitAlert = shouldEmitPublicAlertReady(idempotencyResult, targetState);
+      // TODO(TASK-148): if (_shouldEmitAlert) await realtimePublisher.emitPublishStatusChanged(...)
+
       return jsonResponse(200, {
         schema_version: SCHEMA_VERSION,
         decision_id: decisionId,
