@@ -318,12 +318,28 @@ export function createApiClient(config: ApiClientConfig) {
     },
 
     /**
+     * GET /timeline - Fetch the authoritative timeline playback state (§12).
+     *
+     * No canonical shared-schema response contract exists yet for this route
+     * (cross-owner gap; see TASK-124 report), so the result stays `unknown` on
+     * purpose. Callers must validate it through a runtime decoder
+     * (`timeline/timeline_model.ts`) before treating any field as trustworthy.
+     * The route is a fixed literal, not user input, so it is requested the same
+     * way as `getRoads`/`getCrowd`/`getDecision` above.
+     */
+    getTimeline(options?: RequestOptions): Promise<ApiResult<unknown>> {
+      return get<unknown>('timeline', options);
+    },
+
+    /**
      * GET {route fragment} - Generic read-only JSON request.
      *
      * Used by the §13 polling fallback for routes that have no canonical
      * shared-schema response contract yet (`/timeline`, `/incidents`,
      * `/reports/{id}`). The result stays `unknown` on purpose: no duplicate
-     * canonical response interface is invented in the frontend.
+     * canonical response interface is invented in the frontend. `getTimeline`
+     * above is a thin, more discoverable wrapper over this same mechanism for
+     * the direct (non-polling-loop) timeline fetch path.
      *
      * @param path - Relative route fragment with identifiers already
      *               URL-encoded. Anything that could escape the injected base

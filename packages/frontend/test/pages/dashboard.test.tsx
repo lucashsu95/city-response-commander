@@ -76,4 +76,56 @@ describe('DashboardPage realtime wiring', () => {
     expect(socket?.isDetached()).toBe(true);
     expect(FakeSocket.instances).toHaveLength(1);
   });
+
+  // ─── FIX 4: stable callback dependencies ────────────────────
+
+  it('does not recreate the realtime connection when timeline state changes across rerenders', async () => {
+    const fetchMock = vi.fn(() =>
+      Promise.resolve({
+        ok: true,
+        status: 200,
+        json: () =>
+          Promise.resolve({
+            timestamps: ['2026-05-20 22:00'],
+            current: '2026-05-20 22:00',
+            schema_version: '1.0',
+            trace_id: 'tr-test',
+            provisional: true,
+          }),
+      }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const view = renderDashboard();
+
+    act(() => {
+      FakeSocket.instances[0]?.emitOpen();
+    });
+    const socketBeforeStateChange = FakeSocket.instances[0];
+
+    // The timeline controller's mount-time GET /timeline resolves here,
+    // driving a real `loading` -> `ready` state transition. Every such
+    // transition re-renders DashboardPage with a brand-new `timeline`
+    // controller object (its state is spread into a fresh object each
+    // render). Before FIX 4, `useCallback` depending on the whole `timeline`
+    // object would give `handleRealtimeEvent`/`handlePollingCycle` — and
+    // therefore `useRealtimeConnection`'s `onEvent`/`onPollingCycle` props —
+    // new identities on every such change.
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(document.querySelector('.timeline-panel__current-value')?.textContent).toBe(
+      '2026-05-20 22:00',
+    );
+
+    // The realtime connection (and its one socket) must not have been
+    // recreated by this timeline-state-driven rerender.
+    expect(FakeSocket.instances).toHaveLength(1);
+    expect(FakeSocket.instances[0]).toBe(socketBeforeStateChange);
+
+    view.unmount();
+  });
 });

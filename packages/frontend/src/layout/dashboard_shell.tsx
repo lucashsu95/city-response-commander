@@ -21,11 +21,21 @@ import type { ConnectionMode, OperationalStatus } from '../state/app_state.js';
 
 // ─── Region Components ─────────────────────────────────────
 
+interface TimelineRegionProps {
+  /**
+   * TASK-124 timeline playback panel. `undefined` (the default) preserves the
+   * pre-TASK-124 empty state so a `DashboardShell` rendered without a
+   * `timelineContent` prop is unchanged.
+   */
+  readonly content?: ReactNode;
+}
+
 /**
- * Timeline region - displays time-axis data playback.
- * Empty state until TASK-124 implementation.
+ * Timeline region - displays time-axis data playback (§12 GET /timeline,
+ * §16.1). Renders the injected TASK-124 `TimelinePanel` when supplied;
+ * otherwise falls back to the pre-TASK-124 empty state.
  */
-function TimelineRegion(): ReactNode {
+function TimelineRegion({ content }: TimelineRegionProps): ReactNode {
   return (
     <section
       className="dashboard-region dashboard-region--timeline"
@@ -34,8 +44,8 @@ function TimelineRegion(): ReactNode {
       <h2 id="timeline-heading" className="dashboard-region__heading">
         時間軸
       </h2>
-      <div className="dashboard-region__content">
-        <EmptyState message="尚無可顯示的時間軸資料" />
+      <div className="dashboard-region__content dashboard-region__content--stacked">
+        {content ?? <EmptyState message="尚無可顯示的時間軸資料" />}
       </div>
     </section>
   );
@@ -138,6 +148,12 @@ export interface DashboardShellProps {
   readonly pollingErrorMessage?: string | null;
   /** Polling cycles that refreshed at least one canonical read target. */
   readonly pollingUpdateCount?: number;
+  /**
+   * TASK-124 timeline playback panel content. Injected by the Dashboard page
+   * so `dashboard_shell.tsx` stays a layout-only component with no fetch or
+   * controller logic of its own.
+   */
+  readonly timelineContent?: ReactNode;
 }
 
 /**
@@ -173,6 +189,7 @@ export function DashboardShell({
   connectionMode = 'disconnected',
   pollingErrorMessage = null,
   pollingUpdateCount = 0,
+  timelineContent,
 }: DashboardShellProps = {}): ReactNode {
   const operationalStatus = resolveOperationalStatus(selectedSnapshot, connectionMode);
 
@@ -189,7 +206,7 @@ export function DashboardShell({
 
       <main className="dashboard-main" role="main">
         <div className="dashboard-grid">
-          <TimelineRegion />
+          <TimelineRegion content={timelineContent} />
           <RoadTrafficRegion />
           <CrowdRegion />
           <DecisionRegion
