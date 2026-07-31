@@ -12,3 +12,15 @@ export type {
   RecoveryGatePorts,
   RecommendedRecoveryMode,
 } from './recovery_gate.js';
+
+export {
+  recoverMissingNarratives,
+  EnrichmentRecoveryCoreMissingError,
+  EnrichmentRecoveryWrongModeError,
+} from './enrichment_recovery.js';
+
+export type {
+  EnrichmentRecoveryInput,
+  EnrichmentRecoveryResult,
+  NarrativeBranchOutcome,
+} from './enrichment_recovery.js';
