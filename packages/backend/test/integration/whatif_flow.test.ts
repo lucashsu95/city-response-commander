@@ -480,6 +480,7 @@ describe('Full 4-stage integration: BL17=40000 (stage 1→2→3→4)', () => {
     // stage 4：SopRetriever KB+S3 雙重失敗
     const bedrock = makeBedrockExplanation('觸發 SOP-3。');
     const sopRetriever = makeSopRetrieverFailing();
+    const invoke = vi.spyOn(bedrock, 'invoke');
 
     const result = await explainWhatIf({
       recomputeResult,
@@ -488,11 +489,14 @@ describe('Full 4-stage integration: BL17=40000 (stage 1→2→3→4)', () => {
       bedrockInvoker: bedrock,
     });
 
-    // citation 缺漏但不拋例外（graceful degradation）
+    // citation 缺漏時必須 fail closed。
     expect(result.sop_citations).toHaveLength(0);
+    expect(invoke).not.toHaveBeenCalled();
+    expect(result.text_source).toBe('template');
+    expect(result.explanation_text).toContain('citation unavailable');
     // does_not_mutate_state 仍為 true
     expect(result.does_not_mutate_state).toBe(true);
-    // explanation_text 非空（Bedrock 成功）
+    // explanation_text 非空（安全 template）
     expect(result.explanation_text.trim().length).toBeGreaterThan(0);
   });
 });

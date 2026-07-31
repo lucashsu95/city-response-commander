@@ -102,7 +102,7 @@ export async function explainWhatIf(
   } else {
     // KB + S3 雙重失敗：記錄診斷資訊，使用部分 citations（可能為空）繼續執行。
     // stage 4 的解釋降級為 template fallback（若 Bedrock 也失敗），
-    // 但不拋出例外——citation 缺口不阻擋 What-if 回應（§21 fast-path 精神）。
+    // 但不拋出例外；完全沒有 citation 時會 fail closed，避免無 grounding 的 LLM 解釋。
     console.warn('[WhatIfExplanation] SopRetriever both KB and S3 failed; using partial citations.', {
       failed_articles: retrieveResult.failed_articles,
       kb_error: retrieveResult.kb_error,
@@ -110,6 +110,15 @@ export async function explainWhatIf(
       partial_count: retrieveResult.partial_citations.length,
     });
     citations = retrieveResult.partial_citations;
+
+    if (citations.length === 0) {
+      return {
+        explanation_text: buildCitationUnavailableExplanationText(recomputeResult),
+        sop_citations: citations,
+        text_source: 'template',
+        does_not_mutate_state: true,
+      };
+    }
   }
 
   // ── 3. 組裝 Bedrock prompt ────────────────────────────────────────────────
@@ -328,4 +337,11 @@ function buildTemplateExplanationText(
   lines.push(``, `（本解釋由決定性模板產生，Bedrock 不可用）`);
 
   return lines.join('\n');
+}
+
+function buildCitationUnavailableExplanationText(recomputeResult: RecomputeResult): string {
+  return [
+    'citation unavailable: 無法取得 SOP 引用，以下僅提供決定性重算事實。',
+    buildTemplateExplanationText(recomputeResult, []),
+  ].join('\n');
 }
