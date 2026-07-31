@@ -21,14 +21,14 @@
  */
 
 import type { APIGatewayProxyEventV2, APIGatewayProxyResultV2 } from 'aws-lambda';
-import type { PublishRecord, AuditTrailEntry } from '@city-commander/shared-schemas';
+import type { PublishRecord } from '@city-commander/shared-schemas';
 import { PublishStatus, SCHEMA_VERSION } from '@city-commander/shared-schemas';
 import {
-  PUBLISH_TRANSITIONS,
   isLegalPublishTransition,
   inferNextPublishState,
   allowedNextStates,
 } from './publish_transitions.js';
+import { appendAuditEntry } from './audit_trail.js';
 
 // ─── Publish result type ──────────────────────────────────────────────────────
 
@@ -163,23 +163,10 @@ function extractDecisionId(event: APIGatewayProxyEventV2): string | null {
 }
 
 // ─── timestamp helper ─────────────────────────────────────────────────────────
-
-/**
- * 產生符合設計規格的 `YYYY-MM-DD HH:MM` 時間戳記。
- * 所有 audit_trail 時間戳均使用此格式（§10.17）。
- */
-function nowTimestamp(): string {
-  const d = new Date();
-  const pad = (n: number): string => String(n).padStart(2, '0');
-  return (
-    `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())} ` +
-    `${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}`
-  );
-}
+// nowTimestamp 已移至 audit_trail.ts（formatAuditTimestamp），此處不重複定義。
 
 // ─── State transition logic ───────────────────────────────────────────────────
 // 轉移規則定義集中在 publish_transitions.ts（SINGLE SOURCE OF TRUTH）
-// 此處 re-export PUBLISH_TRANSITIONS 供模組內 isLegalPublishTransition / inferNextPublishState 使用
 
 /**
  * 解析後的 request body 欄位。
@@ -230,9 +217,7 @@ function parsePublishBody(body: string | null | undefined): ParsedPublishBody {
 /**
  * 從當前狀態推斷下一個合法目標狀態（委派 publish_transitions.ts）。
  */
-function inferNextState(currentState: PublishStatus | null): PublishStatus | null {
-  return inferNextPublishState(currentState);
-}
+// inferNextState 已移除 — 直接呼叫 inferNextPublishState（publish_transitions.ts）
 
 // ─── Main handler factory ─────────────────────────────────────────────────────
 
@@ -312,7 +297,7 @@ export function createPublishHandler(
 
       // ── 4. 解析 request body（target_state + failure_reason）────────────
       const parsedBody = parsePublishBody(event.body);
-      const targetState = parsedBody.target_state ?? inferNextState(currentState);
+      const targetState = parsedBody.target_state ?? inferNextPublishState(currentState);
 
       if (targetState === null) {
         return errorResponse(
@@ -341,38 +326,18 @@ export function createPublishHandler(
         );
       }
 
-      // ── 7. 建立 audit trail entry ─────────────────────────────────────────
-      const auditEntry: AuditTrailEntry = {
+      // ── 7. 組裝新的 PublishRecord（含 append-only audit trail）─────────
+      // audit_trail entry 建立與 approved_by/published_by/failure_reason 填寫
+      // 集中在 audit_trail.ts（TASK-147 SINGLE SOURCE OF TRUTH）
+      const newRecord: PublishRecord = appendAuditEntry({
+        decisionId,
         actor,
-        action: targetState,      // 動詞語意：'draft' | 'approved' | 'published' | 'publish_failed'
-        from_state: currentState,
-        to_state: targetState,
-        at: nowTimestamp(),
-      };
+        existing,
+        targetState,
+        failureReason: parsedBody.failure_reason,
+      });
 
-      // ── 8. 組裝新的 PublishRecord ─────────────────────────────────────────
-      const newRecord: PublishRecord = {
-        decision_id: decisionId,
-        publish_state: targetState,
-        channels: existing?.channels ?? [],
-        // approved_by: 若轉移到 approved，記錄核准者
-        ...(targetState === PublishStatus.approved && { approved_by: actor }),
-        // published_by: 若轉移到 published，記錄發布者（保留前一步的 approved_by）
-        ...(targetState === PublishStatus.published && {
-          approved_by: existing?.approved_by ?? actor,
-          published_by: actor,
-        }),
-        // failure_reason: 若轉移到 publish_failed，記錄失敗原因（§10.11d）
-        ...(targetState === PublishStatus.publish_failed &&
-          parsedBody.failure_reason !== null && {
-            failure_reason: parsedBody.failure_reason,
-          }),
-        audit_trail: [...(existing?.audit_trail ?? []), auditEntry],
-        version: currentVersion + 1,
-        updated_at: auditEntry.at,
-      };
-
-      // ── 9. 委派狀態機寫入（TASK-145）────────────────────────────────────
+      // ── 8. 委派狀態機寫入（TASK-145）────────────────────────────────────
       const writeResult = await writePublishRecord(newRecord, currentVersion);
 
       if (!writeResult.success) {
@@ -397,7 +362,7 @@ export function createPublishHandler(
         );
       }
 
-      // ── 10. 回傳成功結果 ──────────────────────────────────────────────────
+      // ── 9. 回傳成功結果 ───────────────────────────────────────────────────
       return jsonResponse(200, {
         schema_version: SCHEMA_VERSION,
         decision_id: decisionId,
