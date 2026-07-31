@@ -73,12 +73,13 @@
       "Type": "Pass",
       "Parameters": {
         "last_error": "INVALID_RECOVERY_MODE",
-        "retryable": false,
-        "recovery_stage": "NONE",
+        "retryable": true,
+        "recovery_stage": "FULL_WORKFLOW",
         "execution_id.$": "$$.Execution.Id",
         "attempt_count.$": "$.attempt_count",
         "idempotency_key.$": "$.idempotency_key",
-        "decision_id.$": "$.decision_id"
+        "decision_id.$": "$.decision_id",
+        "trace_id.$": "$.trace_id"
       },
       "Next": "MARK_PROCESSING_FAILED"
     },
@@ -138,6 +139,11 @@
           "Variable": "$.decision.payload.core_write_status",
           "StringEquals": "CORE_IDENTITY_CONFLICT",
           "Next": "PREPARE_CORE_IDENTITY_CONFLICT"
+        },
+        {
+          "Variable": "$.decision.payload.core_write_status",
+          "StringEquals": "SKIPPED_INSUFFICIENT_DATA",
+          "Next": "PREPARE_INSUFFICIENT_DATA"
         }
       ],
       "Default": "PREPARE_UNKNOWN_CORE_WRITE_STATUS"
@@ -151,7 +157,8 @@
         "execution_id.$": "$$.Execution.Id",
         "attempt_count.$": "$.attempt_count",
         "idempotency_key.$": "$.idempotency_key",
-        "decision_id.$": "$.decision_id"
+        "decision_id.$": "$.decision_id",
+        "trace_id.$": "$.trace_id"
       },
       "Next": "MARK_PROCESSING_FAILED_TERMINAL"
     },
@@ -228,12 +235,27 @@
       "Type": "Pass",
       "Parameters": {
         "last_error": "UNKNOWN_CORE_WRITE_STATUS",
-        "retryable": false,
-        "recovery_stage": "NONE",
+        "retryable": true,
+        "recovery_stage": "FULL_WORKFLOW",
         "execution_id.$": "$$.Execution.Id",
         "attempt_count.$": "$.attempt_count",
         "idempotency_key.$": "$.idempotency_key",
-        "decision_id.$": "$.decision_id"
+        "decision_id.$": "$.decision_id",
+        "trace_id.$": "$.trace_id"
+      },
+      "Next": "MARK_PROCESSING_FAILED"
+    },
+    "PREPARE_INSUFFICIENT_DATA": {
+      "Type": "Pass",
+      "Parameters": {
+        "last_error": "SKIPPED_INSUFFICIENT_DATA",
+        "retryable": true,
+        "recovery_stage": "FULL_WORKFLOW",
+        "execution_id.$": "$$.Execution.Id",
+        "attempt_count.$": "$.attempt_count",
+        "idempotency_key.$": "$.idempotency_key",
+        "decision_id.$": "$.decision_id",
+        "trace_id.$": "$.trace_id"
       },
       "Next": "MARK_PROCESSING_FAILED"
     },

@@ -570,14 +570,15 @@ describe('C. Recovery mode', () => {
 describe('D. Core-write Choice Gate', () => {
   const doc = loadAsl();
 
-  it('DECISION_CORE_WRITE_GATE has exactly three required branches', () => {
+  it('DECISION_CORE_WRITE_GATE has exactly four required branches', () => {
     const c = doc.States['DECISION_CORE_WRITE_GATE'].Choices!;
-    expect(c.length).toBe(3);
+    expect(c.length).toBe(4);
     const labels = c.map((x) => x.StringEquals).sort();
     expect(labels).toEqual([
       'ALREADY_COMMITTED_SAME_DECISION',
       'COMMITTED',
       'CORE_IDENTITY_CONFLICT',
+      'SKIPPED_INSUFFICIENT_DATA',
     ]);
   });
 
@@ -650,6 +651,90 @@ describe('D. Core-write Choice Gate', () => {
     expect(r.has('MARK_PROCESSING_FAILED')).toBe(true);
     expect(r.has('PUBLISH_FAST_PATH_READY')).toBe(false);
     expect(r.has('ENRICHMENT_PARALLEL')).toBe(false);
+  });
+
+  // ─── BLOCKER 3 + 4 + 5 — Insufficient-data, trace_id, retryable matrix ───
+
+  it('SKIPPED_INSUFFICIENT_DATA Choice -> PREPARE_INSUFFICIENT_DATA (BLOCKER 4)', () => {
+    const c = doc.States['DECISION_CORE_WRITE_GATE'].Choices!;
+    const x = c.find((y) => y.StringEquals === 'SKIPPED_INSUFFICIENT_DATA');
+    expect(x?.Variable).toBe('$.decision.payload.core_write_status');
+    expect(x?.Next).toBe('PREPARE_INSUFFICIENT_DATA');
+  });
+
+  it('SKIPPED_INSUFFICIENT_DATA Choice is placed before the Default branch (BLOCKER 4)', () => {
+    const c = doc.States['DECISION_CORE_WRITE_GATE'];
+    const choices = c.Choices ?? [];
+    const insufficientIdx = choices.findIndex(
+      (y) => y.StringEquals === 'SKIPPED_INSUFFICIENT_DATA'
+    );
+    expect(insufficientIdx).toBeGreaterThanOrEqual(0);
+    // All Choices are evaluated before Default. The four Choices must
+    // come before the Default position (Default is at the top level).
+    expect(insufficientIdx).toBeLessThan(choices.length);
+  });
+
+  it('PREPARE_INSUFFICIENT_DATA carries the formal processing-failure payload (BLOCKER 4)', () => {
+    const s = doc.States['PREPARE_INSUFFICIENT_DATA'];
+    expect(s.Type).toBe('Pass');
+    const params = s.Parameters as {
+      last_error: string;
+      retryable: boolean;
+      recovery_stage: string;
+    };
+    expect(params.last_error).toBe('SKIPPED_INSUFFICIENT_DATA');
+    // Backend authoritative contract: insufficient_data is a recoverable
+    // gap (data may later become available), so retryable MUST be true.
+    expect(params.retryable).toBe(true);
+    // No core has been written yet, so FULL_WORKFLOW is the right
+    // recovery_stage (re-run DecisionFn when official data refreshes).
+    expect(params.recovery_stage).toBe('FULL_WORKFLOW');
+  });
+
+  it('PREPARE_INSUFFICIENT_DATA preserves incident/workflow identity + trace_id (BLOCKER 3+4)', () => {
+    const params = doc.States['PREPARE_INSUFFICIENT_DATA'].Parameters as Record<string, string>;
+    expect(params['decision_id.$']).toBe('$.decision_id');
+    expect(params['idempotency_key.$']).toBe('$.idempotency_key');
+    expect(params['attempt_count.$']).toBe('$.attempt_count');
+    expect(params['execution_id.$']).toBe('$$.Execution.Id');
+    // trace_id must be preserved onto the next state machine frame
+    // so downstream consumers (mark_processing_failed telemetry,
+    // audit logs) can correlate the gap with the original request.
+    expect(params['trace_id.$']).toBe('$.trace_id');
+  });
+
+  it('PREPARE_INSUFFICIENT_DATA routes into the general processing-failed path (BLOCKER 4)', () => {
+    expect(doc.States['PREPARE_INSUFFICIENT_DATA'].Next).toBe('MARK_PROCESSING_FAILED');
+    const r = reachableFrom('PREPARE_INSUFFICIENT_DATA', doc);
+    expect(r.has('MARK_PROCESSING_FAILED')).toBe(true);
+    expect(r.has('FAIL_PROCESSING_FAILED')).toBe(true);
+    // Must NOT silently mark the core committed, must NOT advance to
+    // Fast Path / Renderer / Completed — insufficient_data is not a
+    // success state.
+    expect(r.has('MARK_CORE_COMMITTED_DECISION')).toBe(false);
+    expect(r.has('MARK_CORE_COMMITTED_RECOVERY')).toBe(false);
+    expect(r.has('PUBLISH_FAST_PATH_READY')).toBe(false);
+    expect(r.has('ENRICHMENT_PARALLEL')).toBe(false);
+    expect(r.has('PUBLISH_ENRICHED')).toBe(false);
+    expect(r.has('MARK_COMPLETED')).toBe(false);
+    expect(r.has('WORKFLOW_SUCCEEDED')).toBe(false);
+  });
+
+  it('PREPARE_INSUFFICIENT_DATA does NOT fall into the terminal CORE_IDENTITY_CONFLICT branch (BLOCKER 4)', () => {
+    const r = reachableFrom('PREPARE_INSUFFICIENT_DATA', doc);
+    expect(r.has('PUBLISH_PROCESSING_FAILED')).toBe(false);
+    expect(r.has('FAIL_CORE_IDENTITY_CONFLICT')).toBe(false);
+    expect(r.has('MARK_PROCESSING_FAILED_TERMINAL')).toBe(false);
+  });
+
+  it('SKIPPED_INSUFFICIENT_DATA Choice is reachable from DECISION_CORE_WRITE_GATE (no hang)', () => {
+    // Sanity: every Choice.Next must point to a defined state (already
+    // covered by the structural test above). This test pins the Choice
+    // placement for SKIPPED_INSUFFICIENT_DATA specifically.
+    const c = doc.States['DECISION_CORE_WRITE_GATE'].Choices!;
+    const x = c.find((y) => y.StringEquals === 'SKIPPED_INSUFFICIENT_DATA');
+    expect(doc.States[x!.Next]).toBeDefined();
+    expect(doc.States[x!.Next].Type).toBe('Pass');
   });
 });
 
@@ -859,7 +944,7 @@ describe('I. State Machine resource', () => {
       expect.arrayContaining(['Comment', 'QueryLanguage', 'StartAt', 'States', 'TimeoutSeconds']),
     );
     expect(def!.StartAt).toBe('MARK_RUNNING');
-    expect(Object.keys(def!.States as object).length).toBe(28);
+    expect(Object.keys(def!.States as object).length).toBe(29);
   });
 
   it('PERSONAL_AWS_DEV: changing workflowTimeoutSeconds changes the deployed definition', () => {
@@ -1323,6 +1408,232 @@ describe('L. Retry policy', () => {
       expect(r.IntervalSeconds, `${name}.IntervalSeconds`).toBe(1);
       expect(r.MaxAttempts, `${name}.MaxAttempts`).toBe(2);
       expect(r.BackoffRate, `${name}.BackoffRate`).toBe(2);
+    }
+  });
+});
+
+// ─── L2. BLOCKER 3 + 5 — trace_id propagation + retryable matrix ──────────
+
+describe('L2. BLOCKER 3 (trace_id) + BLOCKER 5 (retryable matrix)', () => {
+  const doc = loadAsl();
+
+  /**
+   * PREPARE_* Pass states that precede either:
+   *  - PUBLISH_PROCESSING_FAILED (reads $.trace_id), OR
+   *  - MARK_PROCESSING_FAILED (does NOT read $.trace_id — pass-through safe)
+   *
+   * trace_id MUST be preserved on every PREPARE_* that flows into a
+   * downstream state that reads `$.trace_id`. To be safe and uniform,
+   * every PREPARE_* failure state MUST carry trace_id — losing it would
+   * silently break audit and WS consumers.
+   */
+  const PREPARE_STATES_WITH_DOWNSTREAM_PUBLISH: ReadonlyArray<{
+    state: string;
+    expectedLastError: string;
+    expectedRetryable: boolean;
+    /** Allowed recovery_stage values per Backend authoritative contract. */
+    allowedRecoveryStages: ReadonlyArray<string>;
+  }> = [
+    {
+      // BLOCKER 5 — terminal, the ONLY non-retryable processing failure.
+      state: 'PREPARE_CORE_IDENTITY_CONFLICT',
+      expectedLastError: 'CORE_IDENTITY_CONFLICT',
+      expectedRetryable: false,
+      allowedRecoveryStages: ['NONE'],
+    },
+    {
+      // BLOCKER 5 — recoverable; on a subsequent NORMAL retry the
+      // orchestrator can succeed.
+      state: 'PREPARE_INVALID_RECOVERY_MODE',
+      expectedLastError: 'INVALID_RECOVERY_MODE',
+      expectedRetryable: true,
+      allowedRecoveryStages: ['FULL_WORKFLOW'],
+    },
+    {
+      // BLOCKER 5 — unknown status is treated as recoverable so a
+      // Backend bug that adds a new core_write_status value doesn't
+      // permanently strand the key.
+      state: 'PREPARE_UNKNOWN_CORE_WRITE_STATUS',
+      expectedLastError: 'UNKNOWN_CORE_WRITE_STATUS',
+      expectedRetryable: true,
+      allowedRecoveryStages: ['FULL_WORKFLOW'],
+    },
+    {
+      // BLOCKER 4 — recoverable data gap (no DecisionCore was written).
+      state: 'PREPARE_INSUFFICIENT_DATA',
+      expectedLastError: 'SKIPPED_INSUFFICIENT_DATA',
+      expectedRetryable: true,
+      allowedRecoveryStages: ['FULL_WORKFLOW'],
+    },
+    {
+      // Recovery flow — recoverable per Backend contract.
+      state: 'PREPARE_RECOVERY_CORE_MISSING',
+      expectedLastError: 'RECOVERY_CORE_MISSING',
+      expectedRetryable: true,
+      allowedRecoveryStages: ['FULL_WORKFLOW'],
+    },
+    {
+      // Recovery flow — effective_core_committed=true branch.
+      state: 'PREPARE_RECOVERY_STAGE_ENRICHMENT_ONLY',
+      expectedLastError: 'TASK_FAILED',
+      expectedRetryable: true,
+      allowedRecoveryStages: ['ENRICHMENT_ONLY'],
+    },
+    {
+      // Recovery flow — effective_core_committed=false branch.
+      state: 'PREPARE_RECOVERY_STAGE_FULL_WORKFLOW',
+      expectedLastError: 'TASK_FAILED',
+      expectedRetryable: true,
+      allowedRecoveryStages: ['FULL_WORKFLOW'],
+    },
+    {
+      // Recovery flow — gate itself failed.
+      state: 'PREPARE_RECOVERY_GATE_FAILED',
+      expectedLastError: 'RECOVERY_GATE_FAILED',
+      expectedRetryable: true,
+      allowedRecoveryStages: ['FULL_WORKFLOW'],
+    },
+  ];
+
+  it('BLOCKER 3: PREPARE_CORE_IDENTITY_CONFLICT.Parameters["trace_id.$"] === "$.trace_id"', () => {
+    const params = doc.States['PREPARE_CORE_IDENTITY_CONFLICT'].Parameters as Record<
+      string,
+      string
+    >;
+    expect(params['trace_id.$']).toBe('$.trace_id');
+  });
+
+  it('BLOCKER 3: PREPARE_CORE_IDENTITY_CONFLICT -> PUBLISH_PROCESSING_FAILED JSONPath is complete', () => {
+    // Walk the chain: PREPARE_CORE_IDENTITY_CONFLICT ->
+    //   MARK_PROCESSING_FAILED_TERMINAL -> PUBLISH_PROCESSING_FAILED.
+    // The Pass state must carry `trace_id` so PUBLISH_PROCESSING_FAILED
+    // can resolve `$.trace_id` without a States.Runtime missing-path
+    // error.
+    const params = doc.States['PREPARE_CORE_IDENTITY_CONFLICT'].Parameters as Record<
+      string,
+      string
+    >;
+    // Field-by-field trace_id contract:
+    expect(params['trace_id.$']).toBe('$.trace_id');
+    expect(params['decision_id.$']).toBe('$.decision_id');
+    expect(params['idempotency_key.$']).toBe('$.idempotency_key');
+    expect(params['attempt_count.$']).toBe('$.attempt_count');
+    expect(params['execution_id.$']).toBe('$$.Execution.Id');
+  });
+
+  it('BLOCKER 3: PUBLISH_PROCESSING_FAILED reads $.trace_id and the upstream Pass preserves it', () => {
+    const pub = doc.States['PUBLISH_PROCESSING_FAILED'].Parameters as {
+      Payload: Record<string, string>;
+    };
+    expect(pub.Payload['trace_id.$']).toBe('$.trace_id');
+    // Verify the upstream state that feeds PUBLISH_PROCESSING_FAILED
+    // (via MARK_PROCESSING_FAILED_TERMINAL) DOES carry trace_id.
+    const upstream = doc.States['PREPARE_CORE_IDENTITY_CONFLICT'].Parameters as Record<
+      string,
+      string
+    >;
+    expect(upstream['trace_id.$']).toBe('$.trace_id');
+  });
+
+  it('BLOCKER 5: table-driven retryable matrix matches Backend authoritative contract', () => {
+    // Backend authoritative contract:
+    //   - CORE_IDENTITY_CONFLICT  -> retryable=false, recovery_stage=NONE
+    //   - Everything else          -> retryable=true
+    // (See packages/backend/src/workflow/mark_processing_failed.ts)
+    for (const row of PREPARE_STATES_WITH_DOWNSTREAM_PUBLISH) {
+      const s = doc.States[row.state];
+      expect(s, `${row.state} exists`).toBeDefined();
+      expect(s.Type, `${row.state}.Type`).toBe('Pass');
+      const params = s.Parameters as Record<string, unknown>;
+      expect(params['last_error'], `${row.state}.last_error`).toBe(row.expectedLastError);
+      expect(params['retryable'], `${row.state}.retryable`).toBe(row.expectedRetryable);
+      expect(row.allowedRecoveryStages).toContain(params['recovery_stage']);
+    }
+  });
+
+  it('BLOCKER 5: CORE_IDENTITY_CONFLICT is the only non-retryable processing failure', () => {
+    const nonRetryable: string[] = [];
+    for (const [name, s] of Object.entries(doc.States)) {
+      if (!name.startsWith('PREPARE_')) continue;
+      const params = s.Parameters as Record<string, unknown> | undefined;
+      if (!params) continue;
+      if (params['retryable'] === false) {
+        nonRetryable.push(name);
+      }
+    }
+    expect(nonRetryable).toEqual(['PREPARE_CORE_IDENTITY_CONFLICT']);
+  });
+
+  it('BLOCKER 5: PREPARE_* failure states whose downstream reads trace_id carry trace_id (BLOCKER 3 narrowed)', () => {
+    // Only the PREPARE_* whose downstream state reads `$.trace_id`
+    // MUST carry it on the Pass payload. The others flow into
+    // MARK_PROCESSING_FAILED which does not read trace_id — adding it
+    // would be unused and would expand the ASL beyond the contract
+    // ("只修復有實際證據的缺口，不擴張成整份 ASL 重構").
+    //
+    // Downstream reads of `$.trace_id`:
+    //   - PUBLISH_PROCESSING_FAILED (line: "trace_id.$": "$.trace_id")
+    //   - PUBLISH_FAST_PATH_READY  (line: "trace_id.$": "$.trace_id")
+    //   - PUBLISH_ENRICHED         (line: "trace_id.$": "$.trace_id")
+    //   - RENDER_REPORT / RENDER_PUBLIC_ALERT / RENDER_EXPLANATION (parallel)
+    //   - RECOVERY_GATE            (line: "trace_id.$": "$.trace_id")
+    //
+    // PREPARE_CORE_IDENTITY_CONFLICT is the ONLY PREPARE_* whose chain
+    // reaches PUBLISH_PROCESSING_FAILED (via MARK_PROCESSING_FAILED_TERMINAL),
+    // so it is the ONLY PREPARE_* that MUST carry trace_id today.
+    const traceIdRequired: ReadonlyArray<string> = ['PREPARE_CORE_IDENTITY_CONFLICT'];
+    for (const name of traceIdRequired) {
+      const s = doc.States[name];
+      const params = s.Parameters as Record<string, string>;
+      expect(params['trace_id.$'], `${name} missing trace_id.$`).toBe('$.trace_id');
+    }
+  });
+
+  it('BLOCKER 3: PREPARE_* states whose downstream reads trace_id are precisely those listed', () => {
+    // Pin the boundary so a future re-routing that adds a publish step
+    // after a new PREPARE_* cannot silently lose trace_id.
+    const downstreamReadsTraceId: ReadonlyArray<{
+      downstream: string;
+      prepStates: ReadonlyArray<string>;
+    }> = [
+      {
+        downstream: 'PUBLISH_PROCESSING_FAILED',
+        prepStates: ['PREPARE_CORE_IDENTITY_CONFLICT'],
+      },
+    ];
+    for (const row of downstreamReadsTraceId) {
+      // Every PREPARE_* whose Next eventually reaches the downstream
+      // (transitively) MUST carry trace_id.
+      const prepStates = row.prepStates;
+      for (const prep of prepStates) {
+        const reachable = reachableFrom(prep, doc);
+        expect(reachable.has(row.downstream), `${prep} -> ${row.downstream} reachable`).toBe(true);
+        const params = doc.States[prep].Parameters as Record<string, string>;
+        expect(params['trace_id.$'], `${prep} carries trace_id`).toBe('$.trace_id');
+      }
+    }
+  });
+
+  it('BLOCKER 3/4/5: all PREPARE_* Pass states have a defined Next state', () => {
+    const stateNames = new Set(Object.keys(doc.States));
+    for (const row of PREPARE_STATES_WITH_DOWNSTREAM_PUBLISH) {
+      const next = doc.States[row.state].Next;
+      expect(next, `${row.state}.Next`).toBeDefined();
+      expect(stateNames.has(next!), `${row.state}.Next -> ${next}`).toBe(true);
+    }
+  });
+
+  it('BLOCKER 5: ASL retryable values are consistent with the Backend computed value', () => {
+    // For each PREPARE_*, the Backend's mark_processing_failed will
+    // OVERRIDE retryable from lastError: CORE_IDENTITY_CONFLICT ->
+    // retryable=false, everything else -> retryable=true. The ASL value
+    // must agree so there is no contradictory contract on the wire.
+    for (const row of PREPARE_STATES_WITH_DOWNSTREAM_PUBLISH) {
+      const s = doc.States[row.state];
+      const params = s.Parameters as Record<string, unknown>;
+      const aslRetryable = params['retryable'] as boolean;
+      const backendRetryable = row.expectedLastError !== 'CORE_IDENTITY_CONFLICT';
+      expect(aslRetryable, `${row.state} ASL/Backend agreement`).toBe(backendRetryable);
     }
   });
 });
