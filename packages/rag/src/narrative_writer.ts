@@ -198,7 +198,7 @@ export async function putNarrative(
   return { outcome: 'committed' };
 }
 
-// ─── Internal helpers ─────────────────────────────────────────────────────────
+// ─── Exported helpers ─────────────────────────────────────────────────────────
 
 /**
  * 組裝 ready_event_id（Dashboard dedup key）。
@@ -209,10 +209,13 @@ export async function putNarrative(
  * 而非 NarrativeType enum 值（如 `REPORT`）。
  * 兩端（DynamoDB item 與 WebSocket 推送）必須使用相同格式，否則 dashboard dedup 靜默失效。
  *
+ * 公開匯出讓 composers 取得 ready_event_id，
+ * 確保 WebSocket 推送與 DynamoDB item 使用相同值。
+ *
  * @see NARRATIVE_TYPE_TO_EVENT_TYPE
  * @see events.ts 中的 `ReportReadyEvent`, `PublicAlertReadyEvent`, `DecisionEnrichedEvent`
  */
-function buildReadyEventId(
+export function buildReadyEventId(
   decisionId: string,
   narrativeType: NarrativeType,
   coreVersionRef: number,

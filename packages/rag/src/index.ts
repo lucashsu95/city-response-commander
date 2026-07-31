@@ -48,9 +48,19 @@ export {
   type SopArticleFetchResult,
 } from './sop_s3_fallback.js';
 
+// ─── Report Composer (TASK-113) ──────────────────────────
+export {
+  composeReport,
+  type ReportComposerInput,
+  type ReportComposeResult,
+  type ReportComposeSuccess,
+  type ReportComposeFailed,
+} from './report_composer.js';
+
 // ─── Narrative Writer (TASK-116) ──────────────────────────
 export {
   putNarrative,
+  buildReadyEventId,
   type NarrativeTableClient,
   type NarrativeItem,
   type NarrativePutResult,
