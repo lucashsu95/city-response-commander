@@ -7,6 +7,7 @@
 export {
   IdempotencyRepository,
   createIdempotencyReader,
+  normalizeIdempotencyRecord,
   IdempotencyRepositoryError,
   IdempotencyConditionFailedError,
   IdempotencyUsageError,

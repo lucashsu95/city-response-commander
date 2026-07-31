@@ -346,6 +346,39 @@ function assertMutationIsUsable(mutation: IdempotencyMutation): void {
   }
 }
 
+/** Nullable attributes that a `REMOVE` clause can leave absent from the item. */
+const NULLABLE_ATTRIBUTES = [
+  'lease_owner',
+  'lease_expires_at',
+  'last_error',
+  'previous_last_error',
+  'workflow_execution_arn',
+  'running_started_at',
+  'running_deadline_at',
+  'completed_execution_arn',
+  'completed_attempt_count',
+  'last_transition_execution_arn',
+  'last_transition_attempt_count',
+  'evidence_source',
+] as const satisfies readonly ClearableIdempotencyField[];
+
+/**
+ * Fill absent nullable attributes with `null`.
+ *
+ * State transitions clear fields with `REMOVE`, which leaves the attribute
+ * absent rather than null. Without this, `record.lease_owner` would be
+ * `undefined` while typed `string | null`, and a `=== null` check somewhere
+ * downstream would silently be false. Normalizing on read keeps the declared
+ * type honest for every consumer.
+ */
+export function normalizeIdempotencyRecord(item: Partial<IdempotencyRecord>): IdempotencyRecord {
+  const normalized: Record<string, unknown> = { ...item };
+  for (const attribute of NULLABLE_ATTRIBUTES) {
+    if (normalized[attribute] === undefined) normalized[attribute] = null;
+  }
+  return normalized as unknown as IdempotencyRecord;
+}
+
 /** True when the thrown value is a DynamoDB conditional-check failure. */
 function isConditionalCheckFailure(error: unknown): boolean {
   if (error instanceof ConditionalCheckFailedException) return true;
@@ -521,7 +554,7 @@ export class IdempotencyRepository implements IdempotencyReader {
         }),
       );
 
-      const attributes = result.Attributes;
+      const attributes = result.Attributes as Partial<IdempotencyRecord> | undefined;
       if (!attributes) {
         throw new IdempotencyRepositoryError(
           `conditionalUpdateState returned no attributes for "${idempotencyKey}"; cannot confirm the transition.`,
@@ -529,7 +562,7 @@ export class IdempotencyRepository implements IdempotencyReader {
           idempotencyKey,
         );
       }
-      return attributes as IdempotencyRecord;
+      return normalizeIdempotencyRecord(attributes);
     } catch (error: unknown) {
       if (error instanceof IdempotencyRepositoryError) throw error;
       if (isConditionalCheckFailure(error)) {
@@ -573,7 +606,8 @@ export class IdempotencyRepository implements IdempotencyReader {
           ConsistentRead: true,
         }),
       );
-      return (result.Item as IdempotencyRecord | undefined) ?? null;
+      const item = result.Item as Partial<IdempotencyRecord> | undefined;
+      return item === undefined ? null : normalizeIdempotencyRecord(item);
     } catch (error: unknown) {
       throw new IdempotencyRepositoryError(
         `getConsistent failed for "${idempotencyKey}": ${describe(error)}`,

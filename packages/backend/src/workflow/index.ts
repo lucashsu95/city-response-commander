@@ -22,3 +22,8 @@ export type { WorkflowStatusInput, StatusActionContext } from './status_context.
 
 export { markRunning } from './mark_running.js';
 export type { MarkRunningContext } from './mark_running.js';
+
+export { markCompleted } from './mark_completed.js';
+
+export { markProcessingFailed, ProcessingFailure } from './mark_processing_failed.js';
+export type { MarkProcessingFailedContext } from './mark_processing_failed.js';
