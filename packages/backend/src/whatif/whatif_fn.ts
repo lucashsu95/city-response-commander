@@ -102,12 +102,25 @@ function errorResponse(
  */
 const MAX_QUERY_LENGTH = 2000;
 
+/**
+ * 取出 request body 的 UTF-8 文字。
+ *
+ * API Gateway 在 `isBase64Encoded=true` 時送來的是 base64 編碼的**位元組**。
+ * 必須以 UTF-8 解碼還原——`atob()` 產生的是 latin1 字串，
+ * 中文問句（What-if 的主要輸入語言）會整段變成亂碼，
+ * 接著 JSON.parse 失敗或解析出錯誤的 query。
+ */
+function decodeBody(event: APIGatewayProxyEventV2): string {
+  const body = event.body ?? '';
+  return event.isBase64Encoded ? Buffer.from(body, 'base64').toString('utf-8') : body;
+}
+
 function parseRequest(event: APIGatewayProxyEventV2): WhatIfRequest | null {
   if (!event.body) return null;
 
   let parsed: unknown;
   try {
-    parsed = JSON.parse(event.isBase64Encoded ? atob(event.body) : event.body);
+    parsed = JSON.parse(decodeBody(event));
   } catch {
     return null;
   }
