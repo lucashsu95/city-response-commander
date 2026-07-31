@@ -33,10 +33,10 @@ Use Conventional Commits format:
 git add <changed-files>
 git commit -m "feat(scope): description"
 
-# Examples:
-git commit -m "feat(domain): implement SOP-3 MRT shuttle trigger"
-git commit -m "fix(frontend): correct ETE display precision"
-git commit -m "test(backend): add unit tests for inject handler"
+# Examples (English type/scope prefix, Traditional Chinese description — see git-workflow skill):
+git commit -m "feat(domain): 實作 SOP-3 捷運接駁觸發邏輯"
+git commit -m "fix(frontend): 修正 ETE 顯示精度"
+git commit -m "test(backend): 新增 inject handler 的單元測試"
 ```
 
 ### 3. Push to GitHub
@@ -126,7 +126,7 @@ git checkout -b feat/sop3-mrt-shuttle
 
 # 3. Make changes and commit
 git add packages/domain/src/sop3-mrt.ts
-git commit -m "feat(domain): implement SOP-3 MRT shuttle trigger"
+git commit -m "feat(domain): 實作 SOP-3 捷運接駁觸發邏輯"
 
 # 4. Push
 git push -u origin feat/sop3-mrt-shuttle
@@ -195,9 +195,9 @@ gh pr create --title "fix stuff"  # ❌ No task link
 ### DO
 
 ```bash
-# Correct: Feature branch with conventional commit
+# Correct: Feature branch with conventional commit (English prefix, Chinese description)
 git checkout -b feat/my-feature
-git commit -m "feat(domain): implement SOP-3 shuttle route"
+git commit -m "feat(domain): 實作 SOP-3 接駁路線"
 git push -u origin feat/my-feature
 gh pr create --title "feat: implement SOP-3" --body "Closes TASK-027"
 ```
