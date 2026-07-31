@@ -127,14 +127,17 @@ export async function composeExplanation(
     if (validation.outcome === 'accepted') {
       // 空字串視同缺漏（SchemaValidator 只確認 string 型別，不排除空字串）
       const rawText = validation.fields['explanation_text'];
+      const effectiveText =
+        rawText != null && rawText.trim().length > 0
+          ? rawText
+          : null;
+
       explanationPayload = {
         type: 'EXPLANATION',
-        explanation_text:
-          rawText != null && rawText.trim().length > 0
-            ? rawText
-            : buildFallbackExplanationText(core, citations),
+        explanation_text: effectiveText ?? buildFallbackExplanationText(core, citations),
       };
-      textSource = 'bedrock';
+      // text_source 只在 Bedrock 實際提供非空文字時才標記為 'bedrock'
+      textSource = effectiveText !== null ? 'bedrock' : 'template';
     } else {
       // SchemaValidator 拒絕（含 core field overwrite 嘗試）→ template
       explanationPayload = buildTemplateExplanation(core, citations);
