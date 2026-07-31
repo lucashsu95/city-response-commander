@@ -67,6 +67,15 @@ export {
   type PublicAlertComposeFailed,
 } from './public_alert_composer.js';
 
+// ─── Explanation Composer (TASK-115) ─────────────────────
+export {
+  composeExplanation,
+  type ExplanationComposerInput,
+  type ExplanationComposeResult,
+  type ExplanationComposeSuccess,
+  type ExplanationComposeFailed,
+} from './explanation_composer.js';
+
 // ─── Narrative Writer (TASK-116) ──────────────────────────
 export {
   putNarrative,
