@@ -7,6 +7,7 @@ export * from './handlers/index.js';
 export * from './inject/index.js';
 export * from './logging/index.js';
 export * from './metrics/index.js';
+export * from './observability/index.js';
 export * from './read_model/index.js';
 export * from './recovery/index.js';
 export * from './repository/index.js';
