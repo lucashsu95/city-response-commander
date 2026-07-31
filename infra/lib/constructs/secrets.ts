@@ -88,7 +88,6 @@ function isBlank(value: string | undefined): boolean {
 function validateDefinitions(defs: SecretDefinition[]): void {
   const seenKeys = new Set<string>();
   const seenNames = new Set<string>();
-  const seenArns = new Set<string>();
 
   for (const def of defs) {
     // ── secretKey non-empty ────────────────────────────────────────────────

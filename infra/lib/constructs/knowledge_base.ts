@@ -179,7 +179,7 @@ export const KB_DATA_SOURCE_BUCKET_CONFIG_KEY = 'kb.data_source_bucket';
  * uses it as `AWS::Bedrock::KnowledgeBase.RoleArn` AND as the sole
  * `Principal` of Rule A in the AOSS access policy, this constant is `true`.
  */
-export const KNOWLEDGE_BASE_SERVICE_ROLE_REQUIRED: true = true;
+export const KNOWLEDGE_BASE_SERVICE_ROLE_REQUIRED = true as const;
 
 // ─── Props ──────────────────────────────────────────────────────────────────
 

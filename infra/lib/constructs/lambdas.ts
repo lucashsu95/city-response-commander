@@ -163,7 +163,7 @@ export const RUNTIME_LAMBDA_NAMES = [
 export type RuntimeLambdaName = (typeof RUNTIME_LAMBDA_NAMES)[number];
 
 /** Fixed count of application runtime Lambdas in this Construct. */
-export const APPLICATION_RUNTIME_LAMBDA_COUNT: 10 = 10;
+export const APPLICATION_RUNTIME_LAMBDA_COUNT = 10 as const;
 
 // ─── Stable function-name suffixes (compose with envContext.resourcePrefix) ─
 
@@ -212,7 +212,16 @@ export const FORBIDDEN_AWS_RESERVED_ENV_KEYS = new Set<string>([
 // ─── Validation ─────────────────────────────────────────────────────────────
 
 const LAMBDA_NAME_RE = /^[A-Za-z0-9_-]+$/;
-const HANDLER_RE = /^[^\x00-\x1F\x7F]+$/;
+
+/**
+ * Returns true when `ch` is a control character that must not appear in a
+ * Lambda handler string. Mirrors the previous regex `[^\x00-\x1F\x7F]`
+ * without triggering `no-control-regex`.
+ */
+function isHandlerControlChar(ch: string): boolean {
+  const code = ch.charCodeAt(0);
+  return code <= 0x1f || code === 0x7f;
+}
 
 function validateMemory(memoryMb: number, fnName: RuntimeLambdaName): void {
   if (!Number.isInteger(memoryMb) || memoryMb < 128 || memoryMb > 10240) {
@@ -245,8 +254,10 @@ function validateHandler(handler: string, fnName: RuntimeLambdaName): void {
   if (handler !== handler.trim()) {
     throw new Error(`${fnName}.handler must not have leading or trailing whitespace`);
   }
-  if (!HANDLER_RE.test(handler)) {
-    throw new Error(`${fnName}.handler must not contain control characters`);
+  for (const ch of handler) {
+    if (isHandlerControlChar(ch)) {
+      throw new Error(`${fnName}.handler must not contain control characters`);
+    }
   }
 }
 

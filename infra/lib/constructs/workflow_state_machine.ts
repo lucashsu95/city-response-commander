@@ -71,7 +71,7 @@
  */
 
 import { Construct } from 'constructs';
-import { Stack, CfnOutput, RemovalPolicy } from 'aws-cdk-lib';
+import { CfnOutput, RemovalPolicy } from 'aws-cdk-lib';
 import * as sfn from 'aws-cdk-lib/aws-stepfunctions';
 import type { IFunction } from 'aws-cdk-lib/aws-lambda';
 import type { IRole } from 'aws-cdk-lib/aws-iam';
@@ -82,7 +82,7 @@ import type { EnvironmentContext } from '../env_context.js';
 // ─── Constants ─────────────────────────────────────────────────────────────
 
 /** Fixed count of application State Machines in this Construct. */
-export const APPLICATION_STATE_MACHINE_COUNT: 1 = 1;
+export const APPLICATION_STATE_MACHINE_COUNT = 1 as const;
 
 /** Stable suffix for the Application State Machine name. */
 const STATE_MACHINE_NAME_SUFFIX = 'workflow';
@@ -402,8 +402,6 @@ export class WorkflowStateMachineConstruct extends Construct {
       // Zero AWS resources. Public references stay `undefined`.
       return;
     }
-
-    const stack = Stack.of(this);
 
     const stateMachineName = `${envContext.resourcePrefix}-${STATE_MACHINE_NAME_SUFFIX}`;
     // Name sanity check: 1-80 chars, A-Za-z0-9_-.

@@ -60,7 +60,7 @@ export interface IdempotencyTableProps {
 // ─── Validation ─────────────────────────────────────────────────────────────
 
 /** DynamoDB table name: 3-255 chars, A-Za-z0-9_-. only */
-const TABLE_NAME_RE = /^[A-Za-z0-9_.\-]{3,255}$/;
+const TABLE_NAME_RE = /^[A-Za-z0-9_.-]{3,255}$/;
 
 function validateTableName(name: string): void {
   if (!name || typeof name !== 'string' || name.trim() === '') {

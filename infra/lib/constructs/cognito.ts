@@ -407,7 +407,7 @@ export class CognitoAuthConstruct extends Construct {
 
     const resourceServerIdentifier = `${resourcePrefix}-${props.userPoolName}-api`;
 
-    const resourceServer = new cognito.UserPoolResourceServer(this, 'ResourceServer', {
+    new cognito.UserPoolResourceServer(this, 'ResourceServer', {
       userPool,
       identifier: resourceServerIdentifier,
       scopes: COGNITO_SCOPE_NAMES.map((name) => ({

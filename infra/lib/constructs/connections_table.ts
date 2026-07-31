@@ -118,7 +118,7 @@ export interface ConnectionsTableProps {
 // ─── Validation ─────────────────────────────────────────────────────────────
 
 /** DynamoDB table name: 3-255 chars, A-Za-z0-9_-. only */
-const TABLE_NAME_RE = /^[A-Za-z0-9_.\-]{3,255}$/;
+const TABLE_NAME_RE = /^[A-Za-z0-9_.-]{3,255}$/;
 
 function validateTableName(name: string): void {
   if (!name || typeof name !== 'string' || name.trim() === '') {
@@ -138,8 +138,34 @@ function validateTableName(name: string): void {
   }
 }
 
-/** DynamoDB attribute name: 1+ chars, no `.`/`[`/`]`/`#`/`:`/control chars. */
-const ATTR_NAME_RE = /^[^\s\.\[\]#:\u0000-\u001F\u007F]+$/;
+/**
+ * Characters forbidden anywhere in a DynamoDB attribute name.
+ * Mirrors the previous regex `[\s.\[\]#:\x00-\x1F\x7F]` without
+ * triggering `no-control-regex`. Kept as a code point set so the
+ * validator below can do a single-pass scan.
+ */
+const FORBIDDEN_ATTR_NAME_CHARS = new Set<string>([
+  ' ',
+  '\t',
+  '\n',
+  '\r',
+  '\f',
+  '\v',
+  '.',
+  '[',
+  ']',
+  '#',
+  ':',
+]);
+
+function isForbiddenAttrNameChar(ch: string): boolean {
+  const code = ch.charCodeAt(0);
+  // ASCII control characters (C0: 0x00-0x1F) and DEL (0x7F).
+  if (code <= 0x1f || code === 0x7f) {
+    return true;
+  }
+  return FORBIDDEN_ATTR_NAME_CHARS.has(ch);
+}
 
 function validateTtlAttributeName(name: string): void {
   if (!name || typeof name !== 'string' || name.trim() === '') {
@@ -156,11 +182,13 @@ function validateTtlAttributeName(name: string): void {
       `ttlAttributeName must not equal the partition key '${CONNECTIONS_TABLE_PARTITION_KEY}'`,
     );
   }
-  if (!ATTR_NAME_RE.test(name)) {
-    throw new Error(
-      `ttlAttributeName '${name}' is not a valid DynamoDB attribute name. ` +
-        'Allowed: any non-whitespace characters except ".", "[", "]", "#", ":" and control characters.',
-    );
+  for (const ch of name) {
+    if (isForbiddenAttrNameChar(ch)) {
+      throw new Error(
+        `ttlAttributeName '${name}' is not a valid DynamoDB attribute name. ` +
+          'Allowed: any non-whitespace characters except ".", "[", "]", "#", ":" and control characters.',
+      );
+    }
   }
 }
 

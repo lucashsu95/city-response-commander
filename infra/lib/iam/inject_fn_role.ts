@@ -314,15 +314,9 @@ export class InjectFnRoleConstruct extends Construct {
     }
 
     // ── Trust policy: Lambda service only ──────────────────────────────────
-
-    const trustDoc = new PolicyDocument({
-      statements: [
-        new PolicyStatement({
-          principals: [new ServicePrincipal('lambda.amazonaws.com')],
-          actions: ['sts:AssumeRole'],
-        }),
-      ],
-    });
+    //
+    // The trust policy is attached implicitly via `Role.assumedBy` below;
+    // a separate PolicyDocument would be redundant and is unused.
 
     // ── Create role ──────────────────────────────────────────────────────
 
