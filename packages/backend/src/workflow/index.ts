@@ -27,3 +27,6 @@ export { markCompleted } from './mark_completed.js';
 
 export { markProcessingFailed, ProcessingFailure } from './mark_processing_failed.js';
 export type { MarkProcessingFailedContext } from './mark_processing_failed.js';
+
+export { reconcileStaleRunning } from './reconcile_stale_running.js';
+export type { ReconcileStaleRunningInput } from './reconcile_stale_running.js';
