@@ -33,3 +33,13 @@ export type { ReconcileStaleRunningInput } from './reconcile_stale_running.js';
 
 export { markCoreCommitted } from './mark_core_committed.js';
 export type { MarkCoreCommittedContext } from './mark_core_committed.js';
+
+export { handleCoreIdentityConflict, PROCESSING_FAILED_EVENT } from './async_conflict_handler.js';
+
+export type {
+  AsyncConflictPorts,
+  AsyncConflictInput,
+  AsyncConflictResult,
+  ProcessingFailedEvent,
+  ProcessingFailedPublisherPort,
+} from './async_conflict_handler.js';
