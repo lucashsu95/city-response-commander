@@ -57,6 +57,16 @@ export {
   type ReportComposeFailed,
 } from './report_composer.js';
 
+// ─── Public Alert Composer (TASK-114) ────────────────────
+export {
+  composePublicAlert,
+  resolveLanguages,
+  type PublicAlertComposerInput,
+  type PublicAlertComposeResult,
+  type PublicAlertComposeSuccess,
+  type PublicAlertComposeFailed,
+} from './public_alert_composer.js';
+
 // ─── Narrative Writer (TASK-116) ──────────────────────────
 export {
   putNarrative,

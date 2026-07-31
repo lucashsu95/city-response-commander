@@ -82,10 +82,16 @@ export interface ValidatedPayload {
   readonly outcome: 'accepted';
   /**
    * 僅含白名單內欄位的 payload（多餘 key 已 strip）。
-   * 所有值均為 string，符合 spec「text-only payload」要求（§10.11b）。
-   * 非 string 值在驗證階段會被拒絕（outcome: use_template）。
+   * REPORT / EXPLANATION：所有值均為 string。
+   * PUBLIC_ALERT：`fields.public_alert_text` 為 undefined，改用 `alertTextMap`。
    */
   readonly fields: Readonly<Record<string, string>>;
+  /**
+   * 僅 `PUBLIC_ALERT` narrative_type 有值：
+   * Bedrock 回傳的語言 map（`{zh: "...", en: "...", ...}`），每個 value 已確認為 string。
+   * REPORT / EXPLANATION 此欄位為 undefined。
+   */
+  readonly alertTextMap?: Readonly<Record<string, string>>;
 }
 
 /** SchemaValidator 驗證失敗，呼叫端必須使用 template fallback */
@@ -99,11 +105,12 @@ export interface RejectedPayload {
 
 /** 拒絕原因 */
 export type RejectionReason =
-  | 'prohibited_field_overwrite' // payload 含 LLM-prohibited core field
-  | 'non_whitelisted_field'       // payload 含該 narrative_type 白名單外的欄位
-  | 'non_string_value'            // 白名單內欄位的值不是 string（spec: text-only）
-  | 'invalid_narrative_type'      // 傳入未知的 narrative_type
-  | 'not_a_plain_object';         // payload 不是純物件（無法安全遍歷）
+  | 'prohibited_field_overwrite'      // payload 含 LLM-prohibited core field
+  | 'non_whitelisted_field'           // payload 含該 narrative_type 白名單外的欄位
+  | 'non_string_value'                // 白名單內欄位的值不是 string（REPORT / EXPLANATION）
+  | 'public_alert_text_map_invalid'   // PUBLIC_ALERT 的 public_alert_text 不是合法語言 map
+  | 'invalid_narrative_type'          // 傳入未知的 narrative_type
+  | 'not_a_plain_object';             // payload 不是純物件（無法安全遍歷）
 
 export type ValidationResult = ValidatedPayload | RejectedPayload;
 
@@ -176,7 +183,14 @@ export function validateBedrockPayload(
     };
   }
 
-  // 5. 驗證所有白名單欄位的值必須是 string（spec: text-only payload）
+  // 5. PUBLIC_ALERT 的 public_alert_text 需要專屬的語言 map 驗證
+  //    其值為 Partial<Record<Language, string>>（物件，非純字串）。
+  //    其他 narrative_type（REPORT / EXPLANATION）的白名單欄位值均須為 string。
+  if (narrativeType === NarrativeType.PUBLIC_ALERT) {
+    return validatePublicAlertPayload(rawPayload);
+  }
+
+  // 5b. REPORT / EXPLANATION：所有白名單欄位的值必須是 string
   const nonStringFields = keys.filter(
     (k) => allowedFields.has(k) && typeof rawPayload[k] !== 'string',
   );
@@ -200,6 +214,51 @@ export function validateBedrockPayload(
 }
 
 // ─── Internal helpers ──────────────────────────────────────────────────────
+
+/**
+ * PUBLIC_ALERT 專屬驗證：`public_alert_text` 值為語言 map（物件）。
+ *
+ * Bedrock 應回傳：`{"public_alert_text": {"zh": "...", "en": "..."}}`
+ * 此函式確保：
+ * - `public_alert_text` 存在
+ * - 其值為純物件
+ * - 物件的每個 value 都是非空 string
+ * - 通過時回傳 `alertTextMap`（不放入通用 `fields`，避免型別混淆）
+ */
+function validatePublicAlertPayload(
+  rawPayload: Record<string, unknown>,
+): ValidationResult {
+  const alertText = rawPayload['public_alert_text'];
+
+  if (!isPlainObject(alertText)) {
+    return {
+      outcome: 'use_template',
+      reason: 'public_alert_text_map_invalid',
+      offendingFields: ['public_alert_text'],
+    };
+  }
+
+  // 每個語言 value 必須是非空 string
+  const alertMap = alertText as Record<string, unknown>;
+  const invalidValues = Object.keys(alertMap).filter(
+    (k) => typeof alertMap[k] !== 'string' || (alertMap[k] as string).trim() === '',
+  );
+  if (invalidValues.length > 0) {
+    return {
+      outcome: 'use_template',
+      reason: 'public_alert_text_map_invalid',
+      offendingFields: ['public_alert_text'],
+    };
+  }
+
+  // 通過：alertTextMap 獨立回傳，fields 為空（PUBLIC_ALERT 無其他 string 欄位）
+  const cleanMap: Record<string, string> = {};
+  for (const k of Object.keys(alertMap)) {
+    cleanMap[k] = alertMap[k] as string;
+  }
+
+  return { outcome: 'accepted', fields: {}, alertTextMap: cleanMap };
+}
 
 /**
  * 嚴格純物件判斷：排除 null、Array、Date 等特殊 object，
