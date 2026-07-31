@@ -22,13 +22,17 @@ import { PublishStatus } from '@city-commander/shared-schemas';
 // channels 模組必須在 import publish_fn 之前 mock，才能攔截其具名匯出
 vi.mock('../../src/publish/channels.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../src/publish/channels.js')>();
-  return { ...actual, evaluateChannelOutcome: vi.fn(actual.evaluateChannelOutcome) };
+  return {
+    ...actual,
+    dispatchChannels: vi.fn(actual.dispatchChannels),
+    evaluateChannelOutcome: vi.fn(actual.evaluateChannelOutcome),
+  };
 });
 
 import { createPublishHandler } from '../../src/publish/publish_fn.js';
 import { applyPublishTransition } from '../../src/publish/publish_state_machine.js';
 import { appendAuditEntry, validateAuditTrailIntegrity } from '../../src/publish/audit_trail.js';
-import { evaluateChannelOutcome } from '../../src/publish/channels.js';
+import { dispatchChannels, evaluateChannelOutcome } from '../../src/publish/channels.js';
 import { createPublishRecordStoreStub } from './publish_store_stub.js';
 
 // ─── Fixtures ─────────────────────────────────────────────────────────────────
@@ -72,7 +76,7 @@ function approvedRecord(): PublishRecord {
  * 以 in-memory store 建立 handler，writePublishRecord 走真正的 state machine
  * （轉移合法性 + 樂觀鎖語意都會被實際檢查）。
  */
-function makeHandler(seed: PublishRecord | null) {
+function makeHandler(seed: PublishRecord | null, overrides: Record<string, unknown> = {}) {
   const store = createPublishRecordStoreStub();
   if (seed !== null) {
     // 直接以首次 Put 塞入種子 record（version 依 seed 為準）
@@ -85,6 +89,7 @@ function makeHandler(seed: PublishRecord | null) {
     readCmsCoreText: async () => '忠孝東路封閉，請改道 光復南路，預計延誤 78.6 分鐘',
     writePublishRecord: (record, expectedVersion) =>
       applyPublishTransition(store, record, expectedVersion),
+    ...overrides,
   });
 
   return { handler, store };
@@ -94,7 +99,26 @@ function makeHandler(seed: PublishRecord | null) {
 
 describe('PublishFn — channel 失敗時的 publish_failed 轉移', () => {
   beforeEach(() => {
+    vi.mocked(dispatchChannels).mockClear();
     vi.mocked(evaluateChannelOutcome).mockReset();
+  });
+
+  it('published 派送時轉交多語 PublicAlert 給通道', async () => {
+    vi.mocked(evaluateChannelOutcome).mockReturnValue({ failed: false });
+    const publicAlertText = {
+      zh: '繁中通報：忠孝東路封閉',
+      en: 'Alert: Zhongxiao East Road is closed',
+    };
+    const { handler } = makeHandler(approvedRecord(), {
+      readPublicAlertText: async () => publicAlertText,
+    });
+
+    const result = await handler(makeEvent({ target_state: 'published' }));
+
+    expect((result as { statusCode: number }).statusCode).toBe(200);
+    expect(dispatchChannels).toHaveBeenCalledWith(
+      expect.objectContaining({ publicAlertText }),
+    );
   });
 
   it('channel 失敗 → publish_failed 實際寫入，且稽核軌跡完整', async () => {

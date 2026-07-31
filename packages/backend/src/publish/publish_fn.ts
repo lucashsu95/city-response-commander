@@ -71,6 +71,13 @@ export interface PublishFnDependencies {
   readonly readCmsCoreText: (decisionId: string) => Promise<string | null>;
 
   /**
+   * 讀取 DecisionNarrative 的多語 PublicAlert 文字（選配，供通道派送）。
+   */
+  readonly readPublicAlertText?: (
+    decisionId: string,
+  ) => Promise<Partial<Record<string, string>> | null>;
+
+  /**
    * 寫入（新建或更新）PublishRecord。
    * 委派實作 publish state machine（TASK-145 的邏輯）。
    *
@@ -303,7 +310,14 @@ function emitStatusChanged(
 export function createPublishHandler(
   deps: PublishFnDependencies,
 ): (event: APIGatewayProxyEventV2) => Promise<APIGatewayProxyResultV2> {
-  const { readDecisionCoreStatus, readPublishRecord, readCmsCoreText, writePublishRecord, realtimePublisher } = deps;
+  const {
+    readDecisionCoreStatus,
+    readPublishRecord,
+    readCmsCoreText,
+    readPublicAlertText,
+    writePublishRecord,
+    realtimePublisher,
+  } = deps;
 
   return async function publishHandler(
     event: APIGatewayProxyEventV2,
@@ -438,9 +452,13 @@ export function createPublishHandler(
 
       if (shouldDispatchChannels) {
         const cmsCoreText = await readCmsCoreText(decisionId) ?? '';
+        const publicAlertText = readPublicAlertText
+          ? (await readPublicAlertText(decisionId)) ?? undefined
+          : undefined;
         const channelResult = dispatchChannels({
           record: newRecord,
           cmsCoreText,
+          publicAlertText,
         });
 
         const outcome = evaluateChannelOutcome(channelResult, false);
