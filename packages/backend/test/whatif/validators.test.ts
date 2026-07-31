@@ -10,7 +10,14 @@
  * - User_Count 非整數 → clarification_required
  * - 歧義（同 entity+field 重複）→ clarification_required
  * - 空 assumptions → clarification_required
- * - P35 property test（100 runs）：任何含非法前綴/field/範圍的 assumption → clarification_required
+ * - P35 property tests（各 100 runs）
+ *
+ * Property 編號說明（§22.1）：
+ * 本檔的 property 全部屬於 **P35「What-if 4 階段含糊即澄清（不猜測）」**，
+ * 以 35 / 35b / 35c 區分不同的失敗成因（範圍 / 型別不匹配 / 歧義）。
+ * 早期版本誤標為 P36、P37 —— 那兩條各自是
+ * 「多語 Bedrock 失敗不退化為僅中文」與「CMS 核心文字與說明文字之權限分離」，
+ * 與 What-if 驗證無關。P1..P37 的編號歸屬屬於成員 1，此處只做對齊。
  */
 
 import * as fc from 'fast-check';
@@ -266,7 +273,7 @@ describe('P35: invalid or ambiguous assumptions → clarification_required', () 
   );
 
   it(
-    'Feature: city-response-commander, Property 36: entity/field mismatch always produces clarification_required',
+    'Feature: city-response-commander, Property 35b: entity/field mismatch always produces clarification_required',
     () => {
       fc.assert(
         fc.property(
@@ -285,7 +292,7 @@ describe('P35: invalid or ambiguous assumptions → clarification_required', () 
   );
 
   it(
-    'Feature: city-response-commander, Property 37: duplicate entity+field always produces clarification_required',
+    'Feature: city-response-commander, Property 35c: duplicate entity+field (ambiguity) always produces clarification_required',
     () => {
       fc.assert(
         fc.property(

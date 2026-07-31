@@ -291,14 +291,13 @@ function emitStatusChanged(
  * @returns Lambda handler function
  *
  * @example
- * // 生產 Lambda 進入點
- * export const handler = createPublishHandler({ ... });
- *
- * // 測試
+ * // 測試（stub 依賴，完全不觸碰 DynamoDB）
  * const handler = createPublishHandler({
- *   readDecisionCoreStatus: async (id) => ({ exists: true, core_committed: true }),
+ *   readDecisionCoreStatus: async () => ({ exists: true, core_committed: true }),
  *   readPublishRecord: async () => null,
- *   writePublishRecord: async (r) => ({ success: true, record: r }),
+ *   readCmsCoreText: async () => '忠孝東路封閉，請改道 光復南路',
+ *   writePublishRecord: async (record) => ({ success: true, record }),
+ *   // realtimePublisher 為選配；未注入時不推送 WebSocket 事件
  * });
  */
 export function createPublishHandler(

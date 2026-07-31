@@ -179,7 +179,7 @@ describe('P35: invalid/ambiguous assumptions always clarification_required (neve
   );
 
   it(
-    'Feature: city-response-commander, Property 36: entity/field mismatch always → clarification_required, stage 3 不執行',
+    'Feature: city-response-commander, Property 35b: entity/field mismatch always → clarification_required, stage 3 不執行',
     () => {
       fc.assert(
         fc.property(
@@ -202,7 +202,7 @@ describe('P35: invalid/ambiguous assumptions always clarification_required (neve
   );
 
   it(
-    'Feature: city-response-commander, Property 37: duplicate entity+field (ambiguity) → clarification_required, stage 3 不執行',
+    'Feature: city-response-commander, Property 35c: duplicate entity+field (ambiguity) → clarification_required, stage 3 不執行',
     () => {
       fc.assert(
         fc.property(
