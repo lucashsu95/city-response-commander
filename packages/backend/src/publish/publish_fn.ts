@@ -443,7 +443,7 @@ export function createPublishHandler(
           cmsCoreText,
         });
 
-        const outcome = evaluateChannelOutcome(channelResult);
+        const outcome = evaluateChannelOutcome(channelResult, false);
         if (outcome.failed) {
           // channel 整體失敗 → 本次轉移的目標改為 publish_failed（spec §10.17、TASK-146）。
           //

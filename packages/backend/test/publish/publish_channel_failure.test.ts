@@ -108,6 +108,8 @@ describe('PublishFn — channel 失敗時的 publish_failed 轉移', () => {
 
     const result = await handler(makeEvent({ target_state: 'published' }));
 
+    expect(evaluateChannelOutcome).toHaveBeenCalledWith(expect.anything(), false);
+
     // HTTP 層如實回報失敗
     expect(typeof result === 'object' && result !== null && 'statusCode' in result).toBe(true);
     const response = result as { statusCode: number; body: string };
