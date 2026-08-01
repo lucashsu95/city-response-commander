@@ -17,53 +17,15 @@
  * @module rag/schema_validator
  */
 
-import { NarrativeType } from '@city-commander/shared-schemas';
+import { LLM_PROHIBITED_FIELDS, NarrativeType } from '@city-commander/shared-schemas';
 
-// ─── LLM-prohibited core fields（與 eslint-local-rules.cjs 同步）─────────────
+// ─── LLM-prohibited core fields ─────────────────────────────────────────────
 //
-// ⚠️  MAINTENANCE NOTE — Divergent Change risk:
-//     這份清單必須與 eslint-local-rules.cjs 的 LLM_PROHIBITED_FIELDS 保持一致。
-//     當 DecisionCore 新增或移除欄位時，兩處都需同步更新。
-//     長期修復方向：由 @city-commander/shared-schemas 匯出 canonical list，
-//     讓 eslint-local-rules.cjs 和此檔案共同引用同一份來源。
-//
-//     ⚠️  BOUNDARY NOTE：不能由本檔案直接 import eslint-local-rules.cjs 來源代替——
-//     該檔案是 repo 根目錄的 lint-time CJS 設定，不屬於任何 package 的
-//     build/rootDir，執行期 import 會有 dist 佈局與 Lambda 打包風險。
-//     正確做法是把 canonical list 遷移進 packages/shared-schemas/，但該目錄
-//     依 docs/team-roles.md 的 CODEOWNERS 為成員 1 專屬區域，「修改共用
-//     Schema：成員 1 必須核准」——此遷移待與成員 1 協調後再執行，
-//     本檔案暫不單方面遷移。
-//
-// 來源：eslint-local-rules.cjs → LLM_PROHIBITED_FIELDS（§9 boundary）
-const LLM_PROHIBITED_FIELDS = new Set<string>([
-  'decision_id',
-  'idempotency_key',
-  'core_hash',
-  'source_manifest_hash',
-  'immutable_after_commit',
-  'event_id',
-  'occurred_at',
-  'event_facts',
-  'triggered_articles',
-  'applied_formula_articles',
-  'invoked_procedures',
-  'art1_measures',
-  'classifications',
-  'incident_anchor',
-  'primary_evacuation',
-  'secondary_evacuation',
-  'excluded_candidates',
-  'affected_intersection_scope',
-  'ete',
-  'multilingual_required',
-  'multilingual_scope',
-  'evidence',
-  'policy',
-  'cms_core_text',
-  'provisional',
-  'schema_version',
-]);
+// Canonical source: @city-commander/shared-schemas (packages/shared-schemas/src/llm_boundary.ts).
+// `eslint-local-rules.cjs` (repo-root lint-time CJS, outside any package's build
+// output) keeps its own literal copy since it can't import this ESM package at
+// lint time; `eslint-local-rules/test/prohibited-fields-sync.test.ts` asserts
+// the two stay identical.
 
 // ─── 白名單 per narrative_type ─────────────────────────────────────────────
 //

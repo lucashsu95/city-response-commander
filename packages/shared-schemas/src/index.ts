@@ -58,6 +58,9 @@ export type {
   AffectedIntersectionScope,
 } from './decision_core.js';
 
+// ─── LLM Boundary (§9) ──────────────────────────────────────
+export { LLM_PROHIBITED_FIELDS } from './llm_boundary.js';
+
 // ─── Decision Narrative (§10.11b) ──────────────────────────
 export type {
   DecisionNarrative,
