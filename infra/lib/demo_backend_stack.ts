@@ -161,6 +161,8 @@ export class DemoBackendStack extends Stack {
         // /what-if. This setting is only used by the demo Lambda; the
         // production stack does not set it.
         DEMO_PUBLIC_WHATIF: 'true',
+        // Bypass source manifest hash verification in demo mode since S3 data is trusted.
+        DEMO_SKIP_HASH_VERIFICATION: 'true',
         AWS_NODEJS_CONNECTION_REUSE_ENABLED: '1',
       },
     });
