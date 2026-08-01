@@ -28,6 +28,8 @@ import {
   InsufficientDataState,
   LoadingIndicator,
 } from '../components/system/async_state.js';
+import { CometSpinner } from '../components/loading/comet_spinner.js';
+import { useI18n } from '../i18n/index.js';
 import { formatTimelineTimestamp } from '../timeline/timeline_model.js';
 import type { CrowdPolicyView, CrowdStationRow, MultilingualScopeSummary } from './crowd_model.js';
 import type { CrowdSnapshotState } from './use_crowd_snapshot.js';
@@ -322,12 +324,13 @@ export interface CrowdPanelProps {
  * existing content, which is never removed.
  */
 export function CrowdPanel({ snapshot, onRetry }: CrowdPanelProps): ReactNode {
+  const { t } = useI18n();
   const { state, error } = snapshot;
 
   if (state === 'idle' || state === 'loading') {
     return (
       <div className="crowd-panel">
-        <LoadingIndicator label="載入基地台人流中" />
+        <LoadingIndicator label={t('crowd.loading')} />
       </div>
     );
   }
@@ -336,10 +339,10 @@ export function CrowdPanel({ snapshot, onRetry }: CrowdPanelProps): ReactNode {
     return (
       <div className="crowd-panel">
         <ErrorState
-          message={error === null ? '基地台人流讀取失敗' : `基地台人流讀取失敗：${error.message}`}
+          message={error === null ? t('crowd.errorFallback') : `${t('crowd.errorFallback')}：${error.message}`}
         />
         <button type="button" className="crowd-panel__retry" onClick={onRetry}>
-          重試
+          {t('action.retry')}
         </button>
       </div>
     );
@@ -347,12 +350,18 @@ export function CrowdPanel({ snapshot, onRetry }: CrowdPanelProps): ReactNode {
 
   return (
     <div className="crowd-panel">
-      <h3 className="crowd-panel__heading">基地台人流與信令</h3>
+      <h3 className="crowd-panel__heading">{t('crowd.heading')}</h3>
 
-      <div className="crowd-panel__status" role="status" aria-live="polite">
-        {snapshot.refreshStatus === 'refreshing' ? '背景更新中…' : null}
+      <div
+        className="crowd-panel__status"
+        role={snapshot.refreshStatus === 'refreshing' ? undefined : 'status'}
+        aria-live="polite"
+      >
+        {snapshot.refreshStatus === 'refreshing' ? (
+          <CometSpinner className="loading-spinner--inline" label={t('crowd.refreshing')} />
+        ) : null}
         {snapshot.refreshStatus === 'idle' && error !== null
-          ? `背景更新失敗：${error.message}（顯示上次成功的快照）`
+          ? t('async.backgroundError', { message: error.message })
           : null}
       </div>
 
@@ -379,7 +388,7 @@ export function CrowdPanel({ snapshot, onRetry }: CrowdPanelProps): ReactNode {
         />
       ) : null}
 
-      {state === 'empty' ? <EmptyState message="目前重播位置沒有可用的基地台觀測" /> : null}
+      {state === 'empty' ? <EmptyState message={t('crowd.empty')} /> : null}
 
       {state === 'ready' ? <StationTable stations={snapshot.stations} /> : null}
 

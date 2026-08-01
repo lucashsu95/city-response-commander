@@ -38,6 +38,8 @@ import {
   InsufficientDataState,
   LoadingIndicator,
 } from '../components/system/async_state.js';
+import { CometSpinner } from '../components/loading/comet_spinner.js';
+import { useI18n } from '../i18n/index.js';
 import {
   DataContractWarning,
   DeterministicBadge,
@@ -503,12 +505,13 @@ export interface EtePanelProps {
  * - a malformed `ete` block → a data-contract error, never a blank basis
  */
 export function EtePanel({ decision, ete, roleEvidence, onRetry }: EtePanelProps): ReactNode {
+  const { t } = useI18n();
   const { state, error, core } = decision;
 
   if (state === 'idle') {
     return (
       <div className="ete-panel">
-        <EmptyState message="尚未有決策可顯示 ETE（等待事件注入或即時事件）" />
+        <EmptyState message={t('ete.idle')} />
       </div>
     );
   }
@@ -516,7 +519,7 @@ export function EtePanel({ decision, ete, roleEvidence, onRetry }: EtePanelProps
   if (state === 'loading') {
     return (
       <div className="ete-panel">
-        <LoadingIndicator label="載入 ETE 計算依據中" />
+        <LoadingIndicator label={t('ete.loading')} />
       </div>
     );
   }
@@ -524,9 +527,9 @@ export function EtePanel({ decision, ete, roleEvidence, onRetry }: EtePanelProps
   if (state === 'error') {
     return (
       <div className="ete-panel">
-        <ErrorState message={error === null ? 'ETE 讀取失敗' : `ETE 讀取失敗：${error.message}`} />
+        <ErrorState message={error === null ? t('ete.errorFallback') : `${t('ete.errorFallback')}：${error.message}`} />
         <button type="button" className="ete-panel__retry" onClick={onRetry}>
-          重試
+          {t('action.retry')}
         </button>
       </div>
     );
@@ -535,7 +538,7 @@ export function EtePanel({ decision, ete, roleEvidence, onRetry }: EtePanelProps
   if (state === 'insufficient_data' || core === null) {
     return (
       <div className="ete-panel">
-        <h3 className="ete-panel__heading">預計恢復時間 ETE（SOP 第 7 條）</h3>
+        <h3 className="ete-panel__heading">{t('ete.heading')}</h3>
         <InsufficientDataState message="尚無已提交的決策核心，不顯示任何 ETE 或計算依據" />
       </div>
     );
@@ -543,12 +546,18 @@ export function EtePanel({ decision, ete, roleEvidence, onRetry }: EtePanelProps
 
   return (
     <div className="ete-panel">
-      <h3 className="ete-panel__heading">預計恢復時間 ETE（SOP 第 7 條）</h3>
+      <h3 className="ete-panel__heading">{t('ete.heading')}</h3>
 
-      <div className="ete-panel__status" role="status" aria-live="polite">
-        {decision.refreshStatus === 'refreshing' ? '背景更新中…' : null}
+      <div
+        className="ete-panel__status"
+        role={decision.refreshStatus === 'refreshing' ? undefined : 'status'}
+        aria-live="polite"
+      >
+        {decision.refreshStatus === 'refreshing' ? (
+          <CometSpinner className="loading-spinner--inline" label={t('ete.refreshing')} />
+        ) : null}
         {decision.refreshStatus === 'idle' && error !== null
-          ? `背景更新失敗：${error.message}（資料可能過時，顯示上次成功的讀取結果）`
+          ? t('async.dataMayBeStale', { message: error.message })
           : null}
       </div>
 

@@ -22,13 +22,9 @@
 
 import { useCallback, useState, type FormEvent, type ReactNode } from 'react';
 import type { WhatIfResponse } from '@city-commander/shared-schemas';
+import { ErrorState } from '../components/system/async_state.js';
+import { TripleDotSpinner } from '../components/loading/triple_dot_spinner.js';
 import {
-  EmptyState,
-  ErrorState,
-  LoadingIndicator,
-} from '../components/system/async_state.js';
-import {
-  DataContractWarning,
   FieldList,
   FieldRow,
   NOT_SUPPLIED,
@@ -36,6 +32,7 @@ import {
   textOrUnavailable,
 } from '../decision/decision_display.js';
 import type { ApiClient } from '../api/client.js';
+import { useI18n } from '../i18n/index.js';
 
 type WhatIfPhase = 'input' | 'confirming' | 'submitting' | 'answered' | 'clarification' | 'error';
 
@@ -93,6 +90,7 @@ function decodeWhatIfResponse(
 }
 
 export function WhatIfDialog({ client }: WhatIfDialogProps): ReactNode {
+  const { t } = useI18n();
   const [queryInput, setQueryInput] = useState('');
   const [phase, setPhase] = useState<WhatIfPhase>('input');
   const [pendingQuery, setPendingQuery] = useState<string | null>(null);
@@ -155,7 +153,7 @@ export function WhatIfDialog({ client }: WhatIfDialogProps): ReactNode {
 
   return (
     <div className="whatif-dialog" data-testid="whatif-dialog">
-      <h3 className="whatif-dialog__heading">What-if 假設情境模擬</h3>
+      <h3 className="whatif-dialog__heading">{t('whatif.heading')}</h3>
 
       <p className="whatif-dialog__note" data-testid="whatif-mutate-state-notice">
         本功能<strong>不會</strong>變更任何決策核心、執行狀態或持久化資料（
@@ -187,7 +185,7 @@ export function WhatIfDialog({ client }: WhatIfDialogProps): ReactNode {
             data-testid="whatif-submit-button"
             disabled={normalizeQuery(queryInput) === null}
           >
-            準備詢問…
+            {t('whatif.submit')}
           </button>
         </form>
       ) : null}
@@ -211,7 +209,7 @@ export function WhatIfDialog({ client }: WhatIfDialogProps): ReactNode {
             onClick={confirmAndSubmit}
             data-testid="whatif-confirm-button"
           >
-            確認詢問
+            {t('whatif.confirmYes')}
           </button>
           <button
             type="button"
@@ -219,13 +217,15 @@ export function WhatIfDialog({ client }: WhatIfDialogProps): ReactNode {
             onClick={cancelConfirmation}
             data-testid="whatif-cancel-button"
           >
-            取消
+            {t('whatif.confirmNo')}
           </button>
         </div>
       ) : null}
 
       {phase === 'submitting' ? (
-        <LoadingIndicator label="What-if 計算中" />
+        <div className="async-state async-state--loading">
+          <TripleDotSpinner label={t('whatif.loading')} />
+        </div>
       ) : null}
 
       {phase === 'error' ? (
@@ -237,7 +237,7 @@ export function WhatIfDialog({ client }: WhatIfDialogProps): ReactNode {
             onClick={startOver}
             data-testid="whatif-reset-button"
           >
-            重新輸入
+            {t('whatif.reset')}
           </button>
         </div>
       ) : null}
@@ -264,7 +264,7 @@ export function WhatIfDialog({ client }: WhatIfDialogProps): ReactNode {
             onClick={startOver}
             data-testid="whatif-reset-button"
           >
-            重新輸入
+            {t('whatif.reset')}
           </button>
         </div>
       ) : null}
@@ -353,7 +353,7 @@ export function WhatIfDialog({ client }: WhatIfDialogProps): ReactNode {
             onClick={startOver}
             data-testid="whatif-reset-button"
           >
-            啟動新的假設情境
+            {t('whatif.restart')}
           </button>
         </div>
       ) : null}

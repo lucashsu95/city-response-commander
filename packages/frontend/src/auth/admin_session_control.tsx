@@ -34,6 +34,7 @@
 import { useCallback, useState, type FormEvent, type ReactNode } from 'react';
 import { hasAdminToken } from './admin_session.js';
 import type { AdminToken } from './admin_session.js';
+import { useI18n } from '../i18n/index.js';
 
 export interface AdminSessionControlProps {
   /** Current in-memory admin token, or `null` when none is held. */
@@ -62,6 +63,7 @@ export function AdminSessionControl({
   adminToken,
   onAdminTokenChange,
 }: AdminSessionControlProps): ReactNode {
+  const { t } = useI18n();
   const [draft, setDraft] = useState('');
   const loaded = hasAdminToken(adminToken);
 
@@ -82,7 +84,7 @@ export function AdminSessionControl({
 
   return (
     <div className="admin-session-control" data-testid="admin-session-control">
-      <h3 className="admin-session-control__heading">管理員憑證</h3>
+      <h3 className="admin-session-control__heading">{t('admin.heading')}</h3>
       <p className="admin-session-control__note">
         請貼上由 Cognito admin 帳號取得的 JWT。憑證只保留於目前頁面記憶體，重新整理或清除後即消失。
       </p>
@@ -92,7 +94,7 @@ export function AdminSessionControl({
         aria-live="polite"
         data-testid="admin-session-status"
       >
-        {loaded ? '目前狀態：已載入憑證' : '目前狀態：尚未載入憑證'}
+        {loaded ? t('admin.statusLoaded') : t('admin.statusEmpty')}
       </p>
 
       <form
@@ -120,7 +122,7 @@ export function AdminSessionControl({
             data-testid="admin-session-load-button"
             disabled={normalizedToken(draft) === null}
           >
-            載入憑證
+            {t('admin.loadButton')}
           </button>
           <button
             type="button"
@@ -129,7 +131,7 @@ export function AdminSessionControl({
             data-testid="admin-session-clear-button"
             disabled={!loaded && draft === ''}
           >
-            清除管理員憑證
+            {t('admin.clearButton')}
           </button>
         </div>
       </form>

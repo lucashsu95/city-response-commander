@@ -13,7 +13,9 @@ describe('DashboardShell', () => {
     render(<DashboardShell />);
 
     expect(screen.getByRole('banner')).toBeInTheDocument();
-    expect(screen.getByText('城市交通應變 AI 指揮台')).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: 'CHT City Response Commander｜城市應變指揮中心' }),
+    ).toBeInTheDocument();
   });
 
   it('renders four dashboard regions', () => {
@@ -59,7 +61,7 @@ describe('DashboardShell', () => {
     render(<DashboardShell />);
 
     expect(screen.getByRole('contentinfo')).toBeInTheDocument();
-    expect(screen.getByText('City Response Commander')).toBeInTheDocument();
+    expect(screen.getAllByText('CHT City Response Commander｜城市應變指揮中心')).toHaveLength(2);
   });
 
   it('renders operational status bar', () => {

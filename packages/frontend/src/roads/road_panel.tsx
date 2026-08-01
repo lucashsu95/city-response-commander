@@ -18,8 +18,10 @@
 
 import type { ReactNode } from 'react';
 import { ErrorState, LoadingIndicator } from '../components/system/async_state.js';
+import { CometSpinner } from '../components/loading/comet_spinner.js';
+import { useI18n } from '../i18n/index.js';
 import type { RoadSegmentView } from './road_model.js';
-import type { RoadControllerError, RoadTrafficState } from './use_road_traffic.js';
+import type { RoadTrafficState } from './use_road_traffic.js';
 
 // ─── Level → Visual Mapping ──────────────────────────────────
 
@@ -41,12 +43,6 @@ function levelToken(level: string | null): LevelToken {
   return 'level-neutral';
 }
 
-const LEVEL_TEXT: Record<LevelToken, string> = {
-  'level-a': 'A 級',
-  'level-b': 'B 級',
-  'level-neutral': '未分級',
-};
-
 const LEVEL_INDICATOR_CLASS: Record<LevelToken, string> = {
   'level-a': 'road-panel__level-dot--red',
   'level-b': 'road-panel__level-dot--yellow',
@@ -63,14 +59,21 @@ interface LevelIndicatorProps {
  * accessibility rule).
  */
 function LevelIndicator({ level }: LevelIndicatorProps): ReactNode {
+  const { t } = useI18n();
   const token = levelToken(level);
+  const label =
+    token === 'level-a'
+      ? t('roads.levelA')
+      : token === 'level-b'
+        ? t('roads.levelB')
+        : t('roads.levelNeutral');
   return (
     <span className="road-panel__level">
       <span
         className={`road-panel__level-dot ${LEVEL_INDICATOR_CLASS[token]}`}
         aria-hidden="true"
       />
-      <span className="road-panel__level-text">{LEVEL_TEXT[token]}</span>
+      <span className="road-panel__level-text">{label}</span>
     </span>
   );
 }
@@ -146,12 +149,6 @@ function SegmentRow({ segment }: SegmentRowProps): ReactNode {
   );
 }
 
-// ─── Error Message Mapping ────────────────────────────────────
-
-function errorMessage(error: RoadControllerError): string {
-  return `路段資料讀取失敗：${error.message}`;
-}
-
 // ─── Panel Props ──────────────────────────────────────────────
 
 export interface RoadPanelProps {
@@ -174,12 +171,13 @@ export interface RoadPanelProps {
  *   of the existing content, which is never removed
  */
 export function RoadPanel({ traffic, onRetry }: RoadPanelProps): ReactNode {
+  const { t } = useI18n();
   const { state, error } = traffic;
 
   if (state === 'idle' || state === 'loading') {
     return (
       <div className="road-panel">
-        <LoadingIndicator label="載入路段車流中" />
+        <LoadingIndicator label={t('roads.loading')} />
       </div>
     );
   }
@@ -187,9 +185,11 @@ export function RoadPanel({ traffic, onRetry }: RoadPanelProps): ReactNode {
   if (state === 'error') {
     return (
       <div className="road-panel">
-        <ErrorState message={error === null ? '路段車流讀取失敗' : errorMessage(error)} />
+        <ErrorState
+          message={error === null ? t('roads.errorFallback') : `${t('roads.errorFallback')}：${error.message}`}
+        />
         <button type="button" className="road-panel__retry" onClick={onRetry}>
-          重試
+          {t('action.retry')}
         </button>
       </div>
     );
@@ -205,23 +205,29 @@ export function RoadPanel({ traffic, onRetry }: RoadPanelProps): ReactNode {
 
   return (
     <div className="road-panel">
-      <h3 className="road-panel__heading">路段車流</h3>
+      <h3 className="road-panel__heading">{t('roads.heading')}</h3>
 
-      <div className="road-panel__status" role="status" aria-live="polite">
-        {traffic.refreshStatus === 'refreshing' ? '背景更新中…' : null}
+      <div
+        className="road-panel__status"
+        role={traffic.refreshStatus === 'refreshing' ? undefined : 'status'}
+        aria-live="polite"
+      >
+        {traffic.refreshStatus === 'refreshing' ? (
+          <CometSpinner className="loading-spinner--inline" label={t('roads.refreshing')} />
+        ) : null}
         {traffic.refreshStatus === 'idle' && traffic.error !== null
-          ? `背景更新失敗：${traffic.error.message}（顯示上次成功的路段資料）`
+          ? t('async.backgroundError', { message: traffic.error.message })
           : null}
       </div>
 
       {state === 'insufficient' ? (
         <p className="road-panel__insufficient" role="status">
-          資料不足，無法完整顯示路段車流（後端回報 insufficient_data）
+          {t('roads.insufficient')}
         </p>
       ) : null}
 
       {state === 'empty' ? (
-        <p className="road-panel__empty">目前無可顯示的路段資料</p>
+        <p className="road-panel__empty">{t('roads.empty')}</p>
       ) : null}
 
       {model !== null && model.segments.length > 0 ? (

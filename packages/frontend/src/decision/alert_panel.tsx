@@ -41,6 +41,7 @@ import {
   InsufficientDataState,
   LoadingIndicator,
 } from '../components/system/async_state.js';
+import { CometSpinner } from '../components/loading/comet_spinner.js';
 import {
   AiTextBadge,
   DeterministicBadge,
@@ -56,6 +57,7 @@ import {
 import type { DecisionCoreView, PublishRecordView } from './decision_read_model.js';
 import { buildPublicAlertTemplate, fallbackLanguageFloor } from './narrative_fallback.js';
 import type { DecisionReadModelState } from './use_decision_read_model.js';
+import { selectServerPublicAlertText, useI18n } from '../i18n/index.js';
 
 /** Display labels for the language codes the design names (§14.4). */
 const LANGUAGE_LABELS: Readonly<Record<string, string>> = {
@@ -112,9 +114,14 @@ export function buildAlertRows(
 
 // ─── Language Rows ───────────────────────────────────────────
 
-function AlertMessage({ row }: { readonly row: AlertRow }): ReactNode {
+function AlertMessage({ row, active }: { readonly row: AlertRow; readonly active: boolean }): ReactNode {
   return (
-    <li className="alert-panel__message" data-language={row.language} data-source={row.source}>
+    <li
+      className="alert-panel__message"
+      data-language={row.language}
+      data-source={row.source}
+      data-active-language={active ? 'true' : 'false'}
+    >
       <h5 className="alert-panel__message-heading">
         {languageLabel(row.language)}
         {row.source === 'backend' ? <AiTextBadge /> : <TemplateBadge />}
@@ -246,12 +253,13 @@ export interface AlertPanelProps {
  * - `ready` → deterministic facts with the committed AI text per language
  */
 export function AlertPanel({ decision, onRetry, onConfirmPublish }: AlertPanelProps): ReactNode {
+  const { locale, t } = useI18n();
   const { state, error, core } = decision;
 
   if (state === 'idle') {
     return (
       <div className="alert-panel">
-        <EmptyState message="尚未有決策可產出民眾簡訊（等待事件注入或即時事件）" />
+        <EmptyState message={t('alert.idle')} />
       </div>
     );
   }
@@ -259,7 +267,7 @@ export function AlertPanel({ decision, onRetry, onConfirmPublish }: AlertPanelPr
   if (state === 'loading') {
     return (
       <div className="alert-panel">
-        <LoadingIndicator label="載入多語民眾簡訊中" />
+        <LoadingIndicator label={t('alert.loading')} />
       </div>
     );
   }
@@ -268,10 +276,10 @@ export function AlertPanel({ decision, onRetry, onConfirmPublish }: AlertPanelPr
     return (
       <div className="alert-panel">
         <ErrorState
-          message={error === null ? '民眾簡訊讀取失敗' : `民眾簡訊讀取失敗：${error.message}`}
+          message={error === null ? t('alert.errorFallback') : `${t('alert.errorFallback')}：${error.message}`}
         />
         <button type="button" className="alert-panel__retry" onClick={onRetry}>
-          重試
+          {t('action.retry')}
         </button>
       </div>
     );
@@ -280,7 +288,7 @@ export function AlertPanel({ decision, onRetry, onConfirmPublish }: AlertPanelPr
   if (state === 'insufficient_data' || core === null) {
     return (
       <div className="alert-panel">
-        <h3 className="alert-panel__heading">多語民眾簡訊</h3>
+        <h3 className="alert-panel__heading">{t('alert.heading')}</h3>
         <InsufficientDataState message="尚無已提交的決策核心，不對外產出任何民眾簡訊" />
       </div>
     );
@@ -288,15 +296,22 @@ export function AlertPanel({ decision, onRetry, onConfirmPublish }: AlertPanelPr
 
   const suppliedTexts = decision.alert?.texts ?? [];
   const rows = buildAlertRows(core, suppliedTexts);
+  const selectedServerText = selectServerPublicAlertText(suppliedTexts, locale);
 
   return (
     <div className="alert-panel">
-      <h3 className="alert-panel__heading">多語民眾簡訊</h3>
+      <h3 className="alert-panel__heading">{t('alert.heading')}</h3>
 
-      <div className="alert-panel__status" role="status" aria-live="polite">
-        {decision.refreshStatus === 'refreshing' ? '背景更新中…' : null}
+      <div
+        className="alert-panel__status"
+        role={decision.refreshStatus === 'refreshing' ? undefined : 'status'}
+        aria-live="polite"
+      >
+        {decision.refreshStatus === 'refreshing' ? (
+          <CometSpinner className="loading-spinner--inline" label={t('alert.refreshing')} />
+        ) : null}
         {decision.refreshStatus === 'idle' && error !== null
-          ? `背景更新失敗：${error.message}（顯示上次成功的讀取結果）`
+          ? t('async.backgroundError', { message: error.message })
           : null}
       </div>
 
@@ -356,7 +371,13 @@ export function AlertPanel({ decision, onRetry, onConfirmPublish }: AlertPanelPr
         ) : (
           <ul className="alert-panel__messages">
             {rows.map((row) => (
-              <AlertMessage key={`${row.language}-${row.source}`} row={row} />
+              <AlertMessage
+                key={`${row.language}-${row.source}`}
+                row={row}
+                active={
+                  row.source === 'backend' && selectedServerText?.language === row.language
+                }
+              />
             ))}
           </ul>
         )}

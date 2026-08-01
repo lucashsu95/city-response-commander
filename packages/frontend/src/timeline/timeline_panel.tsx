@@ -15,6 +15,8 @@
 
 import type { ReactNode } from 'react';
 import { ErrorState, LoadingIndicator } from '../components/system/async_state.js';
+import { CometSpinner } from '../components/loading/comet_spinner.js';
+import { useI18n } from '../i18n/index.js';
 import { formatTimelineTimestamp } from './timeline_model.js';
 import type { TimelineControllerError, TimelinePlaybackState } from './use_timeline_playback.js';
 
@@ -30,9 +32,10 @@ interface TimestampTextProps {
  * unavailable label for `null`/malformed input. Never falls back to the
  * current clock and never repairs a malformed value.
  */
-function TimestampText({ value, unavailableLabel = '無法取得' }: TimestampTextProps): ReactNode {
+function TimestampText({ value, unavailableLabel }: TimestampTextProps): ReactNode {
+  const { t } = useI18n();
   const formatted = formatTimelineTimestamp(value);
-  return <>{formatted.ok ? formatted.text : unavailableLabel}</>;
+  return <>{formatted.ok ? formatted.text : (unavailableLabel ?? t('common.unavailable'))}</>;
 }
 
 // ─── HG-001 Timing Evidence ──────────────────────────────────
@@ -47,6 +50,7 @@ interface TimingEvidencePanelProps {
  * (unavailable) placeholder — never a calculation, never `Date.now()`.
  */
 function TimingEvidencePanel({ timing }: TimingEvidencePanelProps): ReactNode {
+  const { t } = useI18n();
   if (timing === null) {
     return null;
   }
@@ -54,7 +58,7 @@ function TimingEvidencePanel({ timing }: TimingEvidencePanelProps): ReactNode {
   return (
     <section className="timeline-panel__evidence" aria-labelledby="timeline-evidence-heading">
       <h3 id="timeline-evidence-heading" className="timeline-panel__evidence-heading">
-        HG-001 時間證據
+        {t('timeline.evidenceHeading')}
       </h3>
       <dl className="timeline-panel__evidence-list">
         <div className="timeline-panel__evidence-row">
@@ -98,8 +102,8 @@ function TimingEvidencePanel({ timing }: TimingEvidencePanelProps): ReactNode {
 
 // ─── Error Message Mapping ──────────────────────────────────
 
-function errorMessage(error: TimelineControllerError): string {
-  return `時間軸讀取失敗：${error.message}`;
+function errorMessage(error: TimelineControllerError, prefix: string): string {
+  return `${prefix}：${error.message}`;
 }
 
 // ─── Panel Props ─────────────────────────────────────────────
@@ -131,12 +135,13 @@ export function TimelinePanel({
   onPrevious,
   onNext,
 }: TimelinePanelProps): ReactNode {
+  const { t } = useI18n();
   const { state, error } = playback;
 
   if (state === 'idle' || state === 'loading') {
     return (
       <div className="timeline-panel">
-        <LoadingIndicator label="載入時間軸中" />
+        <LoadingIndicator label={t('timeline.loading')} />
       </div>
     );
   }
@@ -144,9 +149,11 @@ export function TimelinePanel({
   if (state === 'error') {
     return (
       <div className="timeline-panel">
-        <ErrorState message={error === null ? '時間軸讀取失敗' : errorMessage(error)} />
+        <ErrorState
+          message={error === null ? t('timeline.errorFallback') : errorMessage(error, t('timeline.errorFallback'))}
+        />
         <button type="button" className="timeline-panel__retry" onClick={onRetry}>
-          重試
+          {t('action.retry')}
         </button>
       </div>
     );
@@ -187,28 +194,34 @@ export function TimelinePanel({
 
   return (
     <div className="timeline-panel">
-      <h3 className="timeline-panel__heading">時間軸重播</h3>
+      <h3 className="timeline-panel__heading">{t('timeline.heading')}</h3>
 
-      <div className="timeline-panel__status" role="status" aria-live="polite">
-        {playback.refreshStatus === 'refreshing' ? '背景更新中…' : null}
+      <div
+        className="timeline-panel__status"
+        role={playback.refreshStatus === 'refreshing' ? undefined : 'status'}
+        aria-live="polite"
+      >
+        {playback.refreshStatus === 'refreshing' ? (
+          <CometSpinner className="loading-spinner--inline" label={t('timeline.refreshing')} />
+        ) : null}
         {playback.refreshStatus === 'idle' && playback.error !== null
-          ? `背景更新失敗：${playback.error.message}（顯示上次成功的時間軸）`
+          ? t('async.backgroundError', { message: playback.error.message })
           : null}
       </div>
 
       {isEmpty ? (
-        <p className="timeline-panel__empty">目前時間軸尚無可播放的時點</p>
+        <p className="timeline-panel__empty">{t('timeline.empty')}</p>
       ) : (
         <>
           <div className="timeline-panel__current" aria-live="polite">
-            <span className="timeline-panel__current-label">目前重播位置</span>
+            <span className="timeline-panel__current-label">{t('timeline.currentLabel')}</span>
             <span className="timeline-panel__current-value">
               <TimestampText value={playback.currentTimestamp} />
             </span>
             {currentPositionLabel !== null ? (
               <span
                 className="timeline-panel__position"
-                aria-label={`目前重播位置 ${currentPositionLabel}`}
+                aria-label={t('timeline.currentPositionAria', { position: currentPositionLabel })}
               >
                 {currentPositionLabel}
               </span>
@@ -221,13 +234,13 @@ export function TimelinePanel({
               className="timeline-panel__nav"
               onClick={onPrevious}
               disabled={atStart}
-              aria-label="上一個時點"
+              aria-label={t('timeline.previousAria')}
             >
-              上一個
+              {t('timeline.previous')}
             </button>
 
             <label className="timeline-panel__select-label" htmlFor="timeline-select">
-              選擇時點
+              {t('timeline.selectLabel')}
             </label>
             <select
               id="timeline-select"
@@ -247,20 +260,20 @@ export function TimelinePanel({
               className="timeline-panel__nav"
               onClick={onNext}
               disabled={atEnd}
-              aria-label="下一個時點"
+              aria-label={t('timeline.nextAria')}
             >
-              下一個
+              {t('timeline.next')}
             </button>
           </div>
 
           <p className="timeline-panel__selected">
-            已選時點：<TimestampText value={playback.selectedTimestamp} />
+            {t('timeline.selectedLabel')}<TimestampText value={playback.selectedTimestamp} />
             {selectedPositionLabel !== null ? (
               <span
                 className="timeline-panel__position timeline-panel__position--selected"
-                aria-label={`選擇位置 ${selectedPositionLabel}`}
+                aria-label={t('timeline.selectedPosition', { position: selectedPositionLabel })}
               >
-                選擇位置 {selectedPositionLabel}
+                {t('timeline.selectedPosition', { position: selectedPositionLabel })}
               </span>
             ) : null}
           </p>

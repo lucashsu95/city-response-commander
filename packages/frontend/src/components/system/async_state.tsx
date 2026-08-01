@@ -9,6 +9,8 @@
 
 import type { ReactNode } from 'react';
 import type { AsyncStatus } from '../../state/app_state.js';
+import { CometSpinner } from '../loading/comet_spinner.js';
+import { useI18n } from '../../i18n/index.js';
 
 // ─── Loading State ─────────────────────────────────────────
 
@@ -20,11 +22,13 @@ export interface LoadingIndicatorProps {
 /**
  * Loading indicator with accessible labeling.
  */
-export function LoadingIndicator({ label = '載入中' }: LoadingIndicatorProps): ReactNode {
+export function LoadingIndicator({ label }: LoadingIndicatorProps): ReactNode {
+  const { t } = useI18n();
+  const resolvedLabel = label ?? t('async.loading');
+
   return (
-    <div className="async-state async-state--loading" role="status" aria-live="polite">
-      <div className="async-state__spinner" aria-hidden="true" />
-      <span className="async-state__text">{label}</span>
+    <div className="async-state async-state--loading">
+      <CometSpinner label={resolvedLabel} />
     </div>
   );
 }

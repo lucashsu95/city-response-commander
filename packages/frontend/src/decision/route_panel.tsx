@@ -35,6 +35,8 @@ import {
   InsufficientDataState,
   LoadingIndicator,
 } from '../components/system/async_state.js';
+import { CometSpinner } from '../components/loading/comet_spinner.js';
+import { useI18n } from '../i18n/index.js';
 import {
   DataContractWarning,
   DeterministicBadge,
@@ -335,12 +337,13 @@ export interface RoutePanelProps {
  * - a malformed route block → a data-contract error, never an empty route list
  */
 export function RoutePanel({ decision, routes, onRetry }: RoutePanelProps): ReactNode {
+  const { t } = useI18n();
   const { state, error, core } = decision;
 
   if (state === 'idle') {
     return (
       <div className="route-panel">
-        <EmptyState message="尚未有決策可顯示疏散路徑（等待事件注入或即時事件）" />
+        <EmptyState message={t('route.idle')} />
       </div>
     );
   }
@@ -348,7 +351,7 @@ export function RoutePanel({ decision, routes, onRetry }: RoutePanelProps): Reac
   if (state === 'loading') {
     return (
       <div className="route-panel">
-        <LoadingIndicator label="載入疏散路徑決策中" />
+        <LoadingIndicator label={t('route.loading')} />
       </div>
     );
   }
@@ -357,10 +360,10 @@ export function RoutePanel({ decision, routes, onRetry }: RoutePanelProps): Reac
     return (
       <div className="route-panel">
         <ErrorState
-          message={error === null ? '疏散路徑讀取失敗' : `疏散路徑讀取失敗：${error.message}`}
+          message={error === null ? t('route.errorFallback') : `${t('route.errorFallback')}：${error.message}`}
         />
         <button type="button" className="route-panel__retry" onClick={onRetry}>
-          重試
+          {t('action.retry')}
         </button>
       </div>
     );
@@ -369,7 +372,7 @@ export function RoutePanel({ decision, routes, onRetry }: RoutePanelProps): Reac
   if (state === 'insufficient_data' || core === null) {
     return (
       <div className="route-panel">
-        <h3 className="route-panel__heading">疏散路徑與排除理由（SOP 第 2 條）</h3>
+        <h3 className="route-panel__heading">{t('route.heading')}</h3>
         <InsufficientDataState message="尚無已提交的決策核心，不顯示任何疏散路徑或候選排序" />
       </div>
     );
@@ -377,12 +380,18 @@ export function RoutePanel({ decision, routes, onRetry }: RoutePanelProps): Reac
 
   return (
     <div className="route-panel">
-      <h3 className="route-panel__heading">疏散路徑與排除理由（SOP 第 2 條）</h3>
+      <h3 className="route-panel__heading">{t('route.heading')}</h3>
 
-      <div className="route-panel__status" role="status" aria-live="polite">
-        {decision.refreshStatus === 'refreshing' ? '背景更新中…' : null}
+      <div
+        className="route-panel__status"
+        role={decision.refreshStatus === 'refreshing' ? undefined : 'status'}
+        aria-live="polite"
+      >
+        {decision.refreshStatus === 'refreshing' ? (
+          <CometSpinner className="loading-spinner--inline" label={t('route.refreshing')} />
+        ) : null}
         {decision.refreshStatus === 'idle' && error !== null
-          ? `背景更新失敗：${error.message}（資料可能過時，顯示上次成功的讀取結果）`
+          ? t('async.dataMayBeStale', { message: error.message })
           : null}
       </div>
 

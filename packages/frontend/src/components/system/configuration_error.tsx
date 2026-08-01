@@ -9,6 +9,7 @@
 
 import type { ReactNode } from 'react';
 import type { RuntimeConfigError } from '../../config/runtime_config.js';
+import { useI18n } from '../../i18n/index.js';
 
 export interface ConfigurationErrorScreenProps {
   /** Configuration validation errors */
@@ -20,6 +21,7 @@ export interface ConfigurationErrorScreenProps {
  * Renders instead of application when config validation fails.
  */
 export function ConfigurationErrorScreen({ errors }: ConfigurationErrorScreenProps): ReactNode {
+  const { t } = useI18n();
   return (
     <main
       className="config-error-screen"
@@ -29,15 +31,15 @@ export function ConfigurationErrorScreen({ errors }: ConfigurationErrorScreenPro
     >
       <div className="config-error-screen__content">
         <h1 id="config-error-title" className="config-error-screen__title">
-          應用程式設定錯誤
+          {t('configError.title')}
         </h1>
         <p className="config-error-screen__description">
-          無法啟動應用程式，因為缺少或無效的環境設定。請聯繫系統管理員。
+          {t('configError.description')}
         </p>
 
         <section aria-labelledby="error-list-title">
           <h2 id="error-list-title" className="config-error-screen__subtitle">
-            設定問題
+            {t('configError.subtitle')}
           </h2>
           <ul className="config-error-screen__error-list" role="list">
             {errors.map((error, index) => (

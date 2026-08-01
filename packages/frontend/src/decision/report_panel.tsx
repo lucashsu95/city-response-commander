@@ -34,6 +34,8 @@ import {
   InsufficientDataState,
   LoadingIndicator,
 } from '../components/system/async_state.js';
+import { CometSpinner } from '../components/loading/comet_spinner.js';
+import { useI18n } from '../i18n/index.js';
 import {
   AiTextBadge,
   DeterministicBadge,
@@ -384,12 +386,13 @@ export interface ReportPanelProps {
  * never removed.
  */
 export function ReportPanel({ decision, onRetry }: ReportPanelProps): ReactNode {
+  const { t } = useI18n();
   const { state, error, core } = decision;
 
   if (state === 'idle') {
     return (
       <div className="report-panel">
-        <EmptyState message="尚未有決策可產出建議書（等待事件注入或即時事件）" />
+        <EmptyState message={t('report.idle')} />
       </div>
     );
   }
@@ -397,7 +400,7 @@ export function ReportPanel({ decision, onRetry }: ReportPanelProps): ReactNode 
   if (state === 'loading') {
     return (
       <div className="report-panel">
-        <LoadingIndicator label="載入交控中心建議書中" />
+        <LoadingIndicator label={t('report.loading')} />
       </div>
     );
   }
@@ -406,10 +409,10 @@ export function ReportPanel({ decision, onRetry }: ReportPanelProps): ReactNode 
     return (
       <div className="report-panel">
         <ErrorState
-          message={error === null ? '建議書讀取失敗' : `建議書讀取失敗：${error.message}`}
+          message={error === null ? t('report.errorFallback') : `${t('report.errorFallback')}：${error.message}`}
         />
         <button type="button" className="report-panel__retry" onClick={onRetry}>
-          重試
+          {t('action.retry')}
         </button>
       </div>
     );
@@ -417,12 +420,18 @@ export function ReportPanel({ decision, onRetry }: ReportPanelProps): ReactNode 
 
   return (
     <div className="report-panel">
-      <h3 className="report-panel__heading">交控中心建議書</h3>
+      <h3 className="report-panel__heading">{t('report.heading')}</h3>
 
-      <div className="report-panel__status" role="status" aria-live="polite">
-        {decision.refreshStatus === 'refreshing' ? '背景更新中…' : null}
+      <div
+        className="report-panel__status"
+        role={decision.refreshStatus === 'refreshing' ? undefined : 'status'}
+        aria-live="polite"
+      >
+        {decision.refreshStatus === 'refreshing' ? (
+          <CometSpinner className="loading-spinner--inline" label={t('report.refreshing')} />
+        ) : null}
         {decision.refreshStatus === 'idle' && error !== null
-          ? `背景更新失敗：${error.message}（顯示上次成功的讀取結果）`
+          ? t('async.backgroundError', { message: error.message })
           : null}
       </div>
 

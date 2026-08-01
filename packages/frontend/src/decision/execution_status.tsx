@@ -53,6 +53,8 @@ import {
   InsufficientDataState,
   LoadingIndicator,
 } from '../components/system/async_state.js';
+import { CometSpinner } from '../components/loading/comet_spinner.js';
+import { useI18n } from '../i18n/index.js';
 import {
   DataContractWarning,
   FieldList,
@@ -512,13 +514,14 @@ export function ExecutionStatusPanel({
   onRetry,
   onRetryInjection,
 }: ExecutionStatusPanelProps): ReactNode {
+  const { t } = useI18n();
   const { state, error } = decision;
   const { presentation, lastFailureEvent, injection } = execution;
 
   if (state === 'idle') {
     return (
       <div className="execution-panel">
-        <h3 className="execution-panel__heading">執行狀態與失敗訊息</h3>
+        <h3 className="execution-panel__heading">{t('execution.heading')}</h3>
         {injection === null ? (
           <EmptyState message="尚未有決策或注入請求（等待管理員注入事件或即時事件）" />
         ) : (
@@ -531,8 +534,8 @@ export function ExecutionStatusPanel({
   if (state === 'loading') {
     return (
       <div className="execution-panel">
-        <h3 className="execution-panel__heading">執行狀態與失敗訊息</h3>
-        <LoadingIndicator label="載入執行狀態中" />
+        <h3 className="execution-panel__heading">{t('execution.heading')}</h3>
+        <LoadingIndicator label={t('execution.loading')} />
       </div>
     );
   }
@@ -540,7 +543,7 @@ export function ExecutionStatusPanel({
   if (state === 'error') {
     return (
       <div className="execution-panel">
-        <h3 className="execution-panel__heading">執行狀態與失敗訊息</h3>
+        <h3 className="execution-panel__heading">{t('execution.heading')}</h3>
         <ErrorState
           message={
             error === null
@@ -549,7 +552,7 @@ export function ExecutionStatusPanel({
           }
         />
         <button type="button" className="execution-panel__retry-button" onClick={onRetry}>
-          重試
+          {t('action.retry')}
         </button>
         {injection === null ? null : (
           <InjectionOutcomeSection outcome={injection} onRetryInjection={onRetryInjection} />
@@ -562,12 +565,18 @@ export function ExecutionStatusPanel({
 
   return (
     <div className="execution-panel">
-      <h3 className="execution-panel__heading">執行狀態與失敗訊息</h3>
+      <h3 className="execution-panel__heading">{t('execution.heading')}</h3>
 
-      <div className="execution-panel__status" role="status" aria-live="polite">
-        {decision.refreshStatus === 'refreshing' ? '背景更新中…' : null}
+      <div
+        className="execution-panel__status"
+        role={decision.refreshStatus === 'refreshing' ? undefined : 'status'}
+        aria-live="polite"
+      >
+        {decision.refreshStatus === 'refreshing' ? (
+          <CometSpinner className="loading-spinner--inline" label={t('execution.refreshing')} />
+        ) : null}
         {decision.refreshStatus === 'idle' && error !== null
-          ? `背景更新失敗：${error.message}（執行狀態可能過時，顯示上次成功讀取的結果）`
+          ? t('async.executionMayBeStale', { message: error.message })
           : null}
       </div>
 

@@ -46,6 +46,7 @@
 
 import { useCallback, useMemo, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { ErrorState, LoadingIndicator } from '../components/system/async_state.js';
+import { useI18n } from '../i18n/index.js';
 import { formatTimelineTimestamp } from '../timeline/timeline_model.js';
 import {
   buildOperationsMapModel,
@@ -115,6 +116,7 @@ interface DetailPanelProps {
  * focus to move away from the SVG grid.
  */
 function DetailPanel({ entity }: DetailPanelProps): ReactNode {
+  const { t } = useI18n();
   if (entity === null) {
     return (
       <div
@@ -123,7 +125,7 @@ function DetailPanel({ entity }: DetailPanelProps): ReactNode {
         aria-live="polite"
         data-testid="map-detail-empty"
       >
-        點選或以方向鍵選取地圖上的道路或基地台以查看詳細資訊。
+        {t('map.detailEmpty')}
       </div>
     );
   }
@@ -223,9 +225,10 @@ function formatDisplayTimestamp(value: string | null): string {
 // ─── Legend ─────────────────────────────────────────────────
 
 function MapLegend(): ReactNode {
+  const { t } = useI18n();
   return (
-    <div className="operations-map__legend" role="group" aria-label="地圖圖例">
-      <h3 className="operations-map__legend-heading">圖例</h3>
+    <div className="operations-map__legend" role="group" aria-label={t('map.legendAria')}>
+      <h3 className="operations-map__legend-heading">{t('map.legendHeading')}</h3>
       <ul className="operations-map__legend-list">
         <li className="operations-map__legend-item">
           <span
@@ -418,13 +421,14 @@ function EntityShape({ entity, selected, onSelect }: EntityShapeProps): ReactNod
 interface SectionStateNoticeProps {
   readonly status: MapSectionStatus;
   readonly label: string;
+  readonly loadingLabel: string;
 }
 
 /** Renders a section-level notice for a non-ready state. `null` when ready. */
-function SectionStateNotice({ status, label }: SectionStateNoticeProps): ReactNode {
+function SectionStateNotice({ status, label, loadingLabel }: SectionStateNoticeProps): ReactNode {
   if (status === 'ready') return null;
   if (status === 'loading') {
-    return <LoadingIndicator label={`載入${label}中`} />;
+    return <LoadingIndicator label={loadingLabel} />;
   }
   if (status === 'error') {
     return <ErrorState message={`${label}讀取失敗，地圖上的${label}圖層可能不完整`} />;
@@ -481,6 +485,7 @@ export function OperationsMap({
   currentTimestamp,
   degraded = false,
 }: OperationsMapProps): ReactNode {
+  const { t } = useI18n();
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
 
   const model = useMemo(
@@ -525,10 +530,10 @@ export function OperationsMap({
     <section className="operations-map" aria-labelledby="operations-map-heading">
       <div className="operations-map__header">
         <h3 id="operations-map-heading" className="operations-map__heading">
-          事件態勢地圖
+          {t('map.heading')}
         </h3>
         <p className="operations-map__disclosure" data-testid="map-schematic-disclosure">
-          營運示意圖，非實際地理比例
+          {t('map.disclosure')}
         </p>
       </div>
 
@@ -542,8 +547,16 @@ export function OperationsMap({
         </p>
       ) : null}
 
-      <SectionStateNotice status={roadStatus} label="路段" />
-      <SectionStateNotice status={crowdStatus} label="基地台" />
+      <SectionStateNotice
+        status={roadStatus}
+        label="路段"
+        loadingLabel={t('map.roadsLoading')}
+      />
+      <SectionStateNotice
+        status={crowdStatus}
+        label="基地台"
+        loadingLabel={t('map.crowdLoading')}
+      />
 
       {hasAnyEntity ? (
         <svg

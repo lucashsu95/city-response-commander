@@ -18,6 +18,7 @@ import { SnapshotProvenance } from '../components/decision/snapshot_provenance.j
 import { AffectedRoadContextView } from '../components/decision/affected_road_context_view.js';
 import { createDefaultOperationalStatus } from '../state/app_state.js';
 import type { ConnectionMode, OperationalStatus } from '../state/app_state.js';
+import { LanguageSwitcher, useI18n } from '../i18n/index.js';
 
 // ─── Region Components ─────────────────────────────────────
 
@@ -36,16 +37,17 @@ interface TimelineRegionProps {
  * otherwise falls back to the pre-TASK-124 empty state.
  */
 function TimelineRegion({ content }: TimelineRegionProps): ReactNode {
+  const { t } = useI18n();
   return (
     <section
       className="dashboard-region dashboard-region--timeline"
       aria-labelledby="timeline-heading"
     >
       <h2 id="timeline-heading" className="dashboard-region__heading">
-        時間軸
+        {t('region.timeline.heading')}
       </h2>
       <div className="dashboard-region__content dashboard-region__content--stacked">
-        {content ?? <EmptyState message="尚無可顯示的時間軸資料" />}
+        {content ?? <EmptyState message={t('region.timeline.empty')} />}
       </div>
     </section>
   );
@@ -66,16 +68,17 @@ interface RoadTrafficRegionProps {
  * when supplied; otherwise falls back to the pre-TASK-125 empty state.
  */
 function RoadTrafficRegion({ content }: RoadTrafficRegionProps): ReactNode {
+  const { t } = useI18n();
   return (
     <section
       className="dashboard-region dashboard-region--roads"
       aria-labelledby="roads-heading"
     >
       <h2 id="roads-heading" className="dashboard-region__heading">
-        路段車流
+        {t('region.roads.heading')}
       </h2>
       <div className="dashboard-region__content dashboard-region__content--stacked">
-        {content ?? <EmptyState message="尚無可顯示的路段資料" />}
+        {content ?? <EmptyState message={t('region.roads.empty')} />}
       </div>
     </section>
   );
@@ -96,16 +99,17 @@ interface CrowdRegionProps {
  * back to the pre-TASK-126 empty state.
  */
 function CrowdRegion({ content }: CrowdRegionProps): ReactNode {
+  const { t } = useI18n();
   return (
     <section
       className="dashboard-region dashboard-region--crowd"
       aria-labelledby="crowd-heading"
     >
       <h2 id="crowd-heading" className="dashboard-region__heading">
-        基地台人流
+        {t('region.crowd.heading')}
       </h2>
       <div className="dashboard-region__content dashboard-region__content--stacked">
-        {content ?? <EmptyState message="尚無可顯示的基地台資料" />}
+        {content ?? <EmptyState message={t('region.crowd.empty')} />}
       </div>
     </section>
   );
@@ -165,16 +169,17 @@ function DecisionRegion({
   affectedRoadContext,
   content,
 }: DecisionRegionProps): ReactNode {
+  const { t } = useI18n();
   return (
     <section
       className="dashboard-region dashboard-region--decision"
       aria-labelledby="decision-heading"
     >
       <h2 id="decision-heading" className="dashboard-region__heading">
-        決策指令
+        {t('region.decision.heading')}
       </h2>
       <div className="dashboard-region__content dashboard-region__content--stacked">
-        {content ?? <EmptyState message="目前尚無可顯示的決策結果" />}
+        {content ?? <EmptyState message={t('region.decision.empty')} />}
         <SnapshotProvenance snapshot={selectedSnapshot} />
         <AffectedRoadContextView context={affectedRoadContext} />
       </div>
@@ -190,16 +195,17 @@ function DecisionRegion({
  * questions without mutating any persistent state.
  */
 function WhatIfRegion({ content }: WhatIfRegionProps): ReactNode {
+  const { t } = useI18n();
   return (
     <section
       className="dashboard-region dashboard-region--whatif"
       aria-labelledby="whatif-heading"
     >
       <h2 id="whatif-heading" className="dashboard-region__heading">
-        What-if 假設情境
+        {t('region.whatif.heading')}
       </h2>
       <div className="dashboard-region__content dashboard-region__content--stacked">
-        {content ?? <EmptyState message="尚無 What-if 假設情境" />}
+        {content ?? <EmptyState message={t('region.whatif.empty')} />}
       </div>
     </section>
   );
@@ -214,16 +220,17 @@ function WhatIfRegion({ content }: WhatIfRegionProps): ReactNode {
  * What-if/Injection.
  */
 function MapRegion({ content }: MapRegionProps): ReactNode {
+  const { t } = useI18n();
   return (
     <section
       className="dashboard-region dashboard-region--map"
       aria-labelledby="map-heading"
     >
       <h2 id="map-heading" className="dashboard-region__heading">
-        事件態勢地圖
+        {t('region.map.heading')}
       </h2>
       <div className="dashboard-region__content dashboard-region__content--stacked">
-        {content ?? <EmptyState message="尚無地圖資料" />}
+        {content ?? <EmptyState message={t('region.map.empty')} />}
       </div>
     </section>
   );
@@ -239,16 +246,17 @@ function MapRegion({ content }: MapRegionProps): ReactNode {
  * themselves.
  */
 function InjectionRegion({ content }: InjectionRegionProps): ReactNode {
+  const { t } = useI18n();
   return (
     <section
       className="dashboard-region dashboard-region--injection"
       aria-labelledby="injection-heading"
     >
       <h2 id="injection-heading" className="dashboard-region__heading">
-        事件注入
+        {t('region.injection.heading')}
       </h2>
       <div className="dashboard-region__content dashboard-region__content--stacked">
-        {content ?? <EmptyState message="尚無事件注入內容" />}
+        {content ?? <EmptyState message={t('region.injection.empty')} />}
       </div>
     </section>
   );
@@ -367,12 +375,16 @@ export function DashboardShell({
   injectionContent,
   overlayContent,
 }: DashboardShellProps = {}): ReactNode {
+  const { t } = useI18n();
   const operationalStatus = resolveOperationalStatus(selectedSnapshot, connectionMode);
 
   return (
     <div className="dashboard-shell">
       <header className="dashboard-header" role="banner">
-        <h1 className="dashboard-header__title">城市交通應變 AI 指揮台</h1>
+        <div className="dashboard-header__identity">
+          <h1 className="dashboard-header__title">{t('shell.title')}</h1>
+          <LanguageSwitcher />
+        </div>
         <OperationalStatusBar
           status={operationalStatus}
           pollingErrorMessage={pollingErrorMessage}
@@ -397,7 +409,7 @@ export function DashboardShell({
       </main>
 
       <footer className="dashboard-footer" role="contentinfo">
-        <p className="dashboard-footer__text">City Response Commander</p>
+        <p className="dashboard-footer__text">{t('shell.footer')}</p>
       </footer>
 
       {overlayContent}

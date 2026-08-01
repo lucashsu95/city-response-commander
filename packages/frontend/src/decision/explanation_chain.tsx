@@ -36,6 +36,8 @@ import {
   InsufficientDataState,
   LoadingIndicator,
 } from '../components/system/async_state.js';
+import { CometSpinner } from '../components/loading/comet_spinner.js';
+import { useI18n } from '../i18n/index.js';
 import {
   AiTextBadge,
   DataContractWarning,
@@ -527,12 +529,13 @@ export function ExplanationChain({
   evidence,
   onRetry,
 }: ExplanationChainProps): ReactNode {
+  const { t } = useI18n();
   const { state, error, core } = decision;
 
   if (state === 'idle') {
     return (
       <div className="explanation-chain">
-        <EmptyState message="尚未有決策可顯示推理過程（等待事件注入或即時事件）" />
+        <EmptyState message={t('explanation.idle')} />
       </div>
     );
   }
@@ -540,7 +543,7 @@ export function ExplanationChain({
   if (state === 'loading') {
     return (
       <div className="explanation-chain">
-        <LoadingIndicator label="載入決策推理鏈中" />
+        <LoadingIndicator label={t('explanation.loading')} />
       </div>
     );
   }
@@ -549,10 +552,10 @@ export function ExplanationChain({
     return (
       <div className="explanation-chain">
         <ErrorState
-          message={error === null ? '推理鏈讀取失敗' : `推理鏈讀取失敗：${error.message}`}
+          message={error === null ? t('explanation.errorFallback') : `${t('explanation.errorFallback')}：${error.message}`}
         />
         <button type="button" className="explanation-chain__retry" onClick={onRetry}>
-          重試
+          {t('action.retry')}
         </button>
       </div>
     );
@@ -561,7 +564,7 @@ export function ExplanationChain({
   if (state === 'insufficient_data' || core === null) {
     return (
       <div className="explanation-chain">
-        <h3 className="explanation-chain__heading">決策推理與解釋鏈</h3>
+        <h3 className="explanation-chain__heading">{t('explanation.heading')}</h3>
         <InsufficientDataState message="尚無已提交的決策核心，無可揭露之推理過程" />
       </div>
     );
@@ -569,12 +572,21 @@ export function ExplanationChain({
 
   return (
     <div className="explanation-chain">
-      <h3 className="explanation-chain__heading">決策推理與解釋鏈</h3>
+      <h3 className="explanation-chain__heading">{t('explanation.heading')}</h3>
 
-      <div className="explanation-chain__status" role="status" aria-live="polite">
-        {decision.refreshStatus === 'refreshing' ? '背景更新中…' : null}
+      <div
+        className="explanation-chain__status"
+        role={decision.refreshStatus === 'refreshing' ? undefined : 'status'}
+        aria-live="polite"
+      >
+        {decision.refreshStatus === 'refreshing' ? (
+          <CometSpinner
+            className="loading-spinner--inline"
+            label={t('explanation.refreshing')}
+          />
+        ) : null}
         {decision.refreshStatus === 'idle' && error !== null
-          ? `背景更新失敗：${error.message}（顯示上次成功的讀取結果）`
+          ? t('async.backgroundError', { message: error.message })
           : null}
       </div>
 

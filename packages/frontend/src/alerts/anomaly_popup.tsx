@@ -24,14 +24,11 @@
  */
 
 import { useEffect, useRef, type ReactNode } from 'react';
+import { useI18n } from '../i18n/index.js';
 import type { AnomalyPresentation, AnomalySource } from './anomaly_model.js';
 
 const TITLE_ID = 'anomaly-popup-title';
 const DESCRIPTION_ID = 'anomaly-popup-description';
-
-/** Fixed framing permitted by TASK-127 when the backend supplied no text. */
-const FRAMING_TITLE = '偵測到異常';
-const FRAMING_DESCRIPTION = '請查看即時道路與人流警示';
 
 /** Operator-facing label for each official channel. */
 const SOURCE_LABELS: Readonly<Record<AnomalySource, string>> = {
@@ -72,6 +69,7 @@ function DetailRow({ label, value, testId }: DetailRowProps): ReactNode {
  * tree while the dashboard is in its ordinary state.
  */
 export function AnomalyPopup({ anomaly, isOpen, onDismiss }: AnomalyPopupProps): ReactNode {
+  const { t } = useI18n();
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
   const restoreFocusRef = useRef<HTMLElement | null>(null);
 
@@ -118,7 +116,7 @@ export function AnomalyPopup({ anomaly, isOpen, onDismiss }: AnomalyPopupProps):
     return null;
   }
 
-  const description = anomaly.summary ?? FRAMING_DESCRIPTION;
+  const description = anomaly.summary ?? t('anomaly.framingDescription');
 
   return (
     <div className="anomaly-popup__backdrop" data-testid="anomaly-popup-backdrop">
@@ -133,7 +131,7 @@ export function AnomalyPopup({ anomaly, isOpen, onDismiss }: AnomalyPopupProps):
         data-anomaly-source={anomaly.source}
       >
         <h2 id={TITLE_ID} className="anomaly-popup__title">
-          {FRAMING_TITLE}
+          {t('anomaly.framingTitle')}
         </h2>
 
         <p id={DESCRIPTION_ID} className="anomaly-popup__description" data-testid="anomaly-popup-description">
@@ -198,7 +196,7 @@ export function AnomalyPopup({ anomaly, isOpen, onDismiss }: AnomalyPopupProps):
             onClick={onDismiss}
             data-testid="anomaly-popup-close"
           >
-            關閉
+            {t('anomaly.close')}
           </button>
         </div>
       </div>

@@ -57,6 +57,8 @@ import { decodeInjectionResponse } from '../decision/execution_model.js';
 import type { InjectionOutcome } from '../decision/execution_model.js';
 import { InjectionOutcomeSection } from '../decision/execution_status.js';
 import type { ApiClient } from '../api/client.js';
+import { useI18n } from '../i18n/index.js';
+import { LoadingIndicator } from '../components/system/async_state.js';
 
 /** Local phase of the confirm-then-submit flow. Not shared with any hook. */
 type InjectionFlowPhase =
@@ -104,6 +106,7 @@ function normalizedEventId(raw: string): string | null {
  * mistaken for a documented workflow outcome).
  */
 export function InjectionPanel({ client, adminToken }: InjectionPanelProps): ReactNode {
+  const { t } = useI18n();
   const [eventIdInput, setEventIdInput] = useState('');
   const [phase, setPhase] = useState<InjectionFlowPhase>('form');
   const [pendingEventId, setPendingEventId] = useState<string | null>(null);
@@ -183,7 +186,7 @@ export function InjectionPanel({ client, adminToken }: InjectionPanelProps): Rea
   if (!admin) {
     return (
       <div className="injection-panel" data-testid="injection-panel">
-        <h3 className="injection-panel__heading">事件注入（管理員）</h3>
+        <h3 className="injection-panel__heading">{t('injection.heading')}</h3>
         <DataContractWarning message="尚未偵測到管理員憑證（Cognito admin）。事件注入為具實際後果之指揮動作，僅限管理員操作；本面板停用表單，不提供任何繞過授權之操作。" />
       </div>
     );
@@ -191,7 +194,7 @@ export function InjectionPanel({ client, adminToken }: InjectionPanelProps): Rea
 
   return (
     <div className="injection-panel" data-testid="injection-panel">
-      <h3 className="injection-panel__heading">事件注入（管理員）</h3>
+      <h3 className="injection-panel__heading">{t('injection.heading')}</h3>
       <p className="injection-panel__note">
         將 <code>live_incidents.json</code> 中的事件注入系統（
         <code>POST /incidents/{'{event_id}'}/inject</code>）。此為具實際後果之指揮動作：成功注入將啟動
@@ -223,7 +226,7 @@ export function InjectionPanel({ client, adminToken }: InjectionPanelProps): Rea
             data-testid="injection-submit-button"
             disabled={normalizedEventId(eventIdInput) === null}
           >
-            準備注入…
+            {t('injection.submit')}
           </button>
         </form>
       ) : null}
@@ -245,7 +248,7 @@ export function InjectionPanel({ client, adminToken }: InjectionPanelProps): Rea
             onClick={confirmAndInject}
             data-testid="injection-confirm-button"
           >
-            確認注入
+            {t('injection.confirmYes')}
           </button>
           <button
             type="button"
@@ -253,15 +256,13 @@ export function InjectionPanel({ client, adminToken }: InjectionPanelProps): Rea
             onClick={cancelConfirmation}
             data-testid="injection-cancel-button"
           >
-            取消
+            {t('injection.confirmNo')}
           </button>
         </div>
       ) : null}
 
       {phase === 'submitting' ? (
-        <p className="injection-panel__status" role="status" aria-live="polite">
-          注入請求送出中…
-        </p>
+        <LoadingIndicator label={t('injection.submitting')} />
       ) : null}
 
       {phase === 'transport_error' ? (
@@ -278,7 +279,7 @@ export function InjectionPanel({ client, adminToken }: InjectionPanelProps): Rea
             onClick={() => setPhase('confirming')}
             data-testid="injection-transport-retry-button"
           >
-            重新嘗試送出
+            {t('injection.retry')}
           </button>
           <button
             type="button"
@@ -286,7 +287,7 @@ export function InjectionPanel({ client, adminToken }: InjectionPanelProps): Rea
             onClick={startOver}
             data-testid="injection-reset-button"
           >
-            重新輸入事件 ID
+            {t('injection.resetLabel')}
           </button>
         </div>
       ) : null}
@@ -300,7 +301,7 @@ export function InjectionPanel({ client, adminToken }: InjectionPanelProps): Rea
             onClick={startOver}
             data-testid="injection-reset-button"
           >
-            注入其他事件
+            {t('injection.again')}
           </button>
         </>
       ) : null}

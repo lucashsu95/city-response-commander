@@ -9,6 +9,7 @@
 
 import type { ReactNode } from 'react';
 import type { OperationalStatus, ConnectionMode } from '../../state/app_state.js';
+import { useI18n } from '../../i18n/index.js';
 
 // ─── Freshness Indicator ───────────────────────────────────
 
@@ -27,19 +28,20 @@ export function FreshnessIndicator({
   isStale,
   stalenessMinutes,
 }: FreshnessIndicatorProps): ReactNode {
+  const { t } = useI18n();
   if (!isStale) {
     return (
       <span className="status-indicator status-indicator--fresh" role="status">
         <span className="status-indicator__dot" aria-hidden="true" />
-        <span className="status-indicator__text">資料為最新</span>
+        <span className="status-indicator__text">{t('status.fresh')}</span>
       </span>
     );
   }
 
   const staleText =
     stalenessMinutes !== null && stalenessMinutes !== undefined
-      ? `資料已過時 ${stalenessMinutes} 分鐘`
-      : '資料已過時';
+      ? t('status.stale.withMinutes', { minutes: stalenessMinutes })
+      : t('status.stale');
 
   return (
     <span
@@ -66,12 +68,6 @@ export interface ConnectionModeIndicatorProps {
  * `polling` uses the specified degraded wording so the operator can never
  * mistake fallback reads for a live push connection.
  */
-const CONNECTION_MODE_LABELS: Record<ConnectionMode, string> = {
-  websocket: '即時連線（WebSocket）',
-  polling: '即時連線降級為輪詢',
-  disconnected: '已斷線',
-};
-
 /**
  * Text glyph per mode so the state never depends on colour alone.
  */
@@ -85,6 +81,7 @@ const CONNECTION_MODE_GLYPHS: Record<ConnectionMode, string> = {
  * Displays current connection mode.
  */
 export function ConnectionModeIndicator({ mode }: ConnectionModeIndicatorProps): ReactNode {
+  const { t } = useI18n();
   const isDegraded = mode !== 'websocket';
   const className = isDegraded
     ? 'status-indicator status-indicator--degraded'
@@ -101,7 +98,13 @@ export function ConnectionModeIndicator({ mode }: ConnectionModeIndicatorProps):
       <span className="status-indicator__icon" aria-hidden="true">
         {CONNECTION_MODE_GLYPHS[mode]}
       </span>
-      <span className="status-indicator__text">{CONNECTION_MODE_LABELS[mode]}</span>
+      <span className="status-indicator__text">
+        {mode === 'websocket'
+          ? t('status.connection.websocket')
+          : mode === 'polling'
+            ? t('status.connection.polling')
+            : t('status.connection.disconnected')}
+      </span>
     </span>
   );
 }
@@ -131,6 +134,7 @@ export function PollingDegradationNotice({
   pollingErrorMessage = null,
   pollingUpdateCount = 0,
 }: PollingDegradationNoticeProps): ReactNode {
+  const { t } = useI18n();
   if (mode !== 'polling') {
     return null;
   }
@@ -145,14 +149,18 @@ export function PollingDegradationNotice({
         <span className="status-indicator__icon" aria-hidden="true">
           ⚠
         </span>
-        <span className="status-indicator__text">輪詢更新失敗：{pollingErrorMessage}</span>
+        <span className="status-indicator__text">
+          {t('status.polling.error', { message: pollingErrorMessage })}
+        </span>
       </span>
     );
   }
 
   return (
     <span className="status-indicator status-indicator--polling-ok" role="status" aria-live="polite">
-      <span className="status-indicator__text">已完成 {pollingUpdateCount} 次輪詢更新</span>
+      <span className="status-indicator__text">
+        {t('status.polling.ok', { count: pollingUpdateCount })}
+      </span>
     </span>
   );
 }
@@ -171,6 +179,7 @@ export interface ProvisionalPolicyIndicatorProps {
 export function ProvisionalPolicyIndicator({
   isProvisional,
 }: ProvisionalPolicyIndicatorProps): ReactNode {
+  const { t } = useI18n();
   if (!isProvisional) {
     return null;
   }
@@ -184,7 +193,7 @@ export function ProvisionalPolicyIndicator({
       <span className="status-indicator__icon" aria-hidden="true">
         ⚙
       </span>
-      <span className="status-indicator__text">暫定政策</span>
+      <span className="status-indicator__text">{t('status.provisional')}</span>
     </span>
   );
 }
@@ -203,6 +212,7 @@ export interface ManualConfirmationIndicatorProps {
 export function ManualConfirmationIndicator({
   required,
 }: ManualConfirmationIndicatorProps): ReactNode {
+  const { t } = useI18n();
   if (!required) {
     return null;
   }
@@ -216,7 +226,7 @@ export function ManualConfirmationIndicator({
       <span className="status-indicator__icon" aria-hidden="true">
         ⚡
       </span>
-      <span className="status-indicator__text">需人工確認</span>
+      <span className="status-indicator__text">{t('status.manualConfirmation')}</span>
     </span>
   );
 }
@@ -240,8 +250,9 @@ export function OperationalStatusBar({
   pollingErrorMessage = null,
   pollingUpdateCount = 0,
 }: OperationalStatusBarProps): ReactNode {
+  const { t } = useI18n();
   return (
-    <div className="operational-status-bar" role="region" aria-label="系統狀態">
+    <div className="operational-status-bar" role="region" aria-label={t('status.region.label')}>
       <FreshnessIndicator isStale={status.isStale} stalenessMinutes={status.stalenessMinutes} />
       <ConnectionModeIndicator mode={status.connectionMode} />
       <PollingDegradationNotice
