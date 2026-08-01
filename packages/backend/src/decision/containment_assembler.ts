@@ -21,9 +21,10 @@
  *   golden fixtures `decision_pipeline.test.ts` uses).
  * - For `OUT_OF_BOUNDS`: call `snap()`, skip the existing RD_ sub-pipeline,
  *   and retain only the shared SOP-3/4/6 station evaluations (TASK-BS-12).
+ * - Build a branch-specific Safe_Context whose road action space is a proven
+ *   subset of Road_Whitelist (TASK-BS-13).
  *
- * NOT yet wired: Safe_Context construction (TASK-BS-13) and the
- * Bedrock/Whitelist_Guard call (TASK-BS-14).
+ * NOT yet wired: the Bedrock/Whitelist_Guard call (TASK-BS-14).
  *
  * ## The STOP-gate short circuit (R12 AC2)
  *
@@ -42,6 +43,7 @@ import {
   buildEvidenceTrace,
   checkEntityScope,
   evaluateStationBasedArticles,
+  partitionByWhitelist,
   resolveSopCoverage,
   runDeterministicDecision,
   snap,
@@ -60,12 +62,22 @@ import type {
   MappedAnchorNode,
   SopCitation,
   SopCoverageResult,
+  UniversalPrinciple,
 } from '@city-commander/shared-schemas';
 
 export interface AssembleContainmentInput {
   readonly ingestion: IngestionResult;
   readonly incident: Incident;
   readonly config: PolicyStrategyConfigProvider;
+}
+
+/** Restricted prompt context handed to Bedrock_Composer starting in TASK-BS-14. */
+export interface SafeContext {
+  readonly allowed_road_whitelist: readonly string[];
+  readonly official_sop_text: readonly SopCitation[] | null;
+  readonly universal_principles: readonly UniversalPrinciple[] | null;
+  readonly scope_disclosure: string | null;
+  readonly instruction: string;
 }
 
 /**
@@ -92,6 +104,8 @@ export interface ContainmentAssemblerResult {
    * `OUT_OF_JURISDICTION` has no valid anchor (R10 AC9).
    */
   readonly mapped_anchor_node: MappedAnchorNode | null;
+  /** `null` only on a STOP path; otherwise assembled deterministically (R8). */
+  readonly safe_context: SafeContext | null;
   /**
    * `IN_SCOPE*` receives the unchanged full deterministic facts. Coverage-gap
    * facts contain only SOP-3/4/6 station outcomes; every RD_-specific field is
@@ -113,6 +127,7 @@ function stoppedFromIngestion(ingestion: {
     sop_coverage: null,
     data_scope_status: null,
     mapped_anchor_node: null,
+    safe_context: null,
     facts: null,
   };
 }
@@ -202,6 +217,75 @@ function buildCoverageGapFacts(
   };
 }
 
+function buildSafeContext(input: {
+  readonly ingestion: IngestionResult;
+  readonly incident: Incident;
+  readonly sopCoverage: SopCoverageResult;
+  readonly dataScopeStatus: DataScopeStatus;
+  readonly mappedAnchorNode: MappedAnchorNode | null;
+  readonly facts: DeterministicDecisionFacts;
+}): SafeContext {
+  const roadNetwork = input.ingestion.roadNetwork;
+  if (roadNetwork === undefined) {
+    throw new Error('Safe_Context requires a ready ingestion with roadNetwork.');
+  }
+
+  const roadWhitelist = new Set(roadNetwork.getAllSegments().map((segment) => segment.segment_id));
+  let candidateIds: readonly string[] = [];
+
+  if (
+    input.dataScopeStatus === 'IN_SCOPE' ||
+    input.dataScopeStatus === 'IN_SCOPE_BY_INTERSECTION'
+  ) {
+    candidateIds = [
+      ...(input.facts.primary_evacuation === null ? [] : [input.facts.primary_evacuation]),
+      ...input.facts.secondary_evacuation,
+      ...input.facts.excluded_candidates.map((candidate) => candidate.segment_id),
+    ];
+  } else if (input.dataScopeStatus === 'OUT_OF_BOUNDS_SNAPPED' && input.mappedAnchorNode !== null) {
+    candidateIds = [
+      input.mappedAnchorNode.segment_id,
+      ...roadNetwork.alternativesOf(input.mappedAnchorNode.segment_id),
+    ];
+  }
+
+  const allowedRoadIds = [...partitionByWhitelist(candidateIds, roadWhitelist).allowed].sort();
+  const officialSopText: SopCitation[] = [];
+  if (
+    input.sopCoverage.sop_coverage_status === 'OFFICIAL_SOP_MATCHED' &&
+    input.ingestion.sopArticles !== undefined
+  ) {
+    for (const articleNo of input.sopCoverage.matched_article_nos) {
+      const chunk = input.ingestion.sopArticles.getByArticleNo(articleNo);
+      if (chunk !== undefined) {
+        officialSopText.push({
+          article_no: articleNo,
+          source_location: `emergency_traffic_sop.txt#article-${articleNo}`,
+          content: chunk.text,
+        });
+      }
+    }
+  }
+
+  const usesUniversalPrinciples =
+    input.sopCoverage.sop_coverage_status === 'UNKNOWN_TYPE_UNIVERSAL_SOP';
+  const scopeDisclosure =
+    input.dataScopeStatus === 'OUT_OF_BOUNDS_SNAPPED' && input.mappedAnchorNode !== null
+      ? `原始地點「${input.incident.location}」未落於已劃設涵蓋範圍；系統已對齊至周界錨點「${input.mappedAnchorNode.gateway_intersection}」（${input.mappedAnchorNode.segment_id}）。`
+      : null;
+  const universalInstruction = usesUniversalPrinciples
+    ? '請依 DEFAULT_UNIVERSAL_SOP 提出周界管制與 Buffer Zone 建議，不得回覆無法判斷或拒絕提供建議。'
+    : '';
+
+  return {
+    allowed_road_whitelist: allowedRoadIds,
+    official_sop_text: usesUniversalPrinciples ? null : officialSopText,
+    universal_principles: usesUniversalPrinciples ? input.sopCoverage.universal_principles : null,
+    scope_disclosure: scopeDisclosure,
+    instruction: `只可使用 allowed_road_whitelist 內的 road id，不得新增或推測其他道路。${universalInstruction}`,
+  };
+}
+
 /**
  * Run Entity_Scope_Check and SOP coverage resolution for an incident,
  * short-circuiting on the existing ingestion-level STOP gate first (R1 AC1,
@@ -255,6 +339,15 @@ export function assembleContainment(input: AssembleContainmentInput): Containmen
             ...snapResult.anchor,
             distance_meters: snapResult.distance_meters,
           };
+    const coverageGapFacts = buildCoverageGapFacts(ingestion, incident, config);
+    const safeContext = buildSafeContext({
+      ingestion,
+      incident,
+      sopCoverage,
+      dataScopeStatus: snapResult.coverage_status,
+      mappedAnchorNode,
+      facts: coverageGapFacts,
+    });
 
     // R12 AC4-AC6 — no call to runDeterministicDecision's RD_ branch. Only
     // the extracted BS_ID-keyed SOP-3/4/6 subset remains available in facts.
@@ -266,7 +359,8 @@ export function assembleContainment(input: AssembleContainmentInput): Containmen
       sop_coverage: sopCoverage,
       data_scope_status: snapResult.coverage_status,
       mapped_anchor_node: mappedAnchorNode,
-      facts: buildCoverageGapFacts(ingestion, incident, config),
+      safe_context: safeContext,
+      facts: coverageGapFacts,
     };
   }
 
@@ -289,6 +383,7 @@ export function assembleContainment(input: AssembleContainmentInput): Containmen
       sop_coverage: sopCoverage,
       data_scope_status: null,
       mapped_anchor_node: null,
+      safe_context: null,
       facts: null,
     };
   }
@@ -301,6 +396,14 @@ export function assembleContainment(input: AssembleContainmentInput): Containmen
     sop_coverage: sopCoverage,
     data_scope_status: entityScope.coverage_status,
     mapped_anchor_node: null, // R10 AC9 — IN_SCOPE* never snaps.
+    safe_context: buildSafeContext({
+      ingestion,
+      incident,
+      sopCoverage,
+      dataScopeStatus: entityScope.coverage_status,
+      mappedAnchorNode: null,
+      facts: decision.facts,
+    }),
     facts: decision.facts,
   };
 }

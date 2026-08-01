@@ -123,6 +123,7 @@
 | 提交影片 | E | ❓ |
 | TASK-BS-11：in-scope containment branch + 三個 golden no-regression diff | Codex | ✅ |
 | TASK-BS-12：coverage-gap snap branch + RD_ short circuit + SOP-3/4/6 seam | Codex | ✅ |
+| TASK-BS-13：Safe_Context whitelist + SOP authority separation | Codex | ✅ |
 
 ---
 

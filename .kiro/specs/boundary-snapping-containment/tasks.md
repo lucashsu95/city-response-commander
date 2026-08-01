@@ -206,7 +206,7 @@ Task ID scheme: `TASK-BS-01..TASK-BS-19`, flat and sequential. `CHECKPOINT` line
   - tests_required: `packages/backend/test/decision/containment_assembler.test.ts` — OUT_OF_BOUNDS_SNAPPED and OUT_OF_JURISDICTION cases.
   - done_definition: No API response ever contains both a non-null `incident_anchor.manual_confirmation_required` fact set AND a non-null `mapped_anchor_node` for the same incident.
 
-- [ ] TASK-BS-13 Implement Safe_Context construction (Requirement 8)
+- [x] TASK-BS-13 Implement Safe_Context construction (Requirement 8)
   - objective: Build the restricted prompt context handed to `Bedrock_Composer`, ensuring the allowed road-id action space is always a subset of `Road_Whitelist`.
   - requirements_covered: R8
   - design_sections: §6.1

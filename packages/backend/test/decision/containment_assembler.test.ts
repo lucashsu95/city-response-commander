@@ -187,6 +187,7 @@ describe('assembleContainment', () => {
         sop_coverage: null,
         data_scope_status: null,
         mapped_anchor_node: null,
+        safe_context: null,
         facts: null,
       });
     });
@@ -243,6 +244,14 @@ describe('assembleContainment', () => {
         capacity_vph: 1800,
         distance_meters: null,
       });
+      expect(result.safe_context).toMatchObject({
+        allowed_road_whitelist: ['RD_TPE_002', 'RD_TPE_004'],
+        official_sop_text: null,
+        universal_principles: result.sop_coverage?.universal_principles,
+      });
+      expect(result.safe_context?.scope_disclosure).toContain('完全不在路網範圍內的地點');
+      expect(result.safe_context?.scope_disclosure).toContain('仁愛路四段');
+      expect(result.safe_context?.instruction).toContain('不得回覆無法判斷');
     });
   });
 
@@ -300,6 +309,8 @@ describe('assembleContainment', () => {
 
       expect(result.data_scope_status).toBe('OUT_OF_JURISDICTION');
       expect(result.mapped_anchor_node).toBeNull();
+      expect(result.safe_context?.allowed_road_whitelist).toEqual([]);
+      expect(result.safe_context?.scope_disclosure).toBeNull();
       expect(result.facts?.incident_anchor).toBeNull();
       expect(result.facts?.primary_evacuation).toBeNull();
     });
@@ -321,6 +332,53 @@ describe('assembleContainment', () => {
       expect(result.facts?.incident_anchor).toBeNull();
       expect(result.facts?.primary_evacuation).toBeNull();
       expect(result.facts?.ete).toBeNull();
+    });
+  });
+
+  describe('R8 — Safe_Context action-space restriction', () => {
+    it('keeps every in-scope evacuation candidate inside Road_Whitelist and uses official SOP text only', () => {
+      const ingestion = readyIngestion();
+      const result = assembleContainment({ ingestion, incident: incident(), config });
+      const roadWhitelist = new Set(
+        ingestion.roadNetwork?.getAllSegments().map((segment) => segment.segment_id),
+      );
+
+      expect(result.safe_context).not.toBeNull();
+      for (const roadId of result.safe_context?.allowed_road_whitelist ?? []) {
+        expect(roadWhitelist.has(roadId)).toBe(true);
+      }
+      expect(
+        result.safe_context?.official_sop_text?.map((citation) => citation.article_no),
+      ).toEqual([2]);
+      expect(result.safe_context?.universal_principles).toBeNull();
+      expect(result.safe_context?.scope_disclosure).toBeNull();
+      expect(result.safe_context?.instruction).toContain('只可使用 allowed_road_whitelist');
+    });
+
+    it('uses exactly anchor plus one-way whitelisted alternatives for a snapped incident', () => {
+      const ingestion = readyIngestion();
+      const result = assembleContainment({
+        ingestion,
+        incident: incident({
+          affected_segment: 'RD_TPE_099',
+          affected_road: undefined,
+          location: '完全不在路網範圍內的地點',
+          type: 'Unknown_Chemical_Leak' as unknown as Incident['type'],
+          description: '未知化學氣體洩漏',
+          timestamp: '2026-05-20 22:30',
+        }),
+        config,
+      });
+      const roadWhitelist = new Set(
+        ingestion.roadNetwork?.getAllSegments().map((segment) => segment.segment_id),
+      );
+
+      expect(result.safe_context?.allowed_road_whitelist).toEqual(['RD_TPE_002', 'RD_TPE_004']);
+      for (const roadId of result.safe_context?.allowed_road_whitelist ?? []) {
+        expect(roadWhitelist.has(roadId)).toBe(true);
+      }
+      expect(result.safe_context?.official_sop_text).toBeNull();
+      expect(result.safe_context?.universal_principles).toHaveLength(3);
     });
   });
 
