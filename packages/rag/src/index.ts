@@ -32,6 +32,7 @@ export {
   SopRetriever,
   BedrockKbClient,
   createSopRetriever,
+  formatCitationLocation,
   type KbRetrieveClient,
   type SopCitationResult,
   type SopRetrieveResult,

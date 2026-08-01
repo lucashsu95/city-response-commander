@@ -114,6 +114,20 @@ export interface SopRetrieveBothFailed {
 
 export type SopRetrieveResult = SopRetrieveSuccess | SopRetrieveBothFailed;
 
+/**
+ * 格式化 citation 的 source_location 顯示文字。
+ *
+ * `source === 's3_fallback'` 代表該引用並非 KB 精準比對結果，
+ * 而是 S3 fallback 的通用條文備份（§14.1, §21）；
+ * 下游（prompt、fallback 文案、citations_presentation）皆須標記此差異，
+ * 避免指揮官誤以為是精確比對的 KB 結果。
+ */
+export function formatCitationLocation(c: SopCitationResult): string {
+  return c.source === 's3_fallback'
+    ? `${c.source_location}（類比引用，非精準比對）`
+    : c.source_location;
+}
+
 // ─── SopRetriever ─────────────────────────────────────────────────────────────
 
 /**

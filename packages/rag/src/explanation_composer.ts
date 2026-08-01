@@ -36,7 +36,7 @@ import {
   type NarrativePutResult,
 } from './narrative_writer.js';
 import type { BedrockInvoker } from './bedrock_adapter.js';
-import type { SopCitationResult } from './sop_retriever.js';
+import { formatCitationLocation, type SopCitationResult } from './sop_retriever.js';
 
 // ─── Input / Output types ─────────────────────────────────────────────────────
 
@@ -244,7 +244,8 @@ function buildExplanationPrompt(
 
   const citationLines = citations
     .map(
-      (c) => `  - 第 ${c.article_no} 條（來源：${c.source_location}）：${c.content.slice(0, 120)}`,
+      (c) =>
+        `  - 第 ${c.article_no} 條（來源：${formatCitationLocation(c)}）：${c.content.slice(0, 120)}`,
     )
     .join('\n');
 
@@ -335,7 +336,7 @@ function buildFallbackExplanationText(
 
   const articleList =
     citations.length > 0
-      ? citations.map((c) => `第 ${c.article_no} 條`).join('、')
+      ? citations.map((c) => `第 ${c.article_no} 條（${formatCitationLocation(c)}）`).join('、')
       : `第 ${triggeredArticles} 條`;
 
   const lines: string[] = [

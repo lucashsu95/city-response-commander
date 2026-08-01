@@ -20,6 +20,7 @@ import { NarrativeType } from '@city-commander/shared-schemas';
 import type { NarrativeTableClient, NarrativeItem } from '../../src/narrative_writer.js';
 import type { BedrockInvoker, BedrockResult } from '../../src/bedrock_adapter.js';
 import type { DecisionCore } from '@city-commander/shared-schemas';
+import type { SopCitationResult } from '../../src/sop_retriever.js';
 
 // ─── Stub helpers ──────────────────────────────────────────────────────────
 
@@ -81,6 +82,14 @@ function makeCore(): DecisionCore {
 function committedClient(): NarrativeTableClient {
   return { conditionalPut: vi.fn(async () => 'committed') };
 }
+
+const SAMPLE_KB_CITATIONS: readonly SopCitationResult[] = [
+  { article_no: 2, content: 'SOP 第 2 條原文', source_location: 's3://bucket/sop/article-2.json', relevancy_score: null, source: 'kb' },
+];
+
+const SAMPLE_S3_FALLBACK_CITATIONS: readonly SopCitationResult[] = [
+  { article_no: 2, content: 'SOP 第 2 條原文', source_location: 's3://bucket/sop/article-2.json', relevancy_score: null, source: 's3_fallback' },
+];
 
 function makeBedrockSuccess(text: string): BedrockInvoker {
   return {
@@ -217,5 +226,29 @@ describe('composeExplanation', () => {
     const before = JSON.stringify(core);
     await composeExplanation(makeInput({ core }));
     expect(JSON.stringify(core)).toBe(before);
+  });
+
+  it('s3_fallback citation → fallback explanation_text includes source_location AND 類比引用 marker', async () => {
+    const client = committedClient();
+    await composeExplanation(
+      makeInput({ citations: SAMPLE_S3_FALLBACK_CITATIONS, narrativeClient: client }),
+    );
+    const item = (client.conditionalPut as ReturnType<typeof vi.fn>).mock
+      .calls[0]?.[0] as NarrativeItem;
+    const payload = item.payload as { explanation_text: string };
+    expect(payload.explanation_text).toContain('s3://bucket/sop/article-2.json');
+    expect(payload.explanation_text).toContain('類比引用');
+  });
+
+  it('kb citation → fallback explanation_text includes source_location WITHOUT 類比引用 marker', async () => {
+    const client = committedClient();
+    await composeExplanation(
+      makeInput({ citations: SAMPLE_KB_CITATIONS, narrativeClient: client }),
+    );
+    const item = (client.conditionalPut as ReturnType<typeof vi.fn>).mock
+      .calls[0]?.[0] as NarrativeItem;
+    const payload = item.payload as { explanation_text: string };
+    expect(payload.explanation_text).toContain('s3://bucket/sop/article-2.json');
+    expect(payload.explanation_text).not.toContain('類比引用');
   });
 });
