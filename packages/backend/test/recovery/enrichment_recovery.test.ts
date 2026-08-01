@@ -20,6 +20,7 @@ import {
 import type { RecoveryGateResult } from '../../src/recovery/recovery_gate.js';
 import type { DecisionNarrativeReadPort } from '../../src/repository/decision_narrative_reader.js';
 import type { ConnectionPublisherPort } from '../../src/events/publish_fast_path_ready.js';
+import type { Telemetry } from '../../src/metrics/telemetry_facade.js';
 
 const DECISION = 'DEC_TPE_2026_ACC_001';
 
@@ -242,6 +243,86 @@ describe('recoverMissingNarratives — decision.enriched gate', () => {
     // publishDecisionEnriched itself swallows per-connection failures into
     // `failures`, so this still resolves successfully with enrichedEmitted=true.
     expect(result.enrichedEmitted).toBe(true);
+  });
+});
+
+// ─── Latency instrumentation (TASK-170) ────────────────────────────────────
+
+describe('recoverMissingNarratives — latency instrumentation (TASK-170)', () => {
+  it('marks EndToEndLatencyMs from core.occurred_at once decision.enriched is emitted', async () => {
+    const core = makeCore(); // occurred_at: '2026-05-20 22:10'
+    const nowMs = Date.parse(core.occurred_at) + 41_000;
+    const recordLatency = vi.fn();
+    const now = vi.fn().mockReturnValue(nowMs);
+
+    const result = await recoverMissingNarratives(
+      makeInput({
+        core,
+        narrativeReader: narrativeReader([
+          NarrativeType.REPORT,
+          NarrativeType.PUBLIC_ALERT,
+          NarrativeType.EXPLANATION,
+        ]),
+        latency: { now, telemetry: { recordLatency } as unknown as Telemetry },
+      }),
+    );
+
+    expect(result.enrichedEmitted).toBe(true);
+    expect(recordLatency).toHaveBeenCalledTimes(1);
+    const trace = recordLatency.mock.calls[0]?.[0] as { snapshot(): { end_to_end_ms: number | null; official_deadline_met: boolean | null } };
+    const snapshot = trace.snapshot();
+    expect(snapshot.end_to_end_ms).toBe(41_000);
+    expect(snapshot.official_deadline_met).toBe(true);
+  });
+
+  it('marks latency even when there are zero live connections (not gated on delivered > 0)', async () => {
+    const core = makeCore();
+    const recordLatency = vi.fn();
+    const now = vi.fn().mockReturnValue(Date.parse(core.occurred_at) + 1_000);
+
+    await recoverMissingNarratives(
+      makeInput({
+        core,
+        connectionPublisher: connectionPublisher([]),
+        narrativeReader: narrativeReader([
+          NarrativeType.REPORT,
+          NarrativeType.PUBLIC_ALERT,
+          NarrativeType.EXPLANATION,
+        ]),
+        latency: { now, telemetry: { recordLatency } as unknown as Telemetry },
+      }),
+    );
+
+    expect(recordLatency).toHaveBeenCalledTimes(1);
+  });
+
+  it('never marks latency when the narrative set is still incomplete', async () => {
+    const recordLatency = vi.fn();
+    const now = vi.fn().mockReturnValue(Date.now());
+
+    const result = await recoverMissingNarratives(
+      makeInput({
+        narrativeReader: narrativeReader([NarrativeType.REPORT, NarrativeType.PUBLIC_ALERT]),
+        latency: { now, telemetry: { recordLatency } as unknown as Telemetry },
+      }),
+    );
+
+    expect(result.enrichedEmitted).toBe(false);
+    expect(recordLatency).not.toHaveBeenCalled();
+  });
+
+  it('is a no-op (no throw) when latency is omitted entirely', async () => {
+    await expect(
+      recoverMissingNarratives(
+        makeInput({
+          narrativeReader: narrativeReader([
+            NarrativeType.REPORT,
+            NarrativeType.PUBLIC_ALERT,
+            NarrativeType.EXPLANATION,
+          ]),
+        }),
+      ),
+    ).resolves.toMatchObject({ enrichedEmitted: true });
   });
 });
 

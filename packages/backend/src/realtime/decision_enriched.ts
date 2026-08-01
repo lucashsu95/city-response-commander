@@ -34,6 +34,8 @@
 import { NarrativeType, SCHEMA_VERSION, type DecisionEnrichedEvent } from '@city-commander/shared-schemas';
 import { buildReadyEventId } from '@city-commander/rag';
 import { REQUIRED_NARRATIVE_TYPES } from '../repository/decision_narrative_reader.js';
+import { LatencyTrace } from '../metrics/latency_trace.js';
+import type { Telemetry } from '../metrics/telemetry_facade.js';
 import {
   isStaleConnectionError,
   type ConnectionPublisherPort,
@@ -127,7 +129,24 @@ export interface DecisionEnrichedPublishResult {
  */
 export async function publishDecisionEnriched(
   publisher: ConnectionPublisherPort,
-  input: DecisionEnrichedInput & { readonly existingNarrativeTypes: readonly NarrativeType[] },
+  input: DecisionEnrichedInput & {
+    readonly existingNarrativeTypes: readonly NarrativeType[];
+    /**
+     * Latency instrumentation (TASK-104/119/154/170), optional. Unlike
+     * `publishFastPathReady`, this takes `now`/`telemetry` rather than an
+     * already-built `LatencyTrace`: this push runs in a Lambda invocation
+     * (recovery, or the eventual enrichment publisher) separate from the one
+     * that ran `DecisionFn`, so there is no in-process trace instance to
+     * reuse. `occurredAt` (= `DecisionCore.occurred_at`) is carried in every
+     * caller's input already and is the same origin the official 60s budget
+     * is measured from, so a fresh trace is rebuilt from it here — that
+     * works across Lambda boundaries where a live object reference would not.
+     */
+    readonly latency?: {
+      readonly now: () => number;
+      readonly telemetry?: Telemetry;
+    };
+  },
 ): Promise<DecisionEnrichedPublishResult> {
   const missing = missingNarrativeTypes(input.existingNarrativeTypes);
   if (missing.length > 0) {
@@ -154,6 +173,33 @@ export async function publishDecisionEnriched(
       }
     }),
   );
+
+  if (input.latency !== undefined) {
+    // Marked after the fan-out, and unconditionally: enrichment is complete
+    // once the broadcast has been attempted. Gating this on `delivered > 0`
+    // would silently drop the measurement whenever no dashboard happened to
+    // be connected — exactly when the data is least likely to be looked at
+    // and most likely to be needed later (mirrors `publishFastPathReady`).
+    //
+    // A malformed `occurredAt` must not fail an otherwise-successful push —
+    // the narrative items and the broadcast above are already done — so the
+    // trace is built defensively rather than let LatencyTrace's constructor
+    // throw out of this function.
+    const startedAtMs = Date.parse(input.occurredAt);
+    if (Number.isFinite(startedAtMs)) {
+      try {
+        const trace = new LatencyTrace({
+          decisionId: input.decisionId,
+          traceId: input.traceId,
+          startedAtMs,
+        });
+        trace.markEnriched(input.latency.now());
+        input.latency.telemetry?.recordLatency(trace);
+      } catch {
+        // Instrumentation must never fail a decision that is otherwise done.
+      }
+    }
+  }
 
   return {
     event,

@@ -17,6 +17,7 @@ import {
   NarrativeSetNotCompleteError,
 } from '../../src/realtime/decision_enriched.js';
 import type { ConnectionPublisherPort } from '../../src/events/publish_fast_path_ready.js';
+import type { Telemetry } from '../../src/metrics/telemetry_facade.js';
 
 const DECISION = 'DEC_TPE_2026_ACC_001';
 const TRACE = 'trace-abc-123';
@@ -139,5 +140,69 @@ describe('publishDecisionEnriched', () => {
         existingNarrativeTypes: [...ALL_THREE].reverse(),
       }),
     ).resolves.not.toThrow();
+  });
+});
+
+// ─── Latency instrumentation (TASK-170) ────────────────────────────────────
+
+describe('publishDecisionEnriched — latency instrumentation', () => {
+  it('marks EndToEndLatencyMs from occurredAt, unconditionally, after the fan-out', async () => {
+    const publisher = createPublisher(['conn-1']);
+    const recordLatency = vi.fn();
+    const occurredAtMs = Date.parse(baseInput.occurredAt);
+    const now = vi.fn().mockReturnValue(occurredAtMs + 12_000);
+
+    await publishDecisionEnriched(publisher, {
+      ...baseInput,
+      existingNarrativeTypes: ALL_THREE,
+      latency: { now, telemetry: { recordLatency } as unknown as Telemetry },
+    });
+
+    expect(recordLatency).toHaveBeenCalledTimes(1);
+    const trace = recordLatency.mock.calls[0]?.[0] as { snapshot(): { end_to_end_ms: number | null } };
+    expect(trace.snapshot().end_to_end_ms).toBe(12_000);
+  });
+
+  it('still marks latency when zero connections are live (not gated on delivered > 0)', async () => {
+    const publisher = createPublisher([]);
+    const recordLatency = vi.fn();
+    const now = vi.fn().mockReturnValue(Date.parse(baseInput.occurredAt) + 5_000);
+
+    await publishDecisionEnriched(publisher, {
+      ...baseInput,
+      existingNarrativeTypes: ALL_THREE,
+      latency: { now, telemetry: { recordLatency } as unknown as Telemetry },
+    });
+
+    expect(recordLatency).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not throw when occurredAt is unparseable', async () => {
+    const publisher = createPublisher(['conn-1']);
+    const recordLatency = vi.fn();
+    const now = vi.fn().mockReturnValue(0);
+
+    await expect(
+      publishDecisionEnriched(publisher, {
+        ...baseInput,
+        occurredAt: 'not-a-date',
+        existingNarrativeTypes: ALL_THREE,
+        latency: { now, telemetry: { recordLatency } as unknown as Telemetry },
+      }),
+    ).resolves.not.toThrow();
+    expect(recordLatency).not.toHaveBeenCalled();
+  });
+
+  it('never throws before the completeness check even when latency is present', async () => {
+    const publisher = createPublisher();
+    const recordLatency = vi.fn();
+    await expect(
+      publishDecisionEnriched(publisher, {
+        ...baseInput,
+        existingNarrativeTypes: [NarrativeType.REPORT],
+        latency: { now: () => 0, telemetry: { recordLatency } as unknown as Telemetry },
+      }),
+    ).rejects.toThrow(NarrativeSetNotCompleteError);
+    expect(recordLatency).not.toHaveBeenCalled();
   });
 });

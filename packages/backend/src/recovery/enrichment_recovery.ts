@@ -42,6 +42,7 @@ import {
   type DecisionEnrichedPublishResult,
 } from '../realtime/decision_enriched.js';
 import type { ConnectionPublisherPort } from '../events/publish_fast_path_ready.js';
+import type { Telemetry } from '../metrics/telemetry_facade.js';
 
 // ─── Guard errors ──────────────────────────────────────────────────────────
 
@@ -93,6 +94,17 @@ export interface EnrichmentRecoveryInput {
   readonly connectionPublisher: ConnectionPublisherPort;
   readonly traceId: string;
   readonly policyVersion: string;
+  /**
+   * Latency instrumentation (TASK-170), optional. Passed straight through to
+   * `publishDecisionEnriched`, which rebuilds a `LatencyTrace` from
+   * `core.occurred_at` — this recovery Lambda never had DecisionFn's
+   * in-process trace to begin with, so there is nothing to thread but
+   * `now`/`telemetry`.
+   */
+  readonly latency?: {
+    readonly now: () => number;
+    readonly telemetry?: Telemetry;
+  };
 }
 
 export interface EnrichmentRecoveryResult {
@@ -163,6 +175,7 @@ export async function recoverMissingNarratives(
         policyVersion: input.policyVersion,
         occurredAt: input.core.occurred_at,
         provisional: input.core.provisional,
+        latency: input.latency,
       });
       enrichedEmitted = true;
     } catch {
