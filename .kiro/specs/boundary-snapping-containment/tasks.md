@@ -191,7 +191,7 @@ Task ID scheme: `TASK-BS-01..TASK-BS-19`, flat and sequential. `CHECKPOINT` line
   - tests_required: `packages/backend/test/decision/containment_assembler.test.ts` — golden no-regression cases, diffed against `packages/backend/test/decision/decision_fn.test.ts` fixtures.
   - done_definition: Zero diff on all three golden fixtures.
 
-- [ ] TASK-BS-12 Wire the `OUT_OF_BOUNDS_SNAPPED` / `OUT_OF_JURISDICTION` branch with RD_ sub-pipeline short-circuit (Requirement 12 AC4–AC6)
+- [x] TASK-BS-12 Wire the `OUT_OF_BOUNDS_SNAPPED` / `OUT_OF_JURISDICTION` branch with RD_ sub-pipeline short-circuit (Requirement 12 AC4–AC6)
   - objective: When an incident is a Coverage_Gap, skip the existing RD_ branch's classification/anchor/evacuation/ETE (which would only produce degraded nulls) and assemble the decision from `Boundary_Snapper` + `Sop_Coverage_Resolver` output instead.
   - requirements_covered: R12 (AC4, AC5, AC6)
   - design_sections: §3.2

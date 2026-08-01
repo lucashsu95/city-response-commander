@@ -122,6 +122,7 @@
 | 提交 GitHub 連結 | B | ❓ |
 | 提交影片 | E | ❓ |
 | TASK-BS-11：in-scope containment branch + 三個 golden no-regression diff | Codex | ✅ |
+| TASK-BS-12：coverage-gap snap branch + RD_ short circuit + SOP-3/4/6 seam | Codex | ✅ |
 
 ---
 

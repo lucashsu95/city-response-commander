@@ -37,6 +37,7 @@ import type { IngestionDataStatus, IngestionResult } from '../ingestion/data_ing
 import { normalizeTimestamp } from '../ingestion/timestamp_normalizer.js';
 import {
   createPolicyStrategyBundle,
+  type PolicyStrategyBundle,
   type PolicyStrategyConfigProvider,
 } from '../strategies/policy_strategy_bundle.js';
 import type { AffectedRoadStrategyResult } from '../strategies/affected_road_strategy.js';
@@ -128,6 +129,25 @@ export interface DeterministicDecisionResult {
   readonly facts: DeterministicDecisionFacts | null;
 }
 
+/** Input for the BS_ID-keyed subset shared by the full and coverage-gap pipelines. */
+export interface StationBasedArticleInput {
+  readonly ingestion: IngestionResult;
+  readonly config: PolicyStrategyConfigProvider;
+  readonly event_timestamp: string;
+}
+
+/**
+ * Deterministic SOP-3/4/6 output, intentionally independent of all RD_ fields.
+ * This is the seam used by Containment_Assembler when a coverage gap must skip
+ * classification, Strategy D, evacuation, and ETE (R12 AC4/AC5).
+ */
+export interface StationBasedArticleResult {
+  readonly evaluations: readonly ArticleEvaluationSummary[];
+  readonly multilingual_required: boolean;
+  readonly multilingual_scope: DeterministicDecisionFacts['multilingual_scope'];
+  readonly policy: PolicyMetadata;
+}
+
 // ─── Internal helper record shapes (Strategy-A selectable) ──
 
 interface TrafficSelectRecord {
@@ -140,6 +160,19 @@ interface CrowdSelectRecord {
   readonly user_count: number;
   readonly growth_rate: number;
   readonly roaming_pct_value: number;
+}
+
+/**
+ * Evaluate only SOP-3, SOP-4, and SOP-6 from BS_ID station data.
+ * No road classification, incident-anchor resolution, evacuation, or ETE code
+ * is reachable through this entry point (R12 AC4/AC5).
+ */
+export function evaluateStationBasedArticles(
+  input: StationBasedArticleInput,
+): StationBasedArticleResult {
+  const bundle = createPolicyStrategyBundle(input.config);
+  const eventDate = normalizeTimestamp(input.event_timestamp).timestamp_normalized;
+  return evaluateStationBasedArticlesWithBundle(input.ingestion, bundle, eventDate);
 }
 
 // ─── Facade ────────────────────────────────────────────────
@@ -182,8 +215,6 @@ export function runDeterministicDecision(
   const eventDate = normalizeTimestamp(incident.timestamp).timestamp_normalized;
 
   const trafficByStation = groupTraffic(ingestion);
-  const crowdByStation = groupCrowd(ingestion);
-
   const evaluations: ArticleEvaluationSummary[] = [];
   const saturationBySegment = new Map<string, number>();
 
@@ -300,60 +331,9 @@ export function runDeterministicDecision(
     }
   }
 
-  // ─── SOP-3 (BL17) as applicable ──
-  const bl17Records = crowdByStation.get(ARTICLE3_STATION_ID);
-  if (bl17Records !== undefined && bl17Records.length > 0) {
-    const selected = bundle.timeAlignment.select(ARTICLE3_STATION_ID, eventDate, bl17Records);
-    const record = selected.record;
-    const article3 = evaluateArticle3({
-      bs_id: ARTICLE3_STATION_ID,
-      user_count: record?.user_count ?? null,
-      growth_rate: record?.growth_rate ?? null,
-    });
-    if (article3.triggered) {
-      evaluations.push({ article: 3, triggered: true });
-    }
-  }
-
-  // ─── SOP-4 (dome dispersal, links SOP-3) as applicable ──
-  const domeRecords = crowdByStation.get(ARTICLE4_STATION_ID);
-  if (domeRecords !== undefined && domeRecords.length > 0) {
-    const selected = bundle.timeAlignment.select(ARTICLE4_STATION_ID, eventDate, domeRecords);
-    const current = selected.record;
-    const article4 = evaluateArticle4({
-      bs_id: ARTICLE4_STATION_ID,
-      current_observed_at: current?.timestamp_normalized ?? eventDate,
-      historical_observations: domeRecords.map((record) => ({
-        observed_at: record.timestamp_normalized,
-        user_count: record.user_count,
-      })),
-      current_growth_rate: current?.growth_rate ?? null,
-    });
-    if (article4.triggered) {
-      evaluations.push({
-        article: 4,
-        triggered: true,
-        invoked_procedures: article4.invoked_procedures,
-      });
-    }
-  }
-
-  // ─── SOP-6 multilingual trigger (Strategy F) — always where in scope ──
-  const currentStations: CurrentStationSnapshot[] = [];
-  for (const [bsId, records] of crowdByStation) {
-    const selected = bundle.timeAlignment.select(bsId, eventDate, records);
-    currentStations.push({
-      bs_id: bsId,
-      roaming_pct_value: selected.record?.roaming_pct_value ?? null,
-    });
-  }
-  const multilingualScopeResult = bundle.multilingualScope.stationsInScope(currentStations, {
-    mode: bundle.metadata.multilingual_scope.mode,
-  });
-  const article6 = evaluateArticle6(multilingualScopeResult);
-  if (article6.triggered) {
-    evaluations.push({ article: 6, triggered: true });
-  }
+  // ─── BS_ID-keyed SOP-3/4/6 subset (also reused by coverage-gap decisions) ──
+  const stationArticles = evaluateStationBasedArticlesWithBundle(ingestion, bundle, eventDate);
+  evaluations.push(...stationArticles.evaluations);
 
   // ─── Aggregate the three distinct article sets (art.7 stays a formula) ──
   const appliedFormulaArticles = ete !== null ? [...ete.applied_formula_articles] : [];
@@ -412,8 +392,8 @@ export function runDeterministicDecision(
     affected_road: affectedRoad,
     affected_intersection_scope: affectedIntersectionScope,
     ete,
-    multilingual_required: article6.multilingual_required,
-    multilingual_scope: article6.multilingual_scope,
+    multilingual_required: stationArticles.multilingual_required,
+    multilingual_scope: stationArticles.multilingual_scope,
     evidence,
     cms_core_text: cmsCoreText,
     policy: bundle.metadata,
@@ -429,6 +409,74 @@ export function runDeterministicDecision(
 }
 
 // ─── Internal helpers ──────────────────────────────────────
+
+function evaluateStationBasedArticlesWithBundle(
+  ingestion: IngestionResult,
+  bundle: PolicyStrategyBundle,
+  eventDate: Date,
+): StationBasedArticleResult {
+  const crowdByStation = groupCrowd(ingestion);
+  const evaluations: ArticleEvaluationSummary[] = [];
+
+  const bl17Records = crowdByStation.get(ARTICLE3_STATION_ID);
+  if (bl17Records !== undefined && bl17Records.length > 0) {
+    const selected = bundle.timeAlignment.select(ARTICLE3_STATION_ID, eventDate, bl17Records);
+    const record = selected.record;
+    const article3 = evaluateArticle3({
+      bs_id: ARTICLE3_STATION_ID,
+      user_count: record?.user_count ?? null,
+      growth_rate: record?.growth_rate ?? null,
+    });
+    if (article3.triggered) {
+      evaluations.push({ article: 3, triggered: true });
+    }
+  }
+
+  const domeRecords = crowdByStation.get(ARTICLE4_STATION_ID);
+  if (domeRecords !== undefined && domeRecords.length > 0) {
+    const selected = bundle.timeAlignment.select(ARTICLE4_STATION_ID, eventDate, domeRecords);
+    const current = selected.record;
+    const article4 = evaluateArticle4({
+      bs_id: ARTICLE4_STATION_ID,
+      current_observed_at: current?.timestamp_normalized ?? eventDate,
+      historical_observations: domeRecords.map((record) => ({
+        observed_at: record.timestamp_normalized,
+        user_count: record.user_count,
+      })),
+      current_growth_rate: current?.growth_rate ?? null,
+    });
+    if (article4.triggered) {
+      evaluations.push({
+        article: 4,
+        triggered: true,
+        invoked_procedures: article4.invoked_procedures,
+      });
+    }
+  }
+
+  const currentStations: CurrentStationSnapshot[] = [];
+  for (const [bsId, records] of crowdByStation) {
+    const selected = bundle.timeAlignment.select(bsId, eventDate, records);
+    currentStations.push({
+      bs_id: bsId,
+      roaming_pct_value: selected.record?.roaming_pct_value ?? null,
+    });
+  }
+  const multilingualScopeResult = bundle.multilingualScope.stationsInScope(currentStations, {
+    mode: bundle.metadata.multilingual_scope.mode,
+  });
+  const article6 = evaluateArticle6(multilingualScopeResult);
+  if (article6.triggered) {
+    evaluations.push({ article: 6, triggered: true });
+  }
+
+  return {
+    evaluations,
+    multilingual_required: article6.multilingual_required,
+    multilingual_scope: article6.multilingual_scope,
+    policy: bundle.metadata,
+  };
+}
 
 function resolveIncident(input: DeterministicDecisionInput): Incident {
   if (input.incident !== undefined) return input.incident;

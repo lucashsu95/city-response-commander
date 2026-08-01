@@ -4,11 +4,11 @@
  *
  * This is a Layer 2 orchestrator: it calls Layer 1 deterministic domain
  * functions (`checkEntityScope`, `resolveSopCoverage`, `runDeterministicDecision`,
- * and — from TASK-BS-12 onward — `snap`) but contains no rule semantics of
- * its own, mirroring `DefaultDomainPipelineAdapter`'s existing split of
+ * `evaluateStationBasedArticles`, and `snap`) but contains no rule semantics
+ * of its own, mirroring `DefaultDomainPipelineAdapter`'s existing split of
  * responsibility.
  *
- * ## Scope of this revision (TASK-BS-10 + TASK-BS-11)
+ * ## Scope of this revision (TASK-BS-10 through TASK-BS-12)
  *
  * Wired so far (design.md §3.1, steps 1-2 plus the `IN_SCOPE`/
  * `IN_SCOPE_BY_INTERSECTION` branch of step "existing pipeline"):
@@ -19,11 +19,11 @@
  *   changes (TASK-BS-11, R12 AC3/AC6/AC7 — proven by
  *   `containment_assembler.test.ts`'s no-regression cases against the same
  *   golden fixtures `decision_pipeline.test.ts` uses).
+ * - For `OUT_OF_BOUNDS`: call `snap()`, skip the existing RD_ sub-pipeline,
+ *   and retain only the shared SOP-3/4/6 station evaluations (TASK-BS-12).
  *
- * NOT yet wired: the `snap()` branch for `OUT_OF_BOUNDS` (TASK-BS-12), Safe_Context
- * construction (TASK-BS-13), and the Bedrock/Whitelist_Guard call (TASK-BS-14).
- * `mapped_anchor_node` is therefore always `null` for now, even though it will
- * be populated for `OUT_OF_BOUNDS_SNAPPED` once TASK-BS-12 lands.
+ * NOT yet wired: Safe_Context construction (TASK-BS-13) and the
+ * Bedrock/Whitelist_Guard call (TASK-BS-14).
  *
  * ## The STOP-gate short circuit (R12 AC2)
  *
@@ -38,9 +38,13 @@
  */
 
 import {
+  aggregateArticles,
+  buildEvidenceTrace,
   checkEntityScope,
+  evaluateStationBasedArticles,
   resolveSopCoverage,
   runDeterministicDecision,
+  snap,
 } from '@city-commander/domain';
 import type {
   DeterministicDecisionFacts,
@@ -49,10 +53,12 @@ import type {
   PolicyStrategyConfigProvider,
 } from '@city-commander/domain';
 import type {
+  BoundarySnapperConfig,
   DataScopeStatus,
   EntityScopeResult,
   Incident,
   MappedAnchorNode,
+  SopCitation,
   SopCoverageResult,
 } from '@city-commander/shared-schemas';
 
@@ -63,11 +69,9 @@ export interface AssembleContainmentInput {
 }
 
 /**
- * Result of the Entity_Scope_Check + SOP coverage + (for `IN_SCOPE*`)
- * `runDeterministicDecision` stage (TASK-BS-10/11 scope). Superseded by the
- * full `ContainmentResult` shape (design.md §6) once TASK-BS-12 through
- * TASK-BS-14 land — `mapped_anchor_node` in particular stays `null` for
- * `OUT_OF_BOUNDS` incidents until TASK-BS-12 wires `snap()`.
+ * Result through the deterministic TASK-BS-12 stage. Superseded by the full
+ * `ContainmentResult` shape (design.md §6) once TASK-BS-13/14 add Safe_Context,
+ * Bedrock composition, and whitelist auditing.
  */
 export interface ContainmentAssemblerResult {
   readonly data_status: IngestionDataStatus;
@@ -79,24 +83,19 @@ export interface ContainmentAssemblerResult {
   /** `null` only when `data_status !== 'ready'` (R12 AC2). */
   readonly sop_coverage: SopCoverageResult | null;
   /**
-   * `null` when `data_status !== 'ready'`, or when coverage is `OUT_OF_BOUNDS`
-   * and TASK-BS-12 has not yet resolved it to `OUT_OF_BOUNDS_SNAPPED` /
-   * `OUT_OF_JURISDICTION`. Otherwise mirrors `entity_scope.coverage_status`
-   * (R10 AC1).
+   * `null` only when `data_status !== 'ready'`; otherwise the final scope after
+   * Entity_Scope_Check and, when needed, Boundary_Snapper (R10 AC1).
    */
   readonly data_scope_status: DataScopeStatus | null;
   /**
-   * Always `null` until TASK-BS-12 wires `snap()` (R10 AC9 — also `null` for
-   * `IN_SCOPE`/`IN_SCOPE_BY_INTERSECTION`, which never snap at all).
+   * Populated only for `OUT_OF_BOUNDS_SNAPPED`; `IN_SCOPE*` never snaps and
+   * `OUT_OF_JURISDICTION` has no valid anchor (R10 AC9).
    */
   readonly mapped_anchor_node: MappedAnchorNode | null;
   /**
-   * Deterministic facts from `runDeterministicDecision`, unchanged from
-   * `DefaultDomainPipelineAdapter`'s existing output — populated only for
-   * `IN_SCOPE`/`IN_SCOPE_BY_INTERSECTION` (R12 AC3, AC6). `null` for
-   * `OUT_OF_BOUNDS` until TASK-BS-12 assembles a Coverage_Gap decision from
-   * `Boundary_Snapper` output instead (R12 AC4 — the RD_ branch is skipped
-   * entirely there, not just its `facts` omitted).
+   * `IN_SCOPE*` receives the unchanged full deterministic facts. Coverage-gap
+   * facts contain only SOP-3/4/6 station outcomes; every RD_-specific field is
+   * empty/null because that sub-pipeline is deliberately skipped (R12 AC4-AC6).
    */
   readonly facts: DeterministicDecisionFacts | null;
 }
@@ -122,6 +121,85 @@ function isInScope(
   status: EntityScopeResult['coverage_status'],
 ): status is Extract<DataScopeStatus, 'IN_SCOPE' | 'IN_SCOPE_BY_INTERSECTION'> {
   return status === 'IN_SCOPE' || status === 'IN_SCOPE_BY_INTERSECTION';
+}
+
+function readBoundarySnapperConfig(config: PolicyStrategyConfigProvider): BoundarySnapperConfig {
+  const maxDistance = config.get('boundary_snapping.max_snap_distance_meters');
+  const coordinatePathEnabled = config.get('boundary_snapping.coordinate_path_enabled');
+
+  if (typeof maxDistance !== 'number' || !Number.isFinite(maxDistance)) {
+    throw new Error('boundary_snapping.max_snap_distance_meters must be a finite number.');
+  }
+  if (typeof coordinatePathEnabled !== 'boolean') {
+    throw new Error('boundary_snapping.coordinate_path_enabled must be a boolean.');
+  }
+
+  return {
+    max_snap_distance_meters: maxDistance,
+    coordinate_path_enabled: coordinatePathEnabled,
+  };
+}
+
+function buildCoverageGapFacts(
+  ingestion: IngestionResult,
+  incident: Incident,
+  config: PolicyStrategyConfigProvider,
+): DeterministicDecisionFacts {
+  const stationArticles = evaluateStationBasedArticles({
+    ingestion,
+    config,
+    event_timestamp: incident.timestamp,
+  });
+  const articles = aggregateArticles({
+    evaluations: stationArticles.evaluations,
+    applied_formula_articles: [],
+  });
+
+  const sopCitations: SopCitation[] = [];
+  if (ingestion.sopArticles !== undefined) {
+    for (const articleNo of articles.citation_article_set) {
+      const chunk = ingestion.sopArticles.getByArticleNo(articleNo);
+      if (chunk !== undefined) {
+        sopCitations.push({
+          article_no: articleNo,
+          source_location: `emergency_traffic_sop.txt#article-${articleNo}`,
+          content: chunk.text,
+        });
+      }
+    }
+  }
+
+  const evidence = buildEvidenceTrace({
+    decision_id: '',
+    classification_reasoning: [],
+    excluded_candidates: [],
+    citation_article_set: articles.citation_article_set,
+    sop_citations: sopCitations,
+    data_points: [],
+  });
+
+  return {
+    source_manifest_hash: ingestion.source_manifest_hash,
+    triggered_articles: articles.triggered_articles,
+    applied_formula_articles: articles.applied_formula_articles,
+    invoked_procedures: articles.invoked_procedures,
+    citation_article_set: articles.citation_article_set,
+    art1_measures: [],
+    classifications: [],
+    incident_anchor: null,
+    primary_evacuation: null,
+    secondary_evacuation: [],
+    excluded_candidates: [],
+    affected_road: null,
+    affected_intersection_scope: null,
+    ete: null,
+    multilingual_required: stationArticles.multilingual_required,
+    multilingual_scope: stationArticles.multilingual_scope,
+    evidence,
+    cms_core_text: null,
+    policy: stationArticles.policy,
+    provisional: true,
+  };
 }
 
 /**
@@ -165,20 +243,30 @@ export function assembleContainment(input: AssembleContainmentInput): Containmen
   const sopCoverage = resolveSopCoverage(incident.type, incident.description);
 
   if (!isInScope(entityScope.coverage_status)) {
-    // OUT_OF_BOUNDS — snap() branch not wired until TASK-BS-12. Deliberately
-    // does NOT call runDeterministicDecision here (R12 AC4): that RD_ branch
-    // would only produce degraded nulls for a segment outside Road_Whitelist,
-    // and its `incident_anchor.manual_confirmation_required` output must never
-    // coexist with a `mapped_anchor_node` for the same incident (R12 AC6).
+    const snapResult = snap(incident, ingestion.roadNetwork, readBoundarySnapperConfig(config));
+    if ('error' in snapResult) {
+      throw new Error(`Boundary_Snapper configuration error: ${snapResult.missing_key}.`);
+    }
+
+    const mappedAnchorNode =
+      snapResult.anchor === null
+        ? null
+        : {
+            ...snapResult.anchor,
+            distance_meters: snapResult.distance_meters,
+          };
+
+    // R12 AC4-AC6 — no call to runDeterministicDecision's RD_ branch. Only
+    // the extracted BS_ID-keyed SOP-3/4/6 subset remains available in facts.
     return {
       data_status: 'ready',
       stop_reason: null,
       source_manifest_hash: ingestion.source_manifest_hash,
       entity_scope: entityScope,
       sop_coverage: sopCoverage,
-      data_scope_status: null,
-      mapped_anchor_node: null,
-      facts: null,
+      data_scope_status: snapResult.coverage_status,
+      mapped_anchor_node: mappedAnchorNode,
+      facts: buildCoverageGapFacts(ingestion, incident, config),
     };
   }
 

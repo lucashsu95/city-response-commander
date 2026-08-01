@@ -146,7 +146,7 @@ function readyIngestion(overrides: ReadyIngestionOverrides = {}): IngestionResul
 
 /** ConfigProvider matching the HG-001 provisional policy set (same values decision_pipeline.test.ts uses). */
 class LocalConfigProvider implements PolicyStrategyConfigProvider {
-  private readonly values: Readonly<Record<string, string | number>> = {
+  private readonly values: Readonly<Record<string, string | number | boolean>> = {
     'policy.time_alignment.mode': 'exact_or_latest_prior_per_entity',
     'policy.time_alignment.max_staleness_minutes': 30,
     'policy.affected_road.role': 'display_only',
@@ -154,8 +154,10 @@ class LocalConfigProvider implements PolicyStrategyConfigProvider {
     'policy.incident_anchor.mode': 'incident_anchor_from_location_text',
     'policy.affected_intersection_scope.mode': 'unresolved_manual_confirmation',
     'policy.multilingual_scope.mode': 'current_snapshot_all_available_stations',
+    'boundary_snapping.max_snap_distance_meters': 5_000,
+    'boundary_snapping.coordinate_path_enabled': false,
   };
-  get(key: string): string | number {
+  get(key: string): string | number | boolean {
     const value = this.values[key];
     if (value === undefined) throw new Error(`missing ${key}`);
     return value;
@@ -219,7 +221,7 @@ describe('assembleContainment', () => {
   });
 
   describe('R1 AC1 — Entity_Scope_Check then SOP coverage resolution', () => {
-    it('resolves OUT_OF_BOUNDS + UNKNOWN_TYPE_UNIVERSAL_SOP for an incident outside both the network and the SOP table, without calling runDeterministicDecision', () => {
+    it('resolves and snaps an incident outside both the network and the SOP table', () => {
       const ingestion = readyIngestion();
       const outOfBoundsIncident = incident({
         affected_segment: 'RD_TPE_099',
@@ -227,16 +229,98 @@ describe('assembleContainment', () => {
         location: '完全不在路網範圍內的地點',
         type: 'Unknown_Chemical_Leak' as unknown as Incident['type'],
         description: '未知化學氣體洩漏',
+        timestamp: '2026-05-20 22:30',
       });
       const result = assembleContainment({ ingestion, incident: outOfBoundsIncident, config });
 
       expect(result.entity_scope?.coverage_status).toBe('OUT_OF_BOUNDS');
       expect(result.sop_coverage?.sop_coverage_status).toBe('UNKNOWN_TYPE_UNIVERSAL_SOP');
       expect(result.sop_coverage?.universal_principles.length).toBeGreaterThan(0);
-      // R12 AC4 — RD_ branch skipped entirely for OUT_OF_BOUNDS, not just its facts omitted.
-      expect(result.data_scope_status).toBeNull();
+      expect(result.data_scope_status).toBe('OUT_OF_BOUNDS_SNAPPED');
+      expect(result.mapped_anchor_node).toEqual({
+        segment_id: 'RD_TPE_002',
+        gateway_intersection: '仁愛路四段',
+        capacity_vph: 1800,
+        distance_meters: null,
+      });
+    });
+  });
+
+  describe('R12 AC4-AC6 — coverage-gap RD_ short circuit', () => {
+    const outsideIncident = (): Incident =>
+      incident({
+        affected_segment: 'RD_TPE_099',
+        affected_road: undefined,
+        location: '完全不在路網範圍內的地點',
+        type: 'Unknown_Chemical_Leak' as unknown as Incident['type'],
+        description: '未知化學氣體洩漏',
+        timestamp: '2026-05-20 22:30',
+      });
+
+    it('returns snapped perimeter facts without Strategy D, evacuation, classification, or ETE', () => {
+      const result = assembleContainment({
+        ingestion: readyIngestion(),
+        incident: outsideIncident(),
+        config,
+      });
+
+      expect(result.data_scope_status).toBe('OUT_OF_BOUNDS_SNAPPED');
+      expect(result.mapped_anchor_node).not.toBeNull();
+      expect(result.facts).not.toBeNull();
+      expect(result.facts).toMatchObject({
+        classifications: [],
+        incident_anchor: null,
+        primary_evacuation: null,
+        secondary_evacuation: [],
+        excluded_candidates: [],
+        ete: null,
+      });
+      expect(result.facts?.incident_anchor !== null && result.mapped_anchor_node !== null).toBe(
+        false,
+      );
+    });
+
+    it('returns OUT_OF_JURISDICTION with no mapped anchor when the network has no perimeter gateway', () => {
+      const closedNetwork = RoadNetworkModel.load([
+        {
+          segment_id: 'RD_TPE_010',
+          name: '封閉測試路段',
+          flow_direction: '南北向',
+          intersections: [],
+          capacity_vph: 1_000,
+          alternatives: [],
+          nearby_stations: [],
+        },
+      ]);
+      const result = assembleContainment({
+        ingestion: readyIngestion({ roadNetwork: closedNetwork }),
+        incident: outsideIncident(),
+        config,
+      });
+
+      expect(result.data_scope_status).toBe('OUT_OF_JURISDICTION');
       expect(result.mapped_anchor_node).toBeNull();
-      expect(result.facts).toBeNull();
+      expect(result.facts?.incident_anchor).toBeNull();
+      expect(result.facts?.primary_evacuation).toBeNull();
+    });
+
+    it('keeps SOP-3/4/6 station evaluations while the RD_ sub-pipeline stays skipped', () => {
+      const ingestion = readyIngestion({
+        crowd: [
+          crowdRecord('BS_MRT_BL17', '2026-05-20 22:25', 31_000, 0.2, 0.1),
+          crowdRecord('BS_TPE_DOME', '2026-05-20 22:00', 40_000, 0.1, 0.35),
+          crowdRecord('BS_TPE_DOME', '2026-05-20 22:30', 27_600, -0.31, 0.35),
+        ],
+      });
+      const testIncident = outsideIncident();
+      const result = assembleContainment({ ingestion, incident: testIncident, config });
+
+      expect(result.facts?.triggered_articles).toEqual([3, 4, 6]);
+      expect(result.facts?.invoked_procedures).toContain('article3_mrt_shuttle_mechanism');
+      expect(result.facts?.multilingual_required).toBe(true);
+      expect(result.facts?.incident_anchor).toBeNull();
+      expect(result.facts?.primary_evacuation).toBeNull();
+      expect(result.facts?.ete).toBeNull();
     });
   });
 
