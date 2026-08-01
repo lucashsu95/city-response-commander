@@ -43,6 +43,10 @@ const LLM_PROHIBITED_FIELDS = new Set([
   'sop_authority',
   'universal_principles',
   'grounding_candidates',
+  'pre_warning_segments',
+  'signal_conflicts',
+  'cascading_risk',
+  'self_blocked_exclusions',
   'provisional',
   'schema_version',
 ]);

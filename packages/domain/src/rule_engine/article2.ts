@@ -32,8 +32,13 @@ import type { RoadNetworkModel } from '../road_network/road_network_model.js';
 
 // ─── Constants ─────────────────────────────────────────────
 
-/** Status values that satisfy the first trigger condition */
-const TRIGGER_STATUSES: ReadonlySet<string> = new Set([
+/**
+ * Status values that satisfy the first trigger condition.
+ * Exported for reuse by `grey_zone_arbitration.ts` (GZAE-R1), which checks
+ * whether a candidate segment is itself blocked by another active incident
+ * using the same blocking-status definition, without redeclaring it.
+ */
+export const TRIGGER_STATUSES: ReadonlySet<string> = new Set([
   IncidentStatus.Closed,
   IncidentStatus.Blocked,
   IncidentStatus.Restricted,

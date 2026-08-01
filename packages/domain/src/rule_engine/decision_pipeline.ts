@@ -22,6 +22,7 @@
 import type {
   AffectedIntersectionScope,
   Art1Measures,
+  CascadingRisk,
   ClassificationReasoning,
   EvidenceTrace,
   GroundingCandidate,
@@ -31,6 +32,7 @@ import type {
   RouteCandidate,
   SegmentClassification,
   Severity,
+  SignalConflict,
   SopCitation,
   SopMatchResult,
   UniversalPrinciple,
@@ -65,6 +67,15 @@ import {
   selectGroundingCandidates,
   UNIVERSAL_DEFENSE_PRINCIPLES,
 } from './universal_defense.js';
+import {
+  excludeSelfBlockedCandidates,
+  diffSelfBlockedExclusions,
+  detectPreWarning,
+  detectSignalConflicts,
+  buildAdjacencyGraph,
+  detectCascadingRisk,
+  type SaturationHistoryPoint,
+} from './grey_zone_arbitration.js';
 
 // ─── Public Input / Result Types ───────────────────────────
 
@@ -140,6 +151,20 @@ export interface DeterministicDecisionFacts {
   /** Non-empty only when `sop_matched` is `false` and a grounding anchor was resolvable (§UARE-R3, R6). */
   readonly grounding_candidates: readonly GroundingCandidate[];
 
+  /**
+   * GZAE (Grey-Zone Arbitration Engine, spec:
+   * .kiro/specs/grey-zone-arbitration-engine/). §GZAE-R2: segments in the
+   * `[0.80, 0.85)` grey zone with a strictly rising 3-point trend. Never
+   * affects `classifications`.
+   */
+  readonly pre_warning_segments: readonly string[];
+  /** GZAE (§GZAE-R3). Cross-article traffic/crowd signal contradictions, advisory-only. */
+  readonly signal_conflicts: readonly SignalConflict[];
+  /** GZAE (§GZAE-R4). Adjacent, individually-non-escalating incidents; `null` when none detected. */
+  readonly cascading_risk: CascadingRisk | null;
+  /** GZAE (§GZAE-R1). `segment_id`s excluded because they are themselves blocked by another active incident. */
+  readonly self_blocked_exclusions: readonly string[];
+
   readonly provisional: true;
 }
 
@@ -204,6 +229,12 @@ export function runDeterministicDecision(
   const roadNetwork = ingestion.roadNetwork;
   const eventDate = normalizeTimestamp(incident.timestamp).timestamp_normalized;
 
+  // GZAE (§GZAE-R1, R4): other incidents from the same ingested set, excluding
+  // the one being decided. Reuses `ingestion.incidents` — no new input surface.
+  const otherActiveIncidents: readonly Incident[] = (ingestion.incidents ?? []).filter(
+    (candidate) => candidate.event_id !== incident.event_id,
+  );
+
   const trafficByStation = groupTraffic(ingestion);
   const crowdByStation = groupCrowd(ingestion);
 
@@ -220,6 +251,12 @@ export function runDeterministicDecision(
   let affectedIntersectionScope: AffectedIntersectionScope | null = null;
   let ete: EteCalculationResult | null = null;
   let cmsCoreText: string | null = null;
+
+  // GZAE (§GZAE-R1..R4) outputs — additive except self_blocked_exclusions,
+  // which reflects R1's post-hoc correction of `candidates`/`excludedCandidates`.
+  let preWarningSegments: readonly string[] = [];
+  let selfBlockedExclusions: readonly string[] = [];
+  const crowdTriggeredStationIds = new Set<string>();
 
   const isRoadEvent = incident.affected_segment.startsWith('RD_');
 
@@ -266,12 +303,22 @@ export function runDeterministicDecision(
       ? null
       : anchor.anchor_intersection;
 
-    const candidates = qualifyCandidates(
+    const candidatesBeforeGzae = qualifyCandidates(
       incident.affected_segment,
       anchorIntersection,
       roadNetwork,
       saturationMap,
     );
+    // GZAE §GZAE-R1: exclude candidates that are themselves blocked by another
+    // active incident. Runs strictly after the existing 3-AND qualification
+    // above and never upgrades an already-excluded candidate.
+    const candidates = excludeSelfBlockedCandidates(
+      candidatesBeforeGzae,
+      incident.event_id,
+      otherActiveIncidents,
+    );
+    selfBlockedExclusions = diffSelfBlockedExclusions(candidatesBeforeGzae, candidates);
+
     const evacuation = selectEvacuation(candidates);
     primaryEvacuation = evacuation.primary_evacuation;
     secondaryEvacuation = evacuation.secondary_evacuation;
@@ -279,6 +326,18 @@ export function runDeterministicDecision(
 
     if (isArticle2Triggered(incident)) {
       evaluations.push({ article: 2, triggered: true });
+    }
+
+    // GZAE §GZAE-R2: threshold-boundary trend pre-warning for the incident's
+    // own segment. Additive-only — never changes `classifications.level`.
+    if (incidentSaturation !== null) {
+      const history = recentSaturationHistoryBefore(
+        trafficByStation.get(incident.affected_segment) ?? [],
+        eventDate,
+      );
+      if (detectPreWarning(incidentSaturation, history)) {
+        preWarningSegments = [incident.affected_segment];
+      }
     }
 
     // ETE affected-set (Strategy C) + latest common exact snapshot + art.7.
@@ -335,6 +394,7 @@ export function runDeterministicDecision(
     });
     if (article3.triggered) {
       evaluations.push({ article: 3, triggered: true });
+      crowdTriggeredStationIds.add(ARTICLE3_STATION_ID);
     }
   }
 
@@ -358,6 +418,7 @@ export function runDeterministicDecision(
         triggered: true,
         invoked_procedures: article4.invoked_procedures,
       });
+      crowdTriggeredStationIds.add(ARTICLE4_STATION_ID);
     }
   }
 
@@ -376,7 +437,30 @@ export function runDeterministicDecision(
   const article6 = evaluateArticle6(multilingualScopeResult);
   if (article6.triggered) {
     evaluations.push({ article: 6, triggered: true });
+    for (const stationId of article6.triggering_station_ids) {
+      crowdTriggeredStationIds.add(stationId);
+    }
   }
+
+  // GZAE §GZAE-R3: cross-article traffic (art.1) vs crowd (art.3/4/6) signal
+  // contradiction, keyed by the existing `nearby_stations` field. Additive-only.
+  const signalConflicts: readonly SignalConflict[] =
+    roadNetwork !== undefined
+      ? detectSignalConflicts(
+          classifications,
+          (segmentId) => roadNetwork.nearbyStations(segmentId),
+          crowdTriggeredStationIds,
+        )
+      : [];
+
+  // GZAE §GZAE-R4: adjacent, individually-non-escalating incidents. Additive-only.
+  const cascadingRisk: CascadingRisk | null =
+    roadNetwork !== undefined
+      ? detectCascadingRisk(
+          [incident, ...otherActiveIncidents],
+          buildAdjacencyGraph(roadNetwork.getAllSegments()),
+        )
+      : null;
 
   // ─── Aggregate the three distinct article sets (art.7 stays a formula) ──
   const appliedFormulaArticles = ete !== null ? [...ete.applied_formula_articles] : [];
@@ -465,6 +549,10 @@ export function runDeterministicDecision(
     sop_authority: sopMatch.sop_authority,
     universal_principles: universalPrinciples,
     grounding_candidates: groundingCandidates,
+    pre_warning_segments: preWarningSegments,
+    signal_conflicts: signalConflicts,
+    cascading_risk: cascadingRisk,
+    self_blocked_exclusions: selfBlockedExclusions,
     provisional: true,
   };
 
@@ -529,6 +617,24 @@ function groupTraffic(ingestion: IngestionResult): ReadonlyMap<string, TrafficSe
     byStation.set(record.Segment_ID, list);
   });
   return byStation;
+}
+
+/**
+ * GZAE §GZAE-R2: the most recent 3 raw saturation observations at or before
+ * `cutoff`, time-ascending. Reuses `groupTraffic`'s already-in-memory,
+ * per-segment array (design.md §4) — no new data-read path. Returns fewer
+ * than 3 points (including zero) when history is insufficient; never
+ * interpolates or defaults a missing point.
+ */
+function recentSaturationHistoryBefore(
+  records: readonly TrafficSelectRecord[],
+  cutoff: Date,
+): readonly SaturationHistoryPoint[] {
+  return records
+    .filter((record) => record.timestamp_normalized.getTime() <= cutoff.getTime())
+    .sort((a, b) => a.timestamp_normalized.getTime() - b.timestamp_normalized.getTime())
+    .slice(-3)
+    .map((record) => ({ saturation_score: record.saturation_score }));
 }
 
 function groupCrowd(ingestion: IngestionResult): ReadonlyMap<string, CrowdSelectRecord[]> {

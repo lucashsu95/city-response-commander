@@ -5,6 +5,7 @@ import type { PolicyMetadata } from './policy_metadata.js';
 import type { ETEResult } from './ete.js';
 import type { RouteCandidate } from './route_candidate.js';
 import type { UniversalPrinciple, GroundingCandidate } from './universal_defense.js';
+import type { SignalConflict, CascadingRisk } from './grey_zone.js';
 
 export interface SegmentClassification {
   readonly segment_id: string;
@@ -105,6 +106,24 @@ export interface DecisionCore {
   readonly universal_principles?: readonly UniversalPrinciple[];
   /** UARE (§UARE-R3, R6). Non-empty only when `sop_matched` is `false` and a grounding anchor was resolvable. */
   readonly grounding_candidates?: readonly GroundingCandidate[];
+
+  /**
+   * GZAE (§GZAE-R2). `segment_id`s in the grey zone `[0.80, 0.85)` with a
+   * strictly rising 3-point trend. Never affects `classifications.level`.
+   * Optional for backwards-compatible read models built before GZAE wiring.
+   */
+  readonly pre_warning_segments?: readonly string[];
+  /** GZAE (§GZAE-R3). Cross-article traffic/crowd signal contradictions, advisory-only. */
+  readonly signal_conflicts?: readonly SignalConflict[];
+  /** GZAE (§GZAE-R4). Adjacent, individually-non-escalating incidents, advisory-only; `null` when none detected. */
+  readonly cascading_risk?: CascadingRisk | null;
+  /**
+   * GZAE (§GZAE-R1). `segment_id`s excluded from evacuation candidacy because
+   * they are themselves the `affected_segment` of another active, blocking
+   * incident. Subset of `excluded_candidates`; recorded separately to
+   * distinguish this mechanism's exclusions from the existing 3-AND ones.
+   */
+  readonly self_blocked_exclusions?: readonly string[];
 
   readonly provisional: boolean;
   readonly schema_version: string;
