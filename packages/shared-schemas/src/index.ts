@@ -155,6 +155,18 @@ export {
   type CitationLocationInput,
 } from './citation_formatting.js';
 
+// ─── RAG Trace (§14.x) ──────────────────────────────────────────
+export type {
+  RagTrace,
+  RagTraceChunk,
+} from './rag_trace.js';
+
+// ─── ETE Calculation Trace (§14.x) ──────────────────────────────
+export type {
+  EteCalculationTrace,
+  EteCalculationVariable,
+} from './ete_calculation.js';
+
 // ─── Discriminated union for API/event payloads (§12/§13) ──
 export type {
   WebSocketEvent,

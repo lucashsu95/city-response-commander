@@ -81,5 +81,11 @@ export interface RecomputeResult {
   readonly applied_formula_articles: readonly number[];
   readonly expected_actions: readonly string[];
   readonly ete_preview?: { readonly ete_minutes: number };
+  /** Severity used in ETE formula (SOP-7 base_clearance lookup) */
+  readonly ete_severity?: string;
+  /** Average saturation score used in ETE formula (SOP-7 congestion_penalty) */
+  readonly ete_avg_saturation?: number;
+  /** Incident timestamp used as base for recovery_at */
+  readonly ete_base_timestamp?: string;
   readonly does_not_mutate_state: true;
 }

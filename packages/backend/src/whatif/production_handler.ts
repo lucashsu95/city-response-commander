@@ -52,5 +52,7 @@ export function createProductionWhatIfHandler(
     // contract as LocalSopRetriever; structural typing is sufficient.
     sopRetriever: sopRetriever as unknown as SopRetriever,
     ruleEngineFacade: facade,
+    // LocalSopRetriever reads from emergency_traffic_sop.txt — NOT a managed AWS KB.
+    retrieverType: 'local_sop_knowledge_base',
   });
 }

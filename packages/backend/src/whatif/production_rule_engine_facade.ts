@@ -171,24 +171,37 @@ export class ProductionRuleEngineWhatIfFacade implements RuleEngineWhatIfFacade 
       applied_formula_articles,
       result.facts?.invoked_procedures ?? [],
     );
+    const eteFacts = result.facts?.ete;
     const eteMinutesRaw =
-      result.facts?.ete !== null && result.facts?.ete !== undefined
-        ? result.facts.ete.ete_minutes
+      eteFacts !== null && eteFacts !== undefined && eteFacts.calculation_status === 'computed'
+        ? eteFacts.ete_minutes
         : undefined;
     const ete_minutes =
-      eteMinutesRaw !== null && eteMinutesRaw !== undefined && Number.isFinite(eteMinutesRaw)
-        ? eteMinutesRaw
+      eteMinutesRaw !== undefined && Number.isFinite(eteMinutesRaw) ? eteMinutesRaw : undefined;
+
+    // ETE raw inputs for the trace builder
+    const ete_severity =
+      eteFacts && 'severity' in eteFacts ? String(eteFacts.severity) : undefined;
+    const ete_avg_saturation =
+      eteFacts && eteFacts.calculation_status === 'computed' && eteFacts.avg_saturation !== null
+        ? eteFacts.avg_saturation
         : undefined;
+    // Use the synthetic incident timestamp as base for recovery_at
+    const ete_base_timestamp = incident.timestamp;
 
     const out: RuleEngineWhatIfFacts = {
       triggered_articles,
       applied_formula_articles,
       expected_actions,
     };
-    if (ete_minutes !== undefined && Number.isFinite(ete_minutes)) {
-      return { ...out, ete_minutes };
-    }
-    return out;
+    const withEte = {
+      ...out,
+      ...(ete_minutes !== undefined && { ete_minutes }),
+      ...(ete_severity !== undefined && { ete_severity }),
+      ...(ete_avg_saturation !== undefined && { ete_avg_saturation }),
+      ...(ete_base_timestamp !== undefined && { ete_base_timestamp }),
+    };
+    return withEte;
   }
 }
 
