@@ -1,26 +1,28 @@
 /**
- * Dashboard Page
+ * Dashboard Page — Redesigned Command Center
  *
- * Main dashboard route component. Owns the realtime connection lifecycle
- * (§13, §16.4) and feeds its connection mode into the operational status bar.
- * Also owns the TASK-124 timeline playback controller and the TASK-125 road
- * traffic controller, wiring their refresh signals:
+ * Main dashboard route component. Wires the CommandCenterShell with:
+ * - OperationsMap (map)
+ * - Timeline playback (timeline bar)
+ * - Metric charts (roads/crowd/roaming)
+ * - AI Decision cards (decision/route/multilingual)
+ * - What-if dialog
+ * - Injection modal
  *
- * - `timeline.updated` (WebSocket notification) → authoritative timeline refresh
- * - the TASK-122 polling fallback's `timeline`/`roads` targets → consumed
- *   directly when available, so no second `GET /timeline`/`GET /roads`
- *   request is issued
- * - the timeline controller's authoritative `currentTimestamp` advancing →
- *   one road refresh (§16, TASK-125); the mount-time initial `GET /roads`
- *   fetch is the road controller's own responsibility, not duplicated here
- * - `anomaly.detected` and the fallback's `roads`/`crowd` bodies → the
- *   TASK-127 anomaly popup controller, which reuses those already-fetched
- *   payloads and adds no request, timer, or socket of its own
+ * Preserves all existing API adapters and state management.
+ * Demo mode bypasses production controllers as before.
  *
  * @module frontend/pages/dashboard
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react';
 import { AnomalyPopup } from '../alerts/anomaly_popup.js';
 import { useAnomalyPopup } from '../alerts/use_anomaly_popup.js';
 import { createApiClient } from '../api/client.js';
@@ -28,7 +30,6 @@ import { createDemoApiClient } from '../api/demo_api_adapter.js';
 import type { DemoApiClient, DemoDecisionView } from '../api/demo_api_adapter.js';
 import { AdminSessionControl } from '../auth/admin_session_control.js';
 import type { AdminToken } from '../auth/admin_session.js';
-import { CrowdPanel } from '../crowd/crowd_panel.js';
 import { useCrowdSnapshot } from '../crowd/use_crowd_snapshot.js';
 import { AlertPanel } from '../decision/alert_panel.js';
 import { EtePanel } from '../decision/ete_panel.js';
@@ -39,13 +40,16 @@ import { ExplanationChain } from '../decision/explanation_chain.js';
 import { ReportPanel } from '../decision/report_panel.js';
 import { RoutePanel } from '../decision/route_panel.js';
 import { useDecisionReadModel } from '../decision/use_decision_read_model.js';
-import { InjectionPanel } from '../inject/injection_panel.js';
-import { WhatIfDialog } from '../whatif/whatif_dialog.js';
 import { useEteView } from '../decision/use_ete_view.js';
 import { useEvidenceView } from '../decision/use_evidence_view.js';
 import { useExecutionStatus } from '../decision/use_execution_status.js';
 import { useRouteView } from '../decision/use_route_view.js';
-import { DashboardShell } from '../layout/dashboard_shell.js';
+import { DemoDecisionPanel } from '../demo/demo_decision_panel.js';
+import { DemoTimeseriesPanel } from '../demo/demo_timeseries_panel.js';
+import { useDemoTimeseries } from '../demo/use_demo_timeseries.js';
+import { CommandCenterShell } from '../layout/command_center_shell.js';
+import type { RoadMetricData, CrowdMetricData, RoamingMetricData } from '../layout/command_center_shell.js';
+import { GeographicMap } from '../map/geographic_map.js';
 import { useRealtimeConnection } from '../realtime/use_realtime.js';
 import type { PollingCycleResult } from '../realtime/polling_fallback.js';
 import type { ReadyEventCommit } from '../realtime/use_realtime.js';
@@ -55,35 +59,22 @@ import { TimelinePanel } from '../timeline/timeline_panel.js';
 import { useTimelinePlayback } from '../timeline/use_timeline_playback.js';
 import { RoadPanel } from '../roads/road_panel.js';
 import { useRoadTraffic } from '../roads/use_road_traffic.js';
-import { DemoDecisionPanel } from '../demo/demo_decision_panel.js';
-import { DemoTimeseriesPanel } from '../demo/demo_timeseries_panel.js';
-import { useDemoTimeseries } from '../demo/use_demo_timeseries.js';
+import { CrowdPanel } from '../crowd/crowd_panel.js';
+import { WhatIfDialog } from '../whatif/whatif_dialog.js';
+import { DashboardShell } from '../layout/dashboard_shell.js';
+import { InjectionPanel } from '../inject/injection_panel.js';
 
-/**
- * Dashboard page component.
- *
- * `VITE_API_MODE=demo` selects the Demo API Compatibility Adapter; in demo
- * mode the dashboard skips every `useTimelinePlayback` / `useRoadTraffic` /
- * `useCrowdSnapshot` / `useDecisionReadModel` controller (those assume the
- * full production `/roads`, `/crowd`, `/timeline`, `/decisions/{id}` routes
- * that the demo stack does not deploy) and renders three independent panels
- * fed directly by the adapter. The production path below is the original
- * TASK-124 / TASK-125 / TASK-126 / TASK-132 wired layout.
- */
+// ─── Demo Mode Entry ──────────────────────────────────────
+
 export function DashboardPage(): ReactNode {
   const config = useAppConfig();
   const isDemoMode = config.apiMode === 'demo';
 
-  // TASK-128 repair: the admin JWT lives only in this page's React state. No
-  // frontend module persists it (no localStorage/sessionStorage/cookie/URL/env),
-  // and no frontend module inspects or trusts its payload — the Backend/Cognito
-  // authorizer remains the sole source of authorization truth. A page refresh
-  // clears this state naturally.
   const [adminToken, setAdminToken] = useState<AdminToken>(null);
 
   if (isDemoMode) {
     return (
-      <DemoDashboardPage
+      <DemoCommandCenterPage
         config={config}
         adminToken={adminToken}
         onAdminTokenChange={setAdminToken}
@@ -100,116 +91,347 @@ export function DashboardPage(): ReactNode {
   );
 }
 
-// ─── Demo Mode Entry Point ────────────────────────────────────
+// ─── Demo Command Center Page ──────────────────────────────
 
-interface DemoDashboardProps {
+interface DemoCommandCenterProps {
   readonly config: ReturnType<typeof useAppConfig>;
   readonly adminToken: AdminToken;
   readonly onAdminTokenChange: (token: AdminToken) => void;
 }
 
-/**
- * Demo-mode dashboard. Bypasses every controller that issues production
- * `GET /timeline`, `GET /roads`, `GET /crowd`, or `GET /decisions/{id}`
- * requests — those routes are not yet deployed — and renders three
- * independent panels driven directly by the Demo API Adapter.
- *
- * The WebSocket is intentionally never connected in demo mode (no demo-side
- * WebSocket route exists); the realtime hook's socket endpoint is empty, so
- * the hook immediately settles on `polling` and the dashboard's connection
- * bar reports the documented fallback mode.
- */
-function DemoDashboardPage({
+function DemoCommandCenterPage({
   config,
   adminToken,
   onAdminTokenChange,
-}: DemoDashboardProps): ReactNode {
+}: DemoCommandCenterProps): ReactNode {
   const adapter = useMemo<DemoApiClient>(
     () => createDemoApiClient({ baseEndpoint: config.apiEndpoint }),
     [config.apiEndpoint],
   );
+
   const demoTimeseries = useDemoTimeseries(adapter);
 
   const [injectedEventId, setInjectedEventId] = useState<string | null>(null);
   const [lastDecision, setLastDecision] = useState<DemoDecisionView | null>(null);
+  const [timelineIndex, setTimelineIndex] = useState<number | null>(null);
+  const [timelinePlaying, setTimelinePlaying] = useState(false);
+  const [selectedSegmentId, setSelectedSegmentId] = useState<string | null>(null);
+
+  // Playback timer
+  const playbackRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const handleDecisionInjected = useCallback((view: DemoDecisionView) => {
     setInjectedEventId(view.eventId);
     setLastDecision(view);
   }, []);
 
-  // Demo-mode realtime transport: the demo API adapter satisfies the
-  // §13 polling-fallback transport shape (`getRoads`/`getCrowd`/`getDecision`/
-  // `getReadOnlyJson`) and routes every fallback target back to the cached
-  // `/demo/timeseries` snapshot. Without this injection `useRealtimeConnection`
-  // would build its own production client and every 2-second poll would issue
-  // `GET /timeline`, `GET /roads`, `GET /crowd` against routes the demo
-  // stack does not deploy, producing continuous 404 noise in the console.
   const realtime = useRealtimeConnection({
     apiEndpoint: config.apiEndpoint,
     wsEndpoint: config.wsEndpoint,
     transport: adapter,
   });
 
+  const timestamps = demoTimeseries.snapshot?.timeline ?? [];
+  const isLoading = demoTimeseries.state === 'loading';
+
+  // Derive the authoritative timeline position for the map's currentTimestamp prop.
+  const currentTimestamp: string | null =
+    timelineIndex !== null && timelineIndex >= 0 && timelineIndex < timestamps.length
+      ? timestamps[timelineIndex]
+      : timestamps.length > 0
+        ? timestamps[timestamps.length - 1]
+        : null;
+
+  // Timeline controls
+  const handleTimelineSelect = useCallback((ts: string) => {
+    const idx = timestamps.indexOf(ts);
+    if (idx >= 0) setTimelineIndex(idx);
+  }, [timestamps]);
+
+  const handleTimelinePrevious = useCallback(() => {
+    setTimelineIndex((prev) => {
+      if (prev === null || prev <= 0) return prev;
+      return prev - 1;
+    });
+  }, []);
+
+  const handleTimelineNext = useCallback(() => {
+    setTimelineIndex((prev) => {
+      if (prev === null || prev >= timestamps.length - 1) return prev;
+      return prev + 1;
+    });
+  }, [timestamps.length]);
+
+  const handleTimelinePlay = useCallback(() => {
+    if (timestamps.length === 0) return;
+    setTimelinePlaying(true);
+  }, [timestamps.length]);
+
+  const handleTimelinePause = useCallback(() => {
+    setTimelinePlaying(false);
+  }, []);
+
+  // Auto-advance when playing
+  useEffect(() => {
+    if (!timelinePlaying) {
+      if (playbackRef.current) {
+        clearInterval(playbackRef.current);
+        playbackRef.current = null;
+      }
+      return;
+    }
+    playbackRef.current = setInterval(() => {
+      setTimelineIndex((prev) => {
+        if (prev === null) return 0;
+        if (prev >= timestamps.length - 1) {
+          setTimelinePlaying(false);
+          return prev;
+        }
+        return prev + 1;
+      });
+    }, 2000);
+    return () => {
+      if (playbackRef.current) clearInterval(playbackRef.current);
+    };
+  }, [timelinePlaying, timestamps.length]);
+
+  // Road metrics from /demo/timeseries traffic rows
+  const roadMetrics = useMemo<readonly RoadMetricData[]>(() => {
+    const traffic = demoTimeseries.snapshot?.traffic ?? [];
+    return traffic.map((t) => {
+      const sat = t.Saturation_Score;
+      const level = sat >= 0.85 ? 'blocked' : sat >= 0.60 ? 'caution' : 'clear';
+      return {
+        roadName: t.Road_Name,
+        avgSpeed: t.Avg_Speed,
+        saturation: sat,
+        status: level as 'clear' | 'caution' | 'blocked' | 'unknown',
+      };
+    });
+  }, [demoTimeseries.snapshot]);
+
+  // Crowd metrics from /demo/timeseries crowd rows
+  const crowdMetrics = useMemo<readonly CrowdMetricData[]>(() => {
+    return (demoTimeseries.snapshot?.crowd ?? []).map((c) => ({
+      stationId: c.BS_ID,
+      locationName: c.Location_Name,
+      userCount: c.User_Count,
+      roamingPct: c.roaming_pct_value,
+    }));
+  }, [demoTimeseries.snapshot]);
+
+  // Roaming metrics
+  const roamingMetrics = useMemo<readonly RoamingMetricData[]>(() => {
+    return (demoTimeseries.snapshot?.crowd ?? [])
+      .filter((c) => c.roaming_pct_value > 0)
+      .map((c) => ({
+        stationId: c.BS_ID,
+        roamingPct: c.roaming_pct_value,
+      }))
+      .sort((a, b) => (b.roamingPct ?? 0) - (a.roamingPct ?? 0));
+  }, [demoTimeseries.snapshot]);
+
+  // AI decision card content from last decision
+  const aiDecisionContent = useMemo(() => {
+    const view = lastDecision;
+    if (!view) {
+      return (
+        <div className="ai-card ai-card--empty">
+          <p className="ai-card__empty-text">尚無決策資料，請注入突發事件</p>
+        </div>
+      );
+    }
+    return (
+      <div className="ai-card ai-card--decision">
+        <div className="ai-card__header">
+          <span className="ai-card__icon" aria-hidden="true">◈</span>
+          <h3 className="ai-card__title">AI 決策推理</h3>
+        </div>
+        <div className="ai-card__body">
+          <div className="ai-card__field">
+            <span className="ai-card__field-label">事故等級</span>
+            <span
+              className="ai-card__field-value ai-card__severity"
+              style={{
+                color: view.severity === 'Critical' ? '#dc2626'
+                  : view.severity === 'High' ? '#f97316'
+                  : view.severity === 'Medium' ? '#eab308'
+                  : '#64748b',
+              }}
+            >
+              {view.severity}
+            </span>
+          </div>
+          <div className="ai-card__field">
+            <span className="ai-card__field-label">事件類型</span>
+            <span className="ai-card__field-value">{view.incidentType}</span>
+          </div>
+          <div className="ai-card__field">
+            <span className="ai-card__field-label">ETE</span>
+            <span className="ai-card__field-value">{view.eteMinutes} 分鐘</span>
+          </div>
+          <div className="ai-card__field">
+            <span className="ai-card__field-label">觸發 SOP</span>
+            <span className="ai-card__field-value">
+              {view.triggeredArticles.length > 0
+                ? view.triggeredArticles.map((a) => `第 ${a} 條`).join('、')
+                : '後端未提供'}
+            </span>
+          </div>
+          {view.cmsCoreText && (
+            <div className="ai-card__text-block">
+              <span className="ai-card__field-label">AI 推論摘要</span>
+              <p className="ai-card__text">{view.cmsCoreText}</p>
+            </div>
+          )}
+          <div className="ai-card__field ai-card__field--source">
+            <span className="ai-card__field-label">文字來源</span>
+            <span className="ai-card__field-value ai-card__source">{view.textSource}</span>
+          </div>
+        </div>
+      </div>
+    );
+  }, [lastDecision]);
+
+  // Route advice content
+  const routeAdviceContent = useMemo(() => {
+    const view = lastDecision;
+    if (!view) {
+      return (
+        <div className="ai-card ai-card--empty">
+          <p className="ai-card__empty-text">尚無疏散路線資料</p>
+        </div>
+      );
+    }
+    return (
+      <div className="ai-card ai-card--routes">
+        <div className="ai-card__header">
+          <span className="ai-card__icon" aria-hidden="true">⬢</span>
+          <h3 className="ai-card__title">推薦疏散路線</h3>
+        </div>
+        <div className="ai-card__body">
+          {view.primaryEvacuation ? (
+            <div className="ai-route ai-route--primary">
+              <span className="ai-route__badge ai-route__badge--primary">主</span>
+              <span className="ai-route__name">{view.primaryEvacuation}</span>
+            </div>
+          ) : (
+            <div className="ai-route ai-route--empty">後端未提供主疏散路線</div>
+          )}
+          {view.secondaryEvacuation.length > 0 && (
+            <div className="ai-route-group">
+              <span className="ai-route-group__label">次要疏散</span>
+              {view.secondaryEvacuation.map((s) => (
+                <div key={s} className="ai-route ai-route--secondary">
+                  <span className="ai-route__badge ai-route__badge--secondary">次</span>
+                  <span className="ai-route__name">{s}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }, [lastDecision]);
+
+  // Multilingual content
+  const multilingualContent = useMemo(() => {
+    const view = lastDecision;
+    return (
+      <div className="ai-card ai-card--multilingual">
+        <div className="ai-card__header">
+          <span className="ai-card__icon" aria-hidden="true">◎</span>
+          <h3 className="ai-card__title">多語通報</h3>
+        </div>
+        <div className="ai-card__body">
+          {view?.cmsCoreText ? (
+            <div className="ai-multilingual-tabs">
+              {(['中文', 'English', '日本語', '한국어'] as const).map((lang, i) => (
+                <div key={lang} className="ai-multilingual-tab">
+                  <span className="ai-multilingual-tab__label">{lang}</span>
+                  <p className="ai-multilingual-tab__text">
+                    {i === 0 ? view.cmsCoreText : '後端未提供'}
+                  </p>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="ai-card__empty-text">後端未提供多語通報內容</p>
+          )}
+          <button
+            type="button"
+            className="ai-card__publish-btn"
+            disabled
+            title="發布功能尚未接線"
+          >
+            發布警示
+          </button>
+          <p className="ai-card__publish-note">發布功能尚未接線</p>
+        </div>
+      </div>
+    );
+  }, [lastDecision]);
+
+  // What-if dialog
+  const whatifContent = useMemo(() => (
+    <WhatIfDialog client={adapter} />
+  ), [adapter]);
+
+  // Injection modal content
+  const injectionContent = useMemo(() => (
+    <>
+      <AdminSessionControl adminToken={adminToken} onAdminTokenChange={onAdminTokenChange} />
+      <DemoDecisionPanel
+        adapter={adapter}
+        injectedEventId={injectedEventId}
+        adminToken={adminToken}
+        onDecisionInjected={handleDecisionInjected}
+      />
+      {lastDecision !== null && (
+        <p className="injection-modal__last">
+          最近注入：<code>{lastDecision.decisionId}</code>（{lastDecision.severity}）
+        </p>
+      )}
+    </>
+  ), [adminToken, onAdminTokenChange, adapter, injectedEventId, lastDecision, handleDecisionInjected]);
+
   return (
-    <DashboardShell
+    <CommandCenterShell
       connectionMode={realtime.connectionMode}
       pollingErrorMessage={realtime.pollingErrorMessage}
       pollingUpdateCount={realtime.pollingUpdateCount}
-      timelineContent={
-        <DemoTimeseriesPanel
+      timelineTimestamps={timestamps}
+      timelineIndex={timelineIndex}
+      timelinePlaying={timelinePlaying}
+      timelineLoading={isLoading}
+      onTimelineSelect={handleTimelineSelect}
+      onTimelinePrevious={handleTimelinePrevious}
+      onTimelineNext={handleTimelineNext}
+      onTimelinePlay={handleTimelinePlay}
+      onTimelinePause={handleTimelinePause}
+      mapContent={
+        <GeographicMap
           snapshot={demoTimeseries.snapshot}
+          decision={lastDecision}
+          loading={isLoading}
           errorMessage={demoTimeseries.errorMessage}
-          loading={demoTimeseries.state === 'loading'}
-          onRetry={demoTimeseries.refresh}
+          selectedSegmentId={selectedSegmentId}
+          onSegmentClick={setSelectedSegmentId}
         />
       }
-      roadsContent={
-        <DemoTimeseriesPanel
-          snapshot={demoTimeseries.snapshot}
-          errorMessage={demoTimeseries.errorMessage}
-          loading={demoTimeseries.state === 'loading'}
-          onRetry={demoTimeseries.refresh}
-        />
-      }
-      crowdContent={
-        <DemoTimeseriesPanel
-          snapshot={demoTimeseries.snapshot}
-          errorMessage={demoTimeseries.errorMessage}
-          loading={demoTimeseries.state === 'loading'}
-          onRetry={demoTimeseries.refresh}
-        />
-      }
-      decisionContent={
-        <DemoDecisionPanel
-          adapter={adapter}
-          injectedEventId={injectedEventId}
-          adminToken={adminToken}
-          onDecisionInjected={handleDecisionInjected}
-        />
-      }
-      whatifContent={<WhatIfDialog client={adapter} />}
-      injectionContent={
-        <>
-          <AdminSessionControl adminToken={adminToken} onAdminTokenChange={onAdminTokenChange} />
-          <DemoDecisionPanel
-            adapter={adapter}
-            injectedEventId={injectedEventId}
-            adminToken={adminToken}
-            onDecisionInjected={handleDecisionInjected}
-          />
-          {lastDecision !== null ? (
-            <p className="dashboard-footer__text" aria-live="polite">
-              最近一次 demo 注入：<code>{lastDecision.decisionId}</code>（{lastDecision.severity}）
-            </p>
-          ) : null}
-        </>
-      }
+      roadMetrics={roadMetrics}
+      crowdMetrics={crowdMetrics}
+      roamingMetrics={roamingMetrics}
+      aiDecisionContent={aiDecisionContent}
+      routeAdviceContent={routeAdviceContent}
+      multilingualContent={multilingualContent}
+      whatifContent={whatifContent}
+      injectionContent={injectionContent}
     />
   );
 }
 
-// ─── Production Mode Entry Point ──────────────────────────────
+// ─── Production Mode (preserved verbatim) ──────────────────
 
 interface ProductionDashboardProps {
   readonly config: ReturnType<typeof useAppConfig>;
@@ -217,19 +439,11 @@ interface ProductionDashboardProps {
   readonly onAdminTokenChange: (token: AdminToken) => void;
 }
 
-/**
- * Production-mode dashboard — the original TASK-124/125/126/132 wired layout.
- * Kept verbatim so the demo integration does not perturb the production
- * controllers in any way.
- */
 function ProductionDashboardPage({
   config,
   adminToken,
   onAdminTokenChange,
 }: ProductionDashboardProps): ReactNode {
-  // Same-lifetime API client shared by the timeline controller's direct
-  // `GET /timeline` fetches. Realtime's own transport (used for the §13
-  // polling fallback) is constructed independently inside `useRealtimeConnection`.
   const transport = useMemo(
     () => createApiClient({ baseEndpoint: config.apiEndpoint }),
     [config.apiEndpoint],
@@ -237,56 +451,22 @@ function ProductionDashboardPage({
 
   const timeline = useTimelinePlayback({ transport });
   const roads = useRoadTraffic({ transport });
-
-  // TASK-126: the crowd snapshot re-reads `GET /crowd` whenever the
-  // authoritative replay position advances (§16.1). The timeline's `current` is
-  // the only trigger — the crowd panel never extrapolates a previous snapshot.
   const crowd = useCrowdSnapshot({ transport, replayPosition: timeline.currentTimestamp });
 
-  // TASK-132: the decision panels read `GET /decisions/{decision_id}`. The id is
-  // only known once a realtime event names one (§13: every decision-scoped event
-  // carries `decision_id`); until then the panels stay in their explicit
-  // "no decision yet" state rather than showing a fabricated report.
   const [decisionId, setDecisionId] = useState<string | null>(null);
   const decision = useDecisionReadModel({ transport, decisionId });
   const { refresh: refreshDecision, ingestDecisionPayload } = decision;
-
-  // TASK-129: `core.evidence` is decoded once per core, not once per render.
   const evidence = useEvidenceView(decision.core);
-
-  // TASK-130: the route blocks (`excluded_candidates`, `incident_anchor`) are
-  // decoded once per core as well.
   const routes = useRouteView(decision.core);
-
-  // TASK-131: `core.ete` carries the authoritative ETE operands (the live
-  // EvidenceTrace has no `formula_substitution` block), decoded once per core.
   const ete = useEteView(decision.core);
-  // Second authoritative source of an affected road's ETE role (§10.10), when
-  // the backend supplies it. Reused from the TASK-129 decode rather than
-  // re-decoding the evidence block.
   const eteRoleEvidence = evidence.kind === 'ok' ? evidence.evidence.affectedSetConstruction : null;
 
-  // TASK-133: the latest `processing.failed` frame (§13). Kept as the decoded
-  // notification it is — the authoritative failure record stays the read-only
-  // `execution` projection re-read from `GET /decisions/{decision_id}`.
   const [lastFailureEvent, setLastFailureEvent] = useState<ProcessingFailedView | null>(null);
   const executionStatus = useExecutionStatus({
     execution: decision.execution,
     lastFailureEvent,
   });
 
-  // FIX 4: `timeline` is a fresh object every render (its state is spread
-  // into a new object alongside its stable methods each time), so depending
-  // on `[timeline]` would recreate these callbacks — and therefore the
-  // realtime connection's `onEvent`/`onPollingCycle` closures — on every
-  // timeline state change. `refresh` and `ingestPolledTimeline` are each
-  // individually stable (memoized with `useCallback`), so destructuring and
-  // depending on just those two keeps these callbacks stable across ordinary
-  // timeline rerenders.
-  // TASK-127: the anomaly popup is a pure presentation controller. It owns no
-  // transport, so it is fed from the realtime/polling data the connection below
-  // already produced. All four members are referentially stable for the mount,
-  // so including them here never changes the realtime callbacks' identity.
   const anomaly = useAnomalyPopup();
   const {
     ingestRealtimeEvent: ingestAnomalyEvent,
@@ -300,33 +480,14 @@ function ProductionDashboardPage({
 
   const handleRealtimeEvent = useCallback(
     (envelope: RealtimeEventEnvelope) => {
-      // TASK-127: `anomaly.detected` auto-opens the popup with no operator
-      // action and no follow-up query. Dispatched first and unconditionally —
-      // the controller ignores every other §13 event type — so this stays a
-      // single dispatch point, and the early returns below can never starve it
-      // of a frame.
       ingestAnomalyEvent(envelope);
-
       if (envelope.eventType === 'timeline.updated') {
-        // §13 architectural rule: the WebSocket frame is a notification only.
-        // It never seeds timeline state directly — it requests the
-        // authoritative GET /timeline refresh.
         refreshTimeline();
         return;
       }
-
-      // TASK-132: `publish.status_changed`, `processing.failed` and
-      // `incident.injected` carry no `ready_event_id`, so they arrive here
-      // rather than through the dedup coordinator. They are still only
-      // notifications: they name the decision and request an authoritative
-      // re-read, and never supply decision state themselves.
       if (envelope.eventType === 'processing.failed') {
-        // TASK-133: the frame's own `error_code` / `retryable` are displayed
-        // beside the authoritative projection (§13 fallback column), so the
-        // decoded notification is kept as well as triggering the re-read.
         setLastFailureEvent(decodeProcessingFailed(envelope.payload));
       }
-
       if (envelope.decisionId === null) return;
       setDecisionId((previous) => (previous === envelope.decisionId ? previous : envelope.decisionId));
       refreshDecision();
@@ -334,11 +495,6 @@ function ProductionDashboardPage({
     [refreshDecision, refreshTimeline, ingestAnomalyEvent],
   );
 
-  // TASK-132: `decision.fast_path_ready` / `decision.enriched` / `report.ready` /
-  // `public_alert.ready` are deduplicated by the TASK-123 coordinator, which
-  // already fetched the authoritative `GET /decisions/{id}` body during
-  // reconciliation. Consume that body instead of issuing a second request; it is
-  // re-validated by the decision decoder before anything is rendered.
   const handleReadyEvent = useCallback(
     (commit: ReadyEventCommit) => {
       const committedId = commit.envelope.decisionId;
@@ -354,27 +510,11 @@ function ProductionDashboardPage({
     (result: PollingCycleResult) => {
       for (const outcome of result.outcomes) {
         if (outcome.target.kind === 'timeline' && outcome.result.ok) {
-          // The TASK-122 fallback loop already issued this GET /timeline
-          // request; consume its (still unvalidated) body directly instead of
-          // issuing a second one.
           ingestPolledTimeline(outcome.result.value.data);
         } else if (outcome.target.kind === 'roads' && outcome.result.ok) {
-          // Same preferred-ingestion path for TASK-125: the fallback loop
-          // already issued this GET /roads request. A failed roads outcome
-          // is ignored here (not looped over) — it never becomes a ready
-          // state.
           ingestPolledRoads(outcome.result.value.data);
-          // TASK-127 reads the *same* body for its anomaly verdict. No second
-          // GET /roads, no new timer, no separate fallback loop.
           ingestAnomalyRoads(outcome.result.value.data);
         } else if (outcome.target.kind === 'crowd' && outcome.result.ok) {
-          // §13 maps `anomaly.detected` to GET /roads + GET /crowd, so the
-          // fallback loop already fetched this body too. Only TASK-127 consumes
-          // it here: the TASK-126 crowd controller exposes no polled-ingest
-          // seam (it re-reads on an authoritative timeline advance instead), and
-          // adding one would mean editing `crowd/**`, which is outside this
-          // task. A failed crowd outcome is ignored for the same reason as
-          // roads above.
           ingestAnomalyCrowd(outcome.result.value.data);
         }
       }
@@ -382,29 +522,13 @@ function ProductionDashboardPage({
     [ingestPolledTimeline, ingestPolledRoads, ingestAnomalyRoads, ingestAnomalyCrowd],
   );
 
-  // TASK-125: refresh road data when the authoritative timeline playback
-  // position advances. `currentTimestamp` is read-tracked in a ref so this
-  // effect only fires a road refresh when it actually *changes* value
-  // (mount's initial `null` -> first value included), never on every
-  // ordinary timeline rerender that leaves it unchanged. This mirrors the
-  // "same timeline current value does not trigger duplicate requests" rule.
   const lastRoadRefreshTimestampRef = useRef<string | null | undefined>(undefined);
   useEffect(() => {
     const previous = lastRoadRefreshTimestampRef.current;
-    if (previous === timeline.currentTimestamp) {
-      return;
-    }
-    // Skip both the very first effect run (previous is `undefined`) and the
-    // transition from "no authoritative position yet" to the first real one
-    // (previous is `null`): both represent the timeline's own initial load
-    // completing, not a playback advance, and the road controller already
-    // issues its own mount-time initial `GET /roads` fetch. Only a change
-    // between two already-authoritative timestamps is a genuine advance.
+    if (previous === timeline.currentTimestamp) return;
     const isGenuineAdvance = previous !== undefined && previous !== null;
     lastRoadRefreshTimestampRef.current = timeline.currentTimestamp;
-    if (!isGenuineAdvance) {
-      return;
-    }
+    if (!isGenuineAdvance) return;
     refreshRoads();
   }, [timeline.currentTimestamp, refreshRoads]);
 
@@ -416,6 +540,7 @@ function ProductionDashboardPage({
     onPollingCycle: handlePollingCycle,
   });
 
+  // For production, fall back to the original shell (no map yet)
   return (
     <DashboardShell
       connectionMode={realtime.connectionMode}
