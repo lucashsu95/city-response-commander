@@ -1,0 +1,8 @@
+# 官方競賽來源資料（SSOT hash 驗證對象）— 永遠鎖定 LF 換行
+# 這些檔案的 SHA-256 記錄在
+# packages/domain/src/source_manifest/official_source_manifest.ts
+# 與 docs/data_audit.md。任何行尾轉換都會使 hash 不符並觸發
+# SOURCE_INTEGRITY_STOP（decision pipeline 直接停止）。
+# 不設定此規則時，Windows 上 core.autocrlf=true 會在 checkout 時
+# 把原始 LF 轉成 CRLF，造成本次修復前的完整性阻塞。
+中華電信資料集/* text eol=lf
