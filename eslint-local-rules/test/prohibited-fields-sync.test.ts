@@ -9,15 +9,27 @@
  * side gets updated, this fails instead of silently drifting.
  */
 import { describe, it, expect } from 'vitest';
-import { LLM_PROHIBITED_FIELDS as CANONICAL } from '@city-commander/shared-schemas';
+import {
+  CONTAINMENT_PROHIBITED_KEYS as CANONICAL_CONTAINMENT,
+  LLM_PROHIBITED_FIELDS as CANONICAL,
+} from '@city-commander/shared-schemas';
 
-// eslint-disable-next-line @typescript-eslint/no-var-requires
+// eslint-disable-next-line @typescript-eslint/no-var-requires, @typescript-eslint/no-require-imports
 const localRules = require('../../eslint-local-rules.cjs') as {
   LLM_PROHIBITED_FIELDS: Set<string>;
+  CONTAINMENT_PROHIBITED_KEYS: Set<string>;
 };
 
 describe('LLM_PROHIBITED_FIELDS sync', () => {
   it('eslint-local-rules.cjs matches the shared-schemas canonical list', () => {
     expect([...localRules.LLM_PROHIBITED_FIELDS].sort()).toEqual([...CANONICAL].sort());
+  });
+});
+
+describe('CONTAINMENT_PROHIBITED_KEYS sync', () => {
+  it('eslint-local-rules.cjs matches the shared-schemas canonical containment list', () => {
+    expect([...localRules.CONTAINMENT_PROHIBITED_KEYS].sort()).toEqual(
+      [...CANONICAL_CONTAINMENT].sort(),
+    );
   });
 });

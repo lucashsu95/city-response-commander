@@ -253,7 +253,7 @@ Task ID scheme: `TASK-BS-01..TASK-BS-19`, flat and sequential. `CHECKPOINT` line
   - tests_required: `packages/rag/test/schema_validator.test.ts` — new case for containment fields, alongside existing `DecisionCore` field cases.
   - done_definition: Existing `DecisionCore`-field rejection tests still pass unmodified; new containment-field rejection test passes.
 
-- [ ] TASK-BS-16 Sync `CONTAINMENT_PROHIBITED_KEYS` into `eslint-local-rules.cjs` and extend `prohibited-fields-sync.test.ts`
+- [x] TASK-BS-16 Sync `CONTAINMENT_PROHIBITED_KEYS` into `eslint-local-rules.cjs` and extend `prohibited-fields-sync.test.ts`
   - objective: Prevent the exact drift the header comment on `llm_boundary.ts` already warns about — a second manually-maintained copy — for the new field set.
   - requirements_covered: R13 (AC1, AC2, AC3)
   - design_sections: §7

@@ -126,6 +126,7 @@
 | TASK-BS-13：Safe_Context whitelist + SOP authority separation | Codex | ✅ |
 | TASK-BS-14：Bedrock composer + whitelist audit + deterministic fallback | Codex | ✅ |
 | TASK-BS-15：CONTAINMENT_PROHIBITED_PATHS runtime enforcement | Codex | ✅ |
+| TASK-BS-16：containment prohibited keys ESLint drift guard | Codex | ✅ |
 
 ---
 

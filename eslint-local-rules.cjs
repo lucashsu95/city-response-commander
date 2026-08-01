@@ -43,6 +43,15 @@ const LLM_PROHIBITED_FIELDS = new Set([
   'schema_version',
 ]);
 
+// Manual copy of packages/shared-schemas/src/containment_disclosure.ts.
+// The sync test below guards this list independently from DecisionCore fields.
+const CONTAINMENT_PROHIBITED_KEYS = new Set([
+  'data_scope_status',
+  'mapped_anchor_node',
+  'sop_coverage_status',
+  'sop_authority',
+]);
+
 function memberFieldName(member) {
   if (!member.computed && member.property.type === 'Identifier') {
     return member.property.name;
@@ -83,7 +92,7 @@ module.exports = {
 
       function reportMemberWrite(node, member) {
         const field = memberFieldName(member);
-        if (field && LLM_PROHIBITED_FIELDS.has(field)) {
+        if (field && (LLM_PROHIBITED_FIELDS.has(field) || CONTAINMENT_PROHIBITED_KEYS.has(field))) {
           context.report({ node, messageId: 'noProhibitedWrite', data: { field } });
         }
       }
@@ -111,5 +120,10 @@ module.exports = {
 // to read at test time.
 Object.defineProperty(module.exports, 'LLM_PROHIBITED_FIELDS', {
   value: LLM_PROHIBITED_FIELDS,
+  enumerable: false,
+});
+
+Object.defineProperty(module.exports, 'CONTAINMENT_PROHIBITED_KEYS', {
+  value: CONTAINMENT_PROHIBITED_KEYS,
   enumerable: false,
 });
