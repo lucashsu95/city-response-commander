@@ -14,6 +14,7 @@ export * from './road_network/road_network_model.js';
 export * from './road_network/intersection_text_match.js';
 
 export * from './boundary/boundary_snapper.js';
+export * from './boundary/containment_pipeline.js';
 export * from './boundary/sop_coverage_resolver.js';
 export * from './boundary/whitelist_guard.js';
 

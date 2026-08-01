@@ -13,14 +13,14 @@ export type { CoreIdentityClassification, CoreIdentityMismatch } from './identit
 
 export { DefaultDomainPipelineAdapter, PENDING_PIPELINE_STEPS } from './domain_pipeline_adapter.js';
 
-export { DEFAULT_DECISION_COMPOSER } from './domain_pipeline_adapter.js';
+export { DEFAULT_CONTAINMENT_ASSEMBLER } from './domain_pipeline_adapter.js';
 
 export type {
   DomainPipelineAdapter,
   DomainPipelineInput,
   DomainPipelineResult,
   DomainPipelinePorts,
-  DecisionComposerPort,
+  ContainmentAssemblerPort,
   DecisionFacts,
   IngestionPort,
 } from './domain_pipeline_adapter.js';
@@ -35,4 +35,10 @@ export type {
 } from './decision_fn.js';
 
 export { assembleContainment } from './containment_assembler.js';
-export type { AssembleContainmentInput, ContainmentAssemblerResult } from './containment_assembler.js';
+export type {
+  AssembleContainmentInput,
+  AssembleContainmentResult,
+  BedrockComposerClient,
+  BedrockComposerOutputValidator,
+  ContainmentAssemblerResult,
+} from './containment_assembler.js';

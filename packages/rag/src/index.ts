@@ -13,6 +13,11 @@ export {
   type RejectedPayload,
   type RejectionReason,
 } from './schema_validator.js';
+export {
+  containmentComposerOutputValidator,
+  validateContainmentComposerOutput,
+} from './containment_output_validator.js';
+export { createContainmentComposer } from './containment_composer.js';
 
 // ─── Bedrock Adapter (TASK-112) ───────────────────────────
 export {

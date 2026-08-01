@@ -30,19 +30,36 @@ import {
   assembleContainment as assembleContainmentWithComposer,
   type AssembleContainmentInput,
   type BedrockComposerClient,
+  type BedrockComposerOutputValidator,
 } from '../../src/decision/containment_assembler.js';
 
 const defaultComposer: BedrockComposerClient = {
-  generate: async () => '',
+  generate: async () => ({ explanation_text: '' }),
+};
+const defaultValidator: BedrockComposerOutputValidator = {
+  validate: (payload) =>
+    typeof payload === 'string'
+      ? { outcome: 'accepted', text: payload }
+      : {
+          outcome: 'accepted',
+          text:
+            typeof payload === 'object' &&
+            payload !== null &&
+            'explanation_text' in payload &&
+            typeof payload.explanation_text === 'string'
+              ? payload.explanation_text
+              : '',
+        },
 };
 
-type TestAssembleInput = Omit<AssembleContainmentInput, 'composer'> & {
+type TestAssembleInput = Omit<AssembleContainmentInput, 'composer' | 'validator'> & {
   readonly composer?: BedrockComposerClient;
+  readonly validator?: BedrockComposerOutputValidator;
 };
 
 function assembleContainment(input: TestAssembleInput) {
-  const { composer = defaultComposer, ...deterministicInput } = input;
-  return assembleContainmentWithComposer({ ...deterministicInput, composer });
+  const { composer = defaultComposer, validator = defaultValidator, ...deterministicInput } = input;
+  return assembleContainmentWithComposer({ ...deterministicInput, composer, validator });
 }
 
 /** Matches decision_pipeline.test.ts's fixture — evidence_trace_builder.ts requires a SOP citation for every triggered article. */
@@ -173,6 +190,7 @@ class LocalConfigProvider implements PolicyStrategyConfigProvider {
     'policy.multilingual_scope.mode': 'current_snapshot_all_available_stations',
     'boundary_snapping.max_snap_distance_meters': 5_000,
     'boundary_snapping.coordinate_path_enabled': false,
+    'containment.universal_sop_enabled': true,
   };
   get(key: string): string | number | boolean {
     const value = this.values[key];
@@ -794,6 +812,81 @@ describe('assembleContainment', () => {
       const first = await assembleContainment({ ingestion, incident: incident(), config });
       const second = await assembleContainment({ ingestion, incident: incident(), config });
       expect(first).toEqual(second);
+    });
+  });
+
+  describe('production safety wiring', () => {
+    const unknownIncident = (): Incident =>
+      incident({
+        affected_segment: 'RD_TPE_099',
+        affected_road: undefined,
+        location: '完全不在路網範圍內的地點',
+        type: 'Unknown_Chemical_Leak' as unknown as Incident['type'],
+        description: '未知化學氣體洩漏',
+      });
+
+    it('validates composer payload before exposing AI reasoning', async () => {
+      const validate = vi.fn<BedrockComposerOutputValidator['validate']>(() => ({
+        outcome: 'use_template',
+        reason: 'prohibited_field_overwrite',
+        offendingFields: ['decision.reroute_roads'],
+      }));
+      const payload = {
+        explanation_text: '不可信內容',
+        decision: { reroute_roads: ['RD_TPE_999'] },
+      };
+      const result = await assembleContainment({
+        ingestion: readyIngestion(),
+        incident: unknownIncident(),
+        config,
+        composer: { generate: async () => payload },
+        validator: { validate },
+      });
+
+      expect(validate).toHaveBeenCalledWith(payload);
+      expect(result.decision.ai_reasoning).toBeNull();
+      expect(result.decision.reroute_roads).toEqual(['RD_TPE_004']);
+    });
+
+    it('does not call composer when universal SOP fallback is disabled', async () => {
+      const generate = vi.fn<BedrockComposerClient['generate']>();
+      const disabledConfig: PolicyStrategyConfigProvider = {
+        get: (key) => (key === 'containment.universal_sop_enabled' ? false : config.get(key)),
+      };
+      const result = await assembleContainment({
+        ingestion: readyIngestion(),
+        incident: unknownIncident(),
+        config: disabledConfig,
+        composer: { generate },
+      });
+
+      expect(generate).not.toHaveBeenCalled();
+      expect(result.sop_coverage_status).toBe('UNKNOWN_TYPE_UNIVERSAL_SOP');
+      expect(result.decision.ai_reasoning).toBeNull();
+    });
+
+    it('returns a typed config error and skips composer when gazetteer source is missing', async () => {
+      const generate = vi.fn<BedrockComposerClient['generate']>();
+      const coordinateConfig: PolicyStrategyConfigProvider = {
+        get: (key) => {
+          if (key === 'boundary_snapping.coordinate_path_enabled') return true;
+          if (key === 'boundary_snapping.anchor_gazetteer_source') throw new Error('missing');
+          return config.get(key);
+        },
+      };
+      const result = await assembleContainment({
+        ingestion: readyIngestion(),
+        incident: unknownIncident(),
+        config: coordinateConfig,
+        composer: { generate },
+      });
+
+      expect(generate).not.toHaveBeenCalled();
+      expect(result).toMatchObject({
+        error: 'CONFIG_MISSING',
+        missing_key: 'boundary_snapping.anchor_gazetteer_source',
+        data_status: 'insufficient_data',
+      });
     });
   });
 });

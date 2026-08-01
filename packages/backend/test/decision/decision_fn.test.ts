@@ -18,7 +18,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { CoreWriteStatus } from '@city-commander/shared-schemas';
 import type { DecisionCore, Incident } from '@city-commander/shared-schemas';
 import {
-  DEFAULT_DECISION_COMPOSER,
+  DEFAULT_CONTAINMENT_ASSEMBLER,
   DefaultDomainPipelineAdapter,
   LatencyTrace,
   NoopTelemetry,
@@ -27,7 +27,7 @@ import {
   TableReadError,
 } from '../../src/index.js';
 import type {
-  DecisionComposerPort,
+  ContainmentAssemblerPort,
   DecisionFacts,
   DecisionFnPorts,
   DomainPipelineAdapter,
@@ -95,7 +95,7 @@ const config: DomainPipelinePorts['config'] = { get: () => 'exact_or_latest_befo
 
 interface AdapterHarness {
   readonly adapter: DefaultDomainPipelineAdapter;
-  readonly decide: ReturnType<typeof vi.fn>;
+  readonly assemble: ReturnType<typeof vi.fn>;
   readonly ingest: ReturnType<typeof vi.fn>;
 }
 
@@ -103,28 +103,39 @@ function createAdapter(
   options: {
     readonly ingestion?: Record<string, unknown>;
     readonly decision?: Record<string, unknown>;
-    readonly decideImpl?: DecisionComposerPort;
+    readonly assembleImpl?: ContainmentAssemblerPort;
   } = {},
 ): AdapterHarness {
   const ingest = vi.fn(() => ingestionResult(options.ingestion ?? {}));
-  const decide =
-    options.decideImpl === undefined
+  const assemble =
+    options.assembleImpl === undefined
       ? vi.fn(() => ({
           data_status: 'ready',
           stop_reason: null,
           source_manifest_hash: MANIFEST,
           facts: decisionFacts(),
+          entity_scope: null,
+          sop_coverage: null,
+          data_scope_status: 'IN_SCOPE',
+          mapped_anchor_node: null,
+          safe_context: null,
+          sop_coverage_status: 'OFFICIAL_SOP_MATCHED',
+          sop_authority: 'OFFICIAL_SOP',
+          decision: { reroute_roads: [], perimeter_control: null, ai_reasoning: null },
+          whitelist_violations: [],
           ...(options.decision ?? {}),
         }))
-      : vi.fn(options.decideImpl);
+      : vi.fn(options.assembleImpl);
 
   return {
     ingest,
-    decide,
+    assemble,
     adapter: new DefaultDomainPipelineAdapter({
       ingestion: { ingest },
       config,
-      decide: decide as unknown as DecisionComposerPort,
+      composer: { generate: async () => ({ explanation_text: '' }) },
+      validator: { validate: () => ({ outcome: 'accepted', text: '' }) },
+      assemble: assemble as unknown as ContainmentAssemblerPort,
     }),
   };
 }
@@ -135,44 +146,44 @@ describe('DefaultDomainPipelineAdapter — delegation to the domain facade', () 
   it('defaults to the real runDeterministicDecision', () => {
     // The injectable port exists for testability; production must not need wiring,
     // and there must be no stub that can be left switched on by accident.
-    expect(typeof DEFAULT_DECISION_COMPOSER).toBe('function');
-    expect(DEFAULT_DECISION_COMPOSER.name).toBe('runDeterministicDecision');
+    expect(typeof DEFAULT_CONTAINMENT_ASSEMBLER).toBe('function');
+    expect(DEFAULT_CONTAINMENT_ASSEMBLER.name).toBe('assembleContainment');
   });
 
   it('calls the facade exactly once for a ready ingestion', async () => {
-    const { adapter, decide } = createAdapter();
+    const { adapter, assemble } = createAdapter();
 
     await adapter.execute({ eventId: EVENT_ID });
 
-    expect(decide).toHaveBeenCalledTimes(1);
+    expect(assemble).toHaveBeenCalledTimes(1);
   });
 
   it('passes the ingestion result straight through, never re-ingesting', async () => {
-    const { adapter, decide, ingest } = createAdapter();
+    const { adapter, assemble, ingest } = createAdapter();
 
     await adapter.execute({ eventId: EVENT_ID });
 
     expect(ingest).toHaveBeenCalledTimes(1);
     // The facade consumes an already-produced IngestionResult; ingesting twice
     // could read two different snapshots of the official files.
-    expect(decide.mock.calls[0][0].ingestion).toBe(ingest.mock.results[0].value);
+    expect(assemble.mock.calls[0][0].ingestion).toBe(ingest.mock.results[0].value);
   });
 
   it('passes the resolved incident, not the raw event_id', async () => {
-    const { adapter, decide } = createAdapter();
+    const { adapter, assemble } = createAdapter();
 
     await adapter.execute({ eventId: EVENT_ID });
 
     // `event_id` would make the facade resolve the incident itself — and THROW
     // when it is absent. Resolving here keeps a data gap reportable.
-    expect(decide.mock.calls[0][0].incident.event_id).toBe(EVENT_ID);
-    expect(decide.mock.calls[0][0].event_id).toBeUndefined();
+    expect(assemble.mock.calls[0][0].incident.event_id).toBe(EVENT_ID);
+    expect(assemble.mock.calls[0][0].event_id).toBeUndefined();
   });
 
   it('passes the config provider through without reading any policy key', async () => {
     const get = vi.fn(() => 'exact_or_latest_before');
     const ingest = vi.fn(() => ingestionResult());
-    const decide = vi.fn(() => ({
+    const assemble = vi.fn(() => ({
       data_status: 'ready',
       stop_reason: null,
       source_manifest_hash: MANIFEST,
@@ -181,12 +192,14 @@ describe('DefaultDomainPipelineAdapter — delegation to the domain facade', () 
     const adapter = new DefaultDomainPipelineAdapter({
       ingestion: { ingest },
       config: { get },
-      decide: decide as unknown as DecisionComposerPort,
+      composer: { generate: async () => ({ explanation_text: '' }) },
+      validator: { validate: () => ({ outcome: 'accepted', text: '' }) },
+      assemble: assemble as unknown as ContainmentAssemblerPort,
     });
 
     await adapter.execute({ eventId: EVENT_ID });
 
-    expect(decide.mock.calls[0][0].config).toEqual({ get });
+    expect(assemble.mock.calls[0][0].config).toEqual({ get });
     // Strategy resolution is the facade's job; the adapter must stay policy-free.
     expect(get).not.toHaveBeenCalled();
   });
@@ -201,6 +214,19 @@ describe('DefaultDomainPipelineAdapter — delegation to the domain facade', () 
     // Identity, not deep equality: any re-shaping here could silently drop a field
     // that the immutable core is supposed to carry.
     expect(result.facts).toBe(facts);
+  });
+
+  it('surfaces containment disclosure from the production assembler path', async () => {
+    const { adapter } = createAdapter();
+
+    const result = await adapter.execute({ eventId: EVENT_ID });
+
+    expect(result.containment).toMatchObject({
+      data_scope_status: 'IN_SCOPE',
+      sop_coverage_status: 'OFFICIAL_SOP_MATCHED',
+      sop_authority: 'OFFICIAL_SOP',
+      decision: { reroute_roads: [], perimeter_control: null, ai_reasoning: null },
+    });
   });
 
   it('reports the manifest hash the facade attributed the decision to', async () => {
@@ -218,7 +244,7 @@ describe('DefaultDomainPipelineAdapter — delegation to the domain facade', () 
 
 describe('DefaultDomainPipelineAdapter — ingestion stops', () => {
   it('stops on a source-hash STOP gate failure', async () => {
-    const { adapter, decide } = createAdapter({
+    const { adapter, assemble } = createAdapter({
       ingestion: {
         data_status: 'insufficient_data',
         stop_reason: 'SHA-256 mismatch: live_incidents.json',
@@ -231,7 +257,7 @@ describe('DefaultDomainPipelineAdapter — ingestion stops', () => {
     expect(result.data_status).toBe('insufficient_data');
     expect(result.stop_reason).toContain('SHA-256 mismatch');
     // An unknown data version must never reach the rule engine.
-    expect(decide).not.toHaveBeenCalled();
+    expect(assemble).not.toHaveBeenCalled();
   });
 
   it('never fabricates a manifest hash when the gate failed', async () => {
@@ -280,11 +306,11 @@ describe('DefaultDomainPipelineAdapter — unknown event_id is a data gap', () =
   });
 
   it('does not call the facade for an unknown event_id', async () => {
-    const { adapter, decide } = createAdapter();
+    const { adapter, assemble } = createAdapter();
 
     await adapter.execute({ eventId: 'TPE_2026_ACC_999' });
 
-    expect(decide).not.toHaveBeenCalled();
+    expect(assemble).not.toHaveBeenCalled();
   });
 
   it('keeps the manifest hash, because ingestion itself succeeded', async () => {
@@ -357,9 +383,9 @@ describe('DefaultDomainPipelineAdapter — no fabrication (§21)', () => {
   it('propagates a facade fault instead of laundering it into a data gap', async () => {
     const fault = new Error('road network model is corrupt');
     const { adapter } = createAdapter({
-      decideImpl: (() => {
+      assembleImpl: (() => {
         throw fault;
-      }) as unknown as DecisionComposerPort,
+      }) as unknown as ContainmentAssemblerPort,
     });
 
     // Reporting this as `insufficient_data` would tell the operator the official

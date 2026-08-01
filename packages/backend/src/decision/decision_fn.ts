@@ -20,7 +20,7 @@
  */
 
 import { CoreWriteStatus } from '@city-commander/shared-schemas';
-import type { DecisionCore } from '@city-commander/shared-schemas';
+import type { ContainmentDisclosure, DecisionCore } from '@city-commander/shared-schemas';
 import type { DecisionCorePort } from '../repository/decision_core_repository.js';
 import { persistDecisionCore } from './decision_core_writer.js';
 import type { PersistCoreOutcome } from './decision_core_writer.js';
@@ -100,6 +100,7 @@ export type DecisionFnResult =
       readonly pending_steps: readonly string[];
       /** Facts computed before the stop, for disclosure. `null` if none. */
       readonly facts: DecisionFacts | null;
+      readonly containment: ContainmentDisclosure | null;
     }
   | {
       readonly data_status: 'ready';
@@ -107,6 +108,7 @@ export type DecisionFnResult =
       readonly core_write_status: CoreWriteStatus;
       readonly outcome: PersistCoreOutcome;
       readonly source_manifest_hash: string;
+      readonly containment: ContainmentDisclosure | null;
     };
 
 /**
@@ -147,6 +149,7 @@ export async function runDecisionFn(
       source_manifest_hash: pipeline.source_manifest_hash,
       pending_steps: pipeline.pending_steps,
       facts: pipeline.facts,
+      containment: pipeline.containment,
     };
   }
 
@@ -186,6 +189,7 @@ export async function runDecisionFn(
     core_write_status: outcome.status,
     outcome,
     source_manifest_hash: pipeline.source_manifest_hash,
+    containment: pipeline.containment,
   };
 }
 

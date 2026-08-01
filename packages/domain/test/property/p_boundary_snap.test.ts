@@ -19,16 +19,14 @@ const incidentArbitrary = fc
       fc.string({ minLength: 1, maxLength: 10 }),
     ),
     affected_road: fc.option(
-      fc.oneof(fc.constantFrom('RD_TPE_002', 'RD_TPE_099'), fc.string({ minLength: 1, maxLength: 10 })),
+      fc.oneof(
+        fc.constantFrom('RD_TPE_002', 'RD_TPE_099'),
+        fc.string({ minLength: 1, maxLength: 10 }),
+      ),
       { nil: undefined },
     ),
     location: fc.oneof(
-      fc.constantFrom(
-        '光復南路與忠孝東路四段南側',
-        '市民大道四段口',
-        '完全不相關的地點文字',
-        '',
-      ),
+      fc.constantFrom('光復南路與忠孝東路四段南側', '市民大道四段口', '完全不相關的地點文字', ''),
       fc.string({ minLength: 0, maxLength: 30 }),
     ),
   })
@@ -98,7 +96,6 @@ describe('Boundary_Snapper.snap property tests', () => {
           ? new Map([[anchorSegmentId, { lat: 25.0, lon: 121.5 }]])
           : undefined;
         const result = snap(
-          makeIncident(),
           network,
           {
             max_snap_distance_meters: params.max_snap_distance_meters,
@@ -124,7 +121,6 @@ describe('Boundary_Snapper.snap property tests', () => {
           ? new Map([['RD_TPE_002', { lat: 25.0, lon: 121.5 }]])
           : undefined;
         const result = snap(
-          makeIncident(),
           network,
           {
             max_snap_distance_meters: params.max_snap_distance_meters,
@@ -154,8 +150,8 @@ describe('Boundary_Snapper.snap property tests', () => {
           coordinate_path_enabled: params.coordinate_path_enabled,
           anchor_gazetteer: gazetteer,
         };
-        const first = snap(makeIncident(), network, config, params.eventCoordinate);
-        const second = snap(makeIncident(), network, config, params.eventCoordinate);
+        const first = snap(network, config, params.eventCoordinate);
+        const second = snap(network, config, params.eventCoordinate);
         expect(first).toEqual(second);
       }),
       { numRuns: 100 },

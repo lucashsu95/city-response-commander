@@ -38,7 +38,6 @@ import type {
   SnapResult,
   BoundarySnapperConfig,
   SopCoverageResult,
-  UniversalPrinciple,
   ContainmentDisclosure,
   MappedAnchorNode,
 } from '../src/index.js';
@@ -47,7 +46,6 @@ import {
   IdempotencyStatus,
   PublishStatus,
   SCHEMA_VERSION,
-  DEFAULT_UNIVERSAL_SOP,
   CONTAINMENT_PROHIBITED_KEYS,
   CONTAINMENT_PROHIBITED_PATHS,
 } from '../src/index.js';
@@ -390,12 +388,6 @@ describe('shared-schemas type-level assertions', () => {
       expect(config.anchor_gazetteer).toBeUndefined();
     });
 
-    it('DEFAULT_UNIVERSAL_SOP has exactly the 3 principles from R6 AC4', () => {
-      expect(DEFAULT_UNIVERSAL_SOP).toHaveLength(3);
-      const ids = DEFAULT_UNIVERSAL_SOP.map((p) => p.principle_id);
-      expect(ids).toEqual(['UPSTREAM_REDUCTION', 'PERIMETER_DISPERSAL', 'PERIMETER_CONTROL']);
-    });
-
     it('SopCoverageResult distinguishes OFFICIAL_SOP_MATCHED from UNKNOWN_TYPE_UNIVERSAL_SOP', () => {
       const officialMatch: SopCoverageResult = {
         sop_coverage_status: 'OFFICIAL_SOP_MATCHED',
@@ -407,7 +399,12 @@ describe('shared-schemas type-level assertions', () => {
         sop_coverage_status: 'UNKNOWN_TYPE_UNIVERSAL_SOP',
         sop_authority: 'SYSTEM_DEFAULT_PRINCIPLE',
         matched_article_nos: [],
-        universal_principles: DEFAULT_UNIVERSAL_SOP,
+        universal_principles: [
+          {
+            principle_id: 'UPSTREAM_REDUCTION',
+            description: 'domain-owned policy text',
+          },
+        ],
       };
       expect(officialMatch.sop_authority).toBe('OFFICIAL_SOP');
       expect(universalFallback.sop_authority).toBe('SYSTEM_DEFAULT_PRINCIPLE');

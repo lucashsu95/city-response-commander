@@ -9,8 +9,8 @@
  *
  * ## Why this file is thin
  *
- * It delegates to `runDeterministicDecision` (member 1's composition facade),
- * which internally runs classification → art.1 → incident anchor (Strategy D) →
+ * It delegates to `assembleContainment`, whose domain seam internally runs
+ * scope/SOP resolution and classification → art.1 → incident anchor (Strategy D) →
  * candidate qualification → evacuation selection → ETE affected-set (Strategy C) →
  * ETE (art.7) → art.2–6 → EvidenceTrace, in the order fixed by the organizer-
  * guided golden walkthroughs.
@@ -18,7 +18,7 @@
  * An earlier revision of this adapter hand-assembled the first few of those steps
  * and declared the rest in a `PENDING_PIPELINE_STEPS` list, because their call
  * contracts were unverified and guessing the assembly would have produced a green
- * test suite with a wrong ETE. The facade removes that guesswork, so the
+ * test suite with a wrong ETE. The domain containment pipeline removes that guesswork, so the
  * hand-assembly is gone: **Strategy A alignment, grading and article aggregation
  * are no longer performed here.** Two implementations of the same alignment could
  * disagree, and only one of them would be the one member 1 validates against
@@ -33,29 +33,33 @@
  * also pass every test. §21 is explicit: official data unavailable →
  * `data_status=insufficient_data`, STOP, disclose the gap.
  *
- * Two gaps are detected here rather than inside the facade:
+ * Two gaps are detected here rather than inside the assembler:
  *
  *  - **Ingestion did not reach `ready`.** Reported with the ingestion
  *    `stop_reason`, before the facade is called at all.
  *  - **The requested `event_id` is absent from the official incident set.** The
- *    facade *throws* in this case; a missing incident is a data gap, not a
+ *    domain pipeline cannot resolve it; a missing incident is a data gap, not a
  *    programming fault, so the incident is resolved here and the gap is returned
  *    as `insufficient_data`.
  *
- * A fault raised by the facade itself propagates. A transient or logic failure
+ * A fault raised by the assembler itself propagates. A transient or logic failure
  * must never be laundered into `insufficient_data`, because that reads as "the
  * official data had a hole" and would be disclosed to the operator as such.
  *
  * @module backend/decision/domain_pipeline_adapter
  */
 
-import { runDeterministicDecision } from '@city-commander/domain';
 import type {
   DeterministicDecisionFacts,
   IngestionResult,
   PolicyStrategyConfigProvider,
 } from '@city-commander/domain';
-import type { Incident } from '@city-commander/shared-schemas';
+import type { ContainmentDisclosure, Incident } from '@city-commander/shared-schemas';
+import {
+  assembleContainment,
+  type BedrockComposerClient,
+  type BedrockComposerOutputValidator,
+} from './containment_assembler.js';
 
 /**
  * Ingestion port (TASK-019).
@@ -69,30 +73,31 @@ export interface IngestionPort {
 }
 
 /**
- * The deterministic composition facade (member 1, `@city-commander/domain`).
+ * The production containment assembler.
  *
  * Typed as a port so the adapter's own mapping — the STOP gate, incident
  * resolution, and the refusal to launder a fault into `insufficient_data` — can be
  * tested without standing up the five official files, a road network and the SOP
- * corpus. {@link DEFAULT_DECISION_COMPOSER} is the real facade, so production
- * needs no wiring and there is no stub to leave switched on by accident.
+ * corpus. {@link DEFAULT_CONTAINMENT_ASSEMBLER} is the real orchestration entry.
  */
-export type DecisionComposerPort = typeof runDeterministicDecision;
+export type ContainmentAssemblerPort = typeof assembleContainment;
 
-/** The real facade. Used unless a test injects a substitute. */
-export const DEFAULT_DECISION_COMPOSER: DecisionComposerPort = runDeterministicDecision;
+/** The real assembler. Used unless a test injects a substitute. */
+export const DEFAULT_CONTAINMENT_ASSEMBLER: ContainmentAssemblerPort = assembleContainment;
 
 /**
  * The ports the default adapter needs.
  *
  * `config` resolves the provisional Strategies A–F (§30) and is passed straight
- * through to the facade; the adapter reads no policy key itself.
+ * through to the assembler; the adapter reads no policy key itself.
  */
 export interface DomainPipelinePorts {
   readonly ingestion: IngestionPort;
   readonly config: PolicyStrategyConfigProvider;
-  /** Defaults to {@link DEFAULT_DECISION_COMPOSER}. */
-  readonly decide?: DecisionComposerPort;
+  readonly composer: BedrockComposerClient;
+  readonly validator: BedrockComposerOutputValidator;
+  /** Defaults to the production containment assembler. */
+  readonly assemble?: ContainmentAssemblerPort;
 }
 
 /** Adapter input. */
@@ -104,7 +109,7 @@ export interface DomainPipelineInput {
 /**
  * Domain steps not yet wired.
  *
- * Empty since `runDeterministicDecision` landed: the facade composes every
+ * Empty since the containment pipeline landed: the domain seam composes every
  * deterministic step. Retained as an explicit, assertable statement that nothing
  * is outstanding — and as the place to re-declare a gap if one ever reappears.
  * While non-empty the adapter returns `insufficient_data`, so a partial pipeline
@@ -133,6 +138,8 @@ export interface DomainPipelineResult {
   readonly pending_steps: readonly string[];
   /** Deterministic facts; `null` whenever `data_status='insufficient_data'`. */
   readonly facts: DecisionFacts | null;
+  /** Boundary/SOP disclosure kept separate from immutable DecisionCore. */
+  readonly containment: ContainmentDisclosure | null;
 }
 
 /** The adapter contract `DecisionFn` depends on. */
@@ -147,11 +154,12 @@ function stopped(stopReason: string, sourceManifestHash = ''): DomainPipelineRes
     source_manifest_hash: sourceManifestHash,
     pending_steps: PENDING_PIPELINE_STEPS,
     facts: null,
+    containment: null,
   };
 }
 
 /**
- * Runs the deterministic pipeline via the domain composition facade.
+ * Runs the production containment assembler.
  *
  * Contains no threshold, no grading boundary and no formula.
  *
@@ -165,10 +173,10 @@ function stopped(stopReason: string, sourceManifestHash = ''): DomainPipelineRes
  * ```
  */
 export class DefaultDomainPipelineAdapter implements DomainPipelineAdapter {
-  private readonly decide: DecisionComposerPort;
+  private readonly assemble: ContainmentAssemblerPort;
 
   constructor(private readonly ports: DomainPipelinePorts) {
-    this.decide = ports.decide ?? DEFAULT_DECISION_COMPOSER;
+    this.assemble = ports.assemble ?? DEFAULT_CONTAINMENT_ASSEMBLER;
   }
 
   async execute(input: DomainPipelineInput): Promise<DomainPipelineResult> {
@@ -184,7 +192,7 @@ export class DefaultDomainPipelineAdapter implements DomainPipelineAdapter {
     }
 
     // 2. Resolve the incident here, so an event_id absent from the official set is
-    //    a disclosed data gap rather than the facade's thrown Error.
+    //    a disclosed data gap rather than a downstream failure.
     const incident = this.resolveIncident(ingested.incidents, input.eventId);
     if (incident === null) {
       return stopped(
@@ -196,11 +204,20 @@ export class DefaultDomainPipelineAdapter implements DomainPipelineAdapter {
     // 3. One deterministic composition call. Every rule, threshold and formula
     //    lives inside it; a fault raised in there propagates rather than being
     //    reported as a data gap.
-    const decision = this.decide({
+    const decision = await this.assemble({
       ingestion: ingested,
       config: this.ports.config,
       incident,
+      composer: this.ports.composer,
+      validator: this.ports.validator,
     });
+
+    if (decision.error === 'CONFIG_MISSING') {
+      return stopped(
+        decision.stop_reason ?? 'Containment configuration is missing.',
+        ingested.source_manifest_hash,
+      );
+    }
 
     if (decision.data_status !== 'ready' || decision.facts === null) {
       return stopped(
@@ -226,6 +243,14 @@ export class DefaultDomainPipelineAdapter implements DomainPipelineAdapter {
       source_manifest_hash: decision.source_manifest_hash,
       pending_steps: PENDING_PIPELINE_STEPS,
       facts: decision.facts,
+      containment: {
+        data_scope_status: decision.data_scope_status,
+        mapped_anchor_node: decision.mapped_anchor_node,
+        sop_coverage_status: decision.sop_coverage_status,
+        sop_authority: decision.sop_authority,
+        decision: decision.decision,
+        whitelist_violations: decision.whitelist_violations,
+      },
     };
   }
 

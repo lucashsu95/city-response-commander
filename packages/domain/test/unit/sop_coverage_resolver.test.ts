@@ -4,9 +4,12 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, it, expect } from 'vitest';
-import { resolveSopCoverage } from '../../src/boundary/sop_coverage_resolver.js';
+import {
+  DEFAULT_UNIVERSAL_SOP,
+  resolveSopCoverage,
+} from '../../src/boundary/sop_coverage_resolver.js';
 import { parseIncidentsJson } from '../../src/ingestion/incident_parser.js';
-import { DEFAULT_UNIVERSAL_SOP, IncidentType } from '@city-commander/shared-schemas';
+import { IncidentType } from '@city-commander/shared-schemas';
 
 describe('resolveSopCoverage', () => {
   describe('R6 AC2 — official type-to-article table (every known IncidentType)', () => {
@@ -101,7 +104,10 @@ describe('resolveSopCoverage', () => {
   });
 
   describe('regression against the official 3 live_incidents.json events', () => {
-    const LIVE_INCIDENTS_PATH = resolve(__dirname, '../../../../中華電信資料集/live_incidents.json');
+    const LIVE_INCIDENTS_PATH = resolve(
+      __dirname,
+      '../../../../中華電信資料集/live_incidents.json',
+    );
     const officialIncidents = parseIncidentsJson(readFileSync(LIVE_INCIDENTS_PATH, 'utf-8'));
 
     it('TPE_2026_ACC_001 (Road_Collapse_Accident) matches article 2', () => {

@@ -19,7 +19,6 @@ import type {
   SnapResult,
 } from '@city-commander/shared-schemas';
 import type { RoadNetworkModel } from '../road_network/road_network_model.js';
-import { intersectionAppearsInLocation } from '../road_network/intersection_text_match.js';
 
 /**
  * Entity_Scope_Check (R2) — determine whether an incident's location falls
@@ -64,7 +63,7 @@ export function checkEntityScope(
   const nameToSegmentIds = new Map<string, string[]>();
   for (const segment of roadNetwork.getAllSegments()) {
     for (const intersectionName of segment.intersections) {
-      if (!intersectionAppearsInLocation(incident.location, intersectionName)) continue;
+      if (!incident.location.includes(intersectionName)) continue;
       const segmentIds = nameToSegmentIds.get(intersectionName) ?? [];
       segmentIds.push(segment.segment_id);
       nameToSegmentIds.set(intersectionName, segmentIds);
@@ -181,10 +180,7 @@ export function haversineMeters(a: AnchorGazetteerEntry, b: AnchorGazetteerEntry
 /** WGS84 bounds check (R3 AC4). */
 function isValidCoordinate(coordinate: AnchorGazetteerEntry): boolean {
   return (
-    coordinate.lat >= -90 &&
-    coordinate.lat <= 90 &&
-    coordinate.lon >= -180 &&
-    coordinate.lon <= 180
+    coordinate.lat >= -90 && coordinate.lat <= 90 && coordinate.lon >= -180 && coordinate.lon <= 180
   );
 }
 
@@ -203,9 +199,10 @@ function pickByCapacity(anchors: readonly PerimeterAnchor[]): PerimeterAnchor {
 }
 
 /** R4 AC4 — nearest by haversine distance wins; tie-break lexicographically smallest segment_id. */
-function pickByDistance(
-  anchors: readonly { anchor: PerimeterAnchor; distance: number }[],
-): { anchor: PerimeterAnchor; distance: number } {
+function pickByDistance(anchors: readonly { anchor: PerimeterAnchor; distance: number }[]): {
+  anchor: PerimeterAnchor;
+  distance: number;
+} {
   let best = anchors[0] as { anchor: PerimeterAnchor; distance: number };
   for (const candidate of anchors) {
     if (
@@ -232,15 +229,15 @@ function pickByDistance(
  * coordinate path is consequently unreachable (design.md §11 Non-Goals).
  */
 export function snap(
-  incident: Incident,
   roadNetwork: RoadNetworkModel,
   config: BoundarySnapperConfig,
   eventCoordinate?: AnchorGazetteerEntry,
 ): SnapResult | BoundarySnapperConfigError {
-  void incident; // reserved for future per-incident snapping refinements; unused today.
-
   // R5 AC1/AC2 — defense-in-depth: never snap without a real threshold.
-  if (typeof config.max_snap_distance_meters !== 'number' || !Number.isFinite(config.max_snap_distance_meters)) {
+  if (
+    typeof config.max_snap_distance_meters !== 'number' ||
+    !Number.isFinite(config.max_snap_distance_meters)
+  ) {
     return { error: 'CONFIG_MISSING', missing_key: 'boundary_snapping.max_snap_distance_meters' };
   }
 
@@ -289,7 +286,10 @@ export function snap(
     .map((anchor) => {
       const anchorCoordinate = gazetteer.get(anchor.segment_id);
       if (anchorCoordinate === undefined) return null;
-      return { anchor, distance: haversineMeters(usableCoordinate as AnchorGazetteerEntry, anchorCoordinate) };
+      return {
+        anchor,
+        distance: haversineMeters(usableCoordinate as AnchorGazetteerEntry, anchorCoordinate),
+      };
     })
     .filter((entry): entry is { anchor: PerimeterAnchor; distance: number } => entry !== null);
 

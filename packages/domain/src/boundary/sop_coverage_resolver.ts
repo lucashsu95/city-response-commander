@@ -13,8 +13,28 @@
  * @module domain/boundary/sop_coverage_resolver
  */
 
-import { DEFAULT_UNIVERSAL_SOP, IncidentType, type SopCoverageResult } from '@city-commander/shared-schemas';
+import {
+  IncidentType,
+  type SopCoverageResult,
+  type UniversalPrinciple,
+} from '@city-commander/shared-schemas';
 import { articleFiveDescriptionTrigger } from '../rule_engine/article5.js';
+
+/** System-default containment policy for incident types outside the official SOP table. */
+export const DEFAULT_UNIVERSAL_SOP: readonly UniversalPrinciple[] = [
+  {
+    principle_id: 'UPSTREAM_REDUCTION',
+    description: '上游減量：於周界錨點上游疏導車流，降低進入未劃設區域之流量',
+  },
+  {
+    principle_id: 'PERIMETER_DISPERSAL',
+    description: '周邊擴散：透過 alternatives 分流至周界錨點鄰近之替代路段',
+  },
+  {
+    principle_id: 'PERIMETER_CONTROL',
+    description: '周界管制：於周界錨點設立管制點，阻止車流繼續駛向未劃設區域',
+  },
+] as const;
 
 interface SopTypeArticleMapping {
   readonly incidentType: string;
@@ -86,7 +106,10 @@ const TYPE_TO_ARTICLE_TABLE: readonly SopTypeArticleMapping[] = [
  *    known-type incident whose type didn't match but description did.
  * 3. Else → UNKNOWN_TYPE_UNIVERSAL_SOP, DEFAULT_UNIVERSAL_SOP attached.
  */
-export function resolveSopCoverage(incidentType: string, incidentDescription: string): SopCoverageResult {
+export function resolveSopCoverage(
+  incidentType: string,
+  incidentDescription: string,
+): SopCoverageResult {
   const tableEntry = TYPE_TO_ARTICLE_TABLE.find((entry) => entry.incidentType === incidentType);
   if (tableEntry !== undefined) {
     return {

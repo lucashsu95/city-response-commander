@@ -14,7 +14,26 @@
  */
 
 import type { DataScopeStatus, PerimeterAnchor } from './boundary_snapping.js';
-import type { SopAuthority, SopCoverageStatus } from './sop_coverage.js';
+import type { SopCitation } from './evidence.js';
+import type { SopAuthority, SopCoverageStatus, UniversalPrinciple } from './sop_coverage.js';
+
+/** The only context an external language model may receive for containment wording. */
+export interface SafeContext {
+  readonly allowed_road_whitelist: readonly string[];
+  readonly official_sop_text: readonly SopCitation[] | null;
+  readonly universal_principles: readonly UniversalPrinciple[] | null;
+  readonly scope_disclosure: string | null;
+  readonly instruction: string;
+}
+
+/** Schema-validation result for untrusted composer output. */
+export type ContainmentComposerValidation =
+  | { readonly outcome: 'accepted'; readonly text: string }
+  | {
+      readonly outcome: 'use_template';
+      readonly reason: string;
+      readonly offendingFields: readonly string[];
+    };
 
 export interface MappedAnchorNode extends PerimeterAnchor {
   readonly distance_meters: number | null;

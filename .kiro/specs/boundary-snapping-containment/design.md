@@ -38,22 +38,22 @@
 
 ## 2. Requirements Mapping
 
-| 需求 | 摘要 | 主要元件 | 執行主體 | 主要落點章節 |
-| --- | --- | --- | --- | --- |
-| R1 | 前置關卡執行順序與職責邊界 | `Containment_Assembler` | 決定性 | §3 |
-| R2 | 實體集合涵蓋判定 | `Boundary_Snapper.checkEntityScope` | 決定性 | §4.1 |
-| R3 | 座標路徑與 haversine | `Boundary_Snapper.snapByCoordinate` | 決定性 | §4.3 |
-| R4 | 周界錨點推導與吸附 | `Boundary_Snapper.deriveAnchors` / `snap` | 決定性 | §4.2 |
-| R5 | 吸附距離上限與 `OUT_OF_JURISDICTION` | `Boundary_Snapper` | 決定性 | §4.2, §4.3 |
-| R6 | 未知事件類型通用接管 | `Sop_Coverage_Resolver` | 決定性 | §5 |
-| R7 | Fact_Gap / Coverage_Gap 並存 | `Containment_Assembler` | 決定性 | §3.2 |
-| R8 | Safe_Context 動作空間限制 | `Containment_Assembler.buildSafeContext` | 決定性 | §6 |
-| R9 | LLM 輸出白名單稽核 | `Whitelist_Guard` | 決定性 | §4.4, §6 |
-| R10 | API 顯式標示欄位 | `Containment_Assembler` | 決定性 | §8 |
-| R11 | 設定項目 | `ConfigProvider` | 決定性 | §9 |
-| R12 | 與 `runDeterministicDecision` 的執行順序 | `Containment_Assembler` | 決定性 | §3 |
-| R13 | `LLM_PROHIBITED_FIELDS` 同步 | `llm_boundary.ts`, `eslint-local-rules.cjs` | 決定性 | §7 |
-| R14 | 測試涵蓋 | 全部模組 | 決定性 | §10 |
+| 需求 | 摘要                                     | 主要元件                                    | 執行主體 | 主要落點章節 |
+| ---- | ---------------------------------------- | ------------------------------------------- | -------- | ------------ |
+| R1   | 前置關卡執行順序與職責邊界               | `Containment_Assembler`                     | 決定性   | §3           |
+| R2   | 實體集合涵蓋判定                         | `Boundary_Snapper.checkEntityScope`         | 決定性   | §4.1         |
+| R3   | 座標路徑與 haversine                     | `Boundary_Snapper.snapByCoordinate`         | 決定性   | §4.3         |
+| R4   | 周界錨點推導與吸附                       | `Boundary_Snapper.deriveAnchors` / `snap`   | 決定性   | §4.2         |
+| R5   | 吸附距離上限與 `OUT_OF_JURISDICTION`     | `Boundary_Snapper`                          | 決定性   | §4.2, §4.3   |
+| R6   | 未知事件類型通用接管                     | `Sop_Coverage_Resolver`                     | 決定性   | §5           |
+| R7   | Fact_Gap / Coverage_Gap 並存             | `Containment_Assembler`                     | 決定性   | §3.2         |
+| R8   | Safe_Context 動作空間限制                | `Containment_Assembler.buildSafeContext`    | 決定性   | §6           |
+| R9   | LLM 輸出白名單稽核                       | `Whitelist_Guard`                           | 決定性   | §4.4, §6     |
+| R10  | API 顯式標示欄位                         | `Containment_Assembler`                     | 決定性   | §8           |
+| R11  | 設定項目                                 | `ConfigProvider`                            | 決定性   | §9           |
+| R12  | 與 `runDeterministicDecision` 的執行順序 | `Containment_Assembler`                     | 決定性   | §3           |
+| R13  | `LLM_PROHIBITED_FIELDS` 同步             | `llm_boundary.ts`, `eslint-local-rules.cjs` | 決定性   | §7           |
+| R14  | 測試涵蓋                                 | 全部模組                                    | 決定性   | §10          |
 
 ---
 
@@ -85,7 +85,7 @@ sequenceDiagram
             Pipeline-->>Assembler: DeterministicDecisionFacts
         else coverage_status in {OUT_OF_BOUNDS_SNAPPED, OUT_OF_JURISDICTION}
             Note over Assembler,Pipeline: 略過 RD_ 分支（classification/Strategy D/<br/>qualifyCandidates/selectEvacuation/ETE）
-            Assembler->>Snap: snap(incident) → Perimeter_Anchor | OUT_OF_JURISDICTION
+            Assembler->>Snap: snap(roadNetwork, config) → Perimeter_Anchor | OUT_OF_JURISDICTION
             Note over Assembler: SOP-3/4/6（BS_ID 站點觸發）仍照既有邏輯執行，<br/>因與 affected_segment 無關（R12 AC5）
         end
 
@@ -134,21 +134,21 @@ export interface EntityScopeResult {
 }
 
 export interface PerimeterAnchor {
-  readonly segment_id: string;       // 屬於 Road_Whitelist（Req 4 AC6）
+  readonly segment_id: string; // 屬於 Road_Whitelist（Req 4 AC6）
   readonly gateway_intersection: string; // 屬於 Intersection_Whitelist（Req 4 AC7）
   readonly capacity_vph: number;
 }
 
 export interface SnapResult {
   readonly coverage_status: 'OUT_OF_BOUNDS_SNAPPED' | 'OUT_OF_JURISDICTION';
-  readonly anchor: PerimeterAnchor | null;      // OUT_OF_JURISDICTION 時為 null（Req 4 AC5/AC8）
-  readonly distance_meters: number | null;      // 座標路徑未啟用時為 null（Req 3 AC6）
-  readonly reason: string;                      // 'no_perimeter_anchor_available' 等
-  readonly evidence: readonly string[];         // 吸附證據（Req 2 AC6, R3 AC3/AC4）
+  readonly anchor: PerimeterAnchor | null; // OUT_OF_JURISDICTION 時為 null（Req 4 AC5/AC8）
+  readonly distance_meters: number | null; // 座標路徑未啟用時為 null（Req 3 AC6）
+  readonly reason: string; // 'no_perimeter_anchor_available' 等
+  readonly evidence: readonly string[]; // 吸附證據（Req 2 AC6, R3 AC3/AC4）
 }
 
 export interface BoundarySnapperConfig {
-  readonly max_snap_distance_meters: number;      // 必填，缺失即錯誤（Req 5 AC1/AC2）
+  readonly max_snap_distance_meters: number; // 必填，缺失即錯誤（Req 5 AC1/AC2）
   readonly coordinate_path_enabled: boolean;
   readonly anchor_gazetteer?: ReadonlyMap<string, { lat: number; lon: number }>; // Req 3 AC1
 }
@@ -158,9 +158,7 @@ export function checkEntityScope(
   roadNetwork: RoadNetworkModel,
 ): EntityScopeResult;
 
-export function derivePerimeterAnchors(
-  roadNetwork: RoadNetworkModel,
-): readonly PerimeterAnchor[];
+export function derivePerimeterAnchors(roadNetwork: RoadNetworkModel): readonly PerimeterAnchor[];
 
 export interface BoundarySnapperConfigError {
   readonly error: 'CONFIG_MISSING';
@@ -168,14 +166,13 @@ export interface BoundarySnapperConfigError {
 }
 
 export function snap(
-  incident: Incident,
   roadNetwork: RoadNetworkModel,
   config: BoundarySnapperConfig,
   eventCoordinate?: AnchorGazetteerEntry, // TASK-BS-06 addendum, see below
 ): SnapResult | BoundarySnapperConfigError;
 ```
 
-> **實作期補充（TASK-BS-06）**：`Incident` 型別本身不含任何座標欄位（官方資料集無座標），因此座標路徑（Req 3）需要的 WGS84 座標不可能從 `incident` 推導出來，只能由呼叫端額外提供（例如未來 Dashboard 地圖點選）。`snap` 因此多了一個可選的第四參數 `eventCoordinate`；對官方資料集而言這個參數恆為 `undefined`，座標路徑維持 §11 所述的「介面已備妥、實際不可觸達」狀態。另外，`max_snap_distance_meters` 雖然在 `BoundarySnapperConfig` 型別上是必填數字，但其執行期真實來源是 `ConfigProvider`（schema 層為 `required:false`，見 §9 修正），型別系統無法保證呼叫端真的有值；`snap` 因此在函式內部做一次防禦性執行期檢查，缺值時回傳 `BoundarySnapperConfigError` 而非拋例外或靜默吸附（Req 5 AC1/AC2）。`Anchor_Gazetteer` 的鍵值採用 `PerimeterAnchor.segment_id`（唯一穩定識別碼）。
+> **實作期補充（TASK-BS-06）**：`Incident` 型別本身不含任何座標欄位（官方資料集無座標），因此座標路徑（Req 3）需要的 WGS84 座標不可能從 `incident` 推導出來，只能由呼叫端額外提供（例如未來 Dashboard 地圖點選）。`snap` 不接收未使用的 `Incident`，而以可選第三參數 `eventCoordinate` 接收座標；對官方資料集而言這個參數恆為 `undefined`，座標路徑維持 §11 所述的「介面已備妥、實際不可觸達」狀態。另外，`max_snap_distance_meters` 雖然在 `BoundarySnapperConfig` 型別上是必填數字，但其執行期真實來源是 `ConfigProvider`（schema 層為 `required:false`，見 §9 修正），型別系統無法保證呼叫端真的有值；`snap` 因此在函式內部做一次防禦性執行期檢查，缺值時回傳 `BoundarySnapperConfigError` 而非拋例外或靜默吸附（Req 5 AC1/AC2）。`Anchor_Gazetteer` 的鍵值採用 `PerimeterAnchor.segment_id`（唯一穩定識別碼）。
 
 ### 4.1 Entity_Scope_Check（Requirement 2）
 
@@ -183,10 +180,10 @@ export function snap(
 
 1. `incident.affected_segment` 屬於 `Road_Whitelist`（`roadNetwork.getSegment(id) !== undefined`）→ `IN_SCOPE`，錨點 = `affected_segment`。
 2. 否則若 `incident.affected_road` 屬於 `Road_Whitelist` → `IN_SCOPE`，錨點 = `affected_road`。
-3. 否則掃描全部路段的 `intersections[]`，找出出現在 `incident.location` 文字中的路口名稱（複用 `incident_anchor_resolution_strategy.ts` 裡 `intersectionAppearsInLocation` 的比對邏輯，含路段別名去除 `一二三四五六七八九十]+段$`）；有命中則 `IN_SCOPE_BY_INTERSECTION`，多個命中依 Req 2 AC5（最長字串優先、字典序 tie-break）選出，錨點 = 該路口所屬路段中 `segment_id` 字典序最小者。
+3. 否則掃描全部路段的 `intersections[]`，只以白名單中的完整路口名稱比對 `incident.location`；有命中則 `IN_SCOPE_BY_INTERSECTION`，多個命中依 Req 2 AC5（最長字串優先、字典序 tie-break）選出，錨點 = 該路口所屬路段中 `segment_id` 字典序最小者。去除「路段」的別名比對只保留於既有 IncidentAnchorResolutionStrategy，不得用於 Entity Scope。
 4. 都沒有命中 → `OUT_OF_BOUNDS`。
 
-> **注意**：此比對邏輯與既有 `IncidentAnchorResolutionStrategy`（Strategy D）在字串比對演算法上刻意共用同一個 helper（見 §4.5），避免兩套「路口名稱是否出現在 location 文字中」的判斷各自實作、結果不一致。
+> **注意**：Entity Scope 的責任是判定是否屬於官方路口白名單，因此採完整名稱；既有 `IncidentAnchorResolutionStrategy`（Strategy D）則負責轄內事件的錨點解析，可保留較寬鬆的路段別名比對。兩者目的不同，不共用 alias helper。
 
 ### 4.2 Perimeter_Anchor 推導與吸附（Requirement 4）
 
@@ -212,7 +209,7 @@ derivePerimeterAnchors(roadNetwork):
 ### 4.3 座標路徑（Requirement 3）
 
 ```ts
-function haversineMeters(a: {lat:number; lon:number}, b: {lat:number; lon:number}): number
+function haversineMeters(a: { lat: number; lon: number }, b: { lat: number; lon: number }): number;
 ```
 
 標準大圓距離公式，回傳整數公尺（Req 3 AC5）。緯度範圍 `[-90,90]`、經度範圍 `[-180,180]` 外視為 `invalid_coordinate`（Req 3 AC4）；`ConfigProvider` 未提供 `anchor_gazetteer` 時記錄 `gazetteer_unavailable`（Req 3 AC3）；兩種情況都退回 Entity_Scope_Check 路徑，`distance_meters` 欄位設為 `null`（Req 3 AC6）。**目前官方資料集（`road_network_geometry.json`、`live_incidents.json`）不含任何座標欄位，座標路徑在本次比賽資料上恆為未啟用狀態**——此路徑僅為未來若 Dashboard 提供地圖點選座標時預留，非本次交付的示範路徑。
@@ -230,8 +227,7 @@ export interface WhitelistPartition {
 export function partitionByWhitelist(
   candidateIds: readonly string[],
   whitelist: ReadonlySet<string>,
-): WhitelistPartition;　// allowed ∪ rejected == candidateIds, allowed ∩ rejected == ∅（Req 12.5 屬性測試）
-
+): WhitelistPartition; // allowed ∪ rejected == candidateIds, allowed ∩ rejected == ∅（Req 12.5 屬性測試）
 export function extractRoadIdLike(text: string): readonly string[];
 // 抽取符合 road id 格式（如 RD_TPE_\d{3}）的子字串，供稽核 Bedrock 輸出（Req 9 AC1）
 ```
@@ -253,7 +249,7 @@ export type SopAuthority = 'OFFICIAL_SOP' | 'SYSTEM_DEFAULT_PRINCIPLE';
 export interface SopCoverageResult {
   readonly sop_coverage_status: SopCoverageStatus;
   readonly sop_authority: SopAuthority;
-  readonly matched_article_nos: readonly number[];      // OFFICIAL_SOP_MATCHED 時非空
+  readonly matched_article_nos: readonly number[]; // OFFICIAL_SOP_MATCHED 時非空
   readonly universal_principles: readonly UniversalPrinciple[]; // UNKNOWN_TYPE_UNIVERSAL_SOP 時非空
 }
 
@@ -263,9 +259,18 @@ export interface UniversalPrinciple {
 }
 
 export const DEFAULT_UNIVERSAL_SOP: readonly UniversalPrinciple[] = [
-  { principle_id: 'UPSTREAM_REDUCTION', description: '上游減量：於周界錨點上游疏導車流，降低進入未劃設區域之流量' },
-  { principle_id: 'PERIMETER_DISPERSAL', description: '周邊擴散：透過 alternatives 分流至周界錨點鄰近之替代路段' },
-  { principle_id: 'PERIMETER_CONTROL', description: '周界管制：於周界錨點設立管制點，阻止車流繼續駛向未劃設區域' },
+  {
+    principle_id: 'UPSTREAM_REDUCTION',
+    description: '上游減量：於周界錨點上游疏導車流，降低進入未劃設區域之流量',
+  },
+  {
+    principle_id: 'PERIMETER_DISPERSAL',
+    description: '周邊擴散：透過 alternatives 分流至周界錨點鄰近之替代路段',
+  },
+  {
+    principle_id: 'PERIMETER_CONTROL',
+    description: '周界管制：於周界錨點設立管制點，阻止車流繼續駛向未劃設區域',
+  },
 ] as const;
 
 export function resolveSopCoverage(
@@ -278,11 +283,11 @@ export function resolveSopCoverage(
 >
 > 對照表內容需可回溯到 `emergency_traffic_sop.txt` 的 7 條條文（Req 6 AC1），並與既有 `.kiro/specs/impl1/tasks.md` 的三個 golden walkthrough 交叉核對：
 >
-> | `incident.type` | 對應條號 | 依據 |
-> | --- | --- | --- |
-> | `Road_Collapse_Accident` | 2 | §2「車禍與路障應變」條件三「`affected_segment` 以 RD_ 開頭」；golden ACC_001 |
-> | `Crowd_Surge_Injury` | 3 | §3「捷運與接駁分流」；golden EVT_002（TASK-054 標題即為 "SOP-3 evaluation, must-compute"） |
-> | `Power_Failure` | 5 | §5「號誌故障應變」明文以 `type = "Power_Failure"` 為觸發條件之一；golden EVT_003 |
+> | `incident.type`          | 對應條號 | 依據                                                                                       |
+> | ------------------------ | -------- | ------------------------------------------------------------------------------------------ |
+> | `Road_Collapse_Accident` | 2        | §2「車禍與路障應變」條件三「`affected_segment` 以 RD_ 開頭」；golden ACC_001               |
+> | `Crowd_Surge_Injury`     | 3        | §3「捷運與接駁分流」；golden EVT_002（TASK-054 標題即為 "SOP-3 evaluation, must-compute"） |
+> | `Power_Failure`          | 5        | §5「號誌故障應變」明文以 `type = "Power_Failure"` 為觸發條件之一；golden EVT_003           |
 >
 > 條文 1（適用全 15 路段，非因特定事件觸發）、3/4/6（純由 `BS_` 基地台數值門檻觸發，非由 `incident.type` 決定）、7（ETE 公式，非「條號比對」性質）不列入此對照表。事件 `description` 的文字觸發後備檢查僅適用於條文 5（唯一在 SOP 文字中寫明「或描述含...」的條文），重用既有 `article5.ts` 抽出的 `articleFiveDescriptionTrigger`，避免重複定義關鍵字字串。
 >
@@ -296,15 +301,18 @@ export function resolveSopCoverage(
 
 ```ts
 export interface ContainmentResult {
-  readonly data_status: IngestionDataStatus;        // 既有欄位，語意不變
-  readonly stop_reason: string | null;               // 既有欄位，語意不變
+  readonly data_status: IngestionDataStatus; // 既有欄位，語意不變
+  readonly stop_reason: string | null; // 既有欄位，語意不變
   readonly data_scope_status:
-    | 'IN_SCOPE' | 'IN_SCOPE_BY_INTERSECTION'
-    | 'OUT_OF_BOUNDS_SNAPPED' | 'OUT_OF_JURISDICTION' | null; // data_status!=ready 時為 null
+    | 'IN_SCOPE'
+    | 'IN_SCOPE_BY_INTERSECTION'
+    | 'OUT_OF_BOUNDS_SNAPPED'
+    | 'OUT_OF_JURISDICTION'
+    | null; // data_status!=ready 時為 null
   readonly mapped_anchor_node: (PerimeterAnchor & { distance_meters: number | null }) | null;
   readonly sop_coverage_status: SopCoverageStatus | null;
   readonly sop_authority: SopAuthority | null;
-  readonly facts: DeterministicDecisionFacts | null;  // IN_SCOPE* 時來自既有 runDeterministicDecision
+  readonly facts: DeterministicDecisionFacts | null; // IN_SCOPE* 時來自既有 runDeterministicDecision
   readonly decision: {
     readonly reroute_roads: readonly string[];
     readonly perimeter_control: { action: string; target_gate: string; reason: string } | null;
@@ -408,29 +416,29 @@ golden fixture 的實際推導結果（`packages/domain/test/unit/perimeter_anch
 
 比照 `packages/config/src/config_schema.ts` 既有攤平陣列格式追加（沿用 §23.1 慣例，非新機制）：
 
-| key | type | required | provisionalDefault | 備註 |
-| --- | --- | --- | --- | --- |
-| `boundary_snapping.max_snap_distance_meters` | number | **false**（TASK-BS-02 修正：`required:true` 會違反既有 `config_schema.test.ts`「所有必填項目都要有 `provisionalDefault`」不變量；`required:false`＋無預設值＋由 `Boundary_Snapper` 自身在使用時顯式檢查缺失並報錯，才是與 `orchestration.state_machine_arn` 完全一致的既有模式） | **無** | Req 5 AC1/AC2 |
-| `boundary_snapping.coordinate_path_enabled` | boolean | true | `false` | Req 11 AC2 |
-| `boundary_snapping.anchor_gazetteer_source` | string | false（僅 `coordinate_path_enabled=true` 時必填） | 無 | Req 11 AC3 |
-| `containment.universal_sop_enabled` | boolean | true | `true` | Req 11 AC4/AC5 |
+| key                                          | type    | required                                                                                                                                                                                                                                                                         | provisionalDefault | 備註           |
+| -------------------------------------------- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------ | -------------- |
+| `boundary_snapping.max_snap_distance_meters` | number  | **false**（TASK-BS-02 修正：`required:true` 會違反既有 `config_schema.test.ts`「所有必填項目都要有 `provisionalDefault`」不變量；`required:false`＋無預設值＋由 `Boundary_Snapper` 自身在使用時顯式檢查缺失並報錯，才是與 `orchestration.state_machine_arn` 完全一致的既有模式） | **無**             | Req 5 AC1/AC2  |
+| `boundary_snapping.coordinate_path_enabled`  | boolean | true                                                                                                                                                                                                                                                                             | `false`            | Req 11 AC2     |
+| `boundary_snapping.anchor_gazetteer_source`  | string  | false（僅 `coordinate_path_enabled=true` 時必填）                                                                                                                                                                                                                                | 無                 | Req 11 AC3     |
+| `containment.universal_sop_enabled`          | boolean | true                                                                                                                                                                                                                                                                             | `true`             | Req 11 AC4/AC5 |
 
 ---
 
 ## 10. 測試策略（對映 Requirement 14）
 
-| Property/測試 | 對映需求 | 位置 |
-| --- | --- | --- |
-| P-B1: 吸附結果 `segment_id` 為 `null` 或屬於 Road_Whitelist | R14.2 | `packages/domain/test/property/p_boundary_snap.test.ts` |
-| P-B2: 相同輸入兩次執行結果相同（純函式性） | R14.3 | 同上 |
-| P-B3: `OUT_OF_JURISDICTION` 時錨點為 `null` | R14.4 | 同上 |
-| P-B4: Whitelist_Guard 分割集合聯集=輸入、交集=空 | R14.5 | `packages/domain/test/unit/whitelist_guard.test.ts` |
-| Sop_Coverage_Resolver 對照表全覆蓋 + ≥3 未知 type | R14.6 | `packages/domain/test/unit/sop_coverage_resolver.test.ts` |
-| Max_Snap_Distance 邊界（=、<、>門檻） | R14.7 | `packages/domain/test/unit/boundary_snapper_boundary.test.ts` |
-| Containment_Assembler 整合：IN_SCOPE / OUT_OF_BOUNDS_SNAPPED / OUT_OF_JURISDICTION / (insufficient_data ∧ OUT_OF_BOUNDS_SNAPPED) | R14.8 | `packages/backend/test/decision/containment_assembler.test.ts` |
-| No-regression：`IN_SCOPE` 事件 `decision_pipeline.ts` 輸出前後逐欄位相同 | R14.9 | 同上（golden diff against 既有 ACC_001/EVT_002/EVT_003 fixtures） |
-| `prohibited-fields-sync.test.ts` 擴充涵蓋 `CONTAINMENT_PROHIBITED_KEYS` | R14.10 | `eslint-local-rules/test/prohibited-fields-sync.test.ts` |
-| Bedrock 輸出嘗試覆寫保留欄位仍以決定性值為準 | R14.11 | `packages/rag/test/schema_validator.test.ts` |
+| Property/測試                                                                                                                    | 對映需求 | 位置                                                              |
+| -------------------------------------------------------------------------------------------------------------------------------- | -------- | ----------------------------------------------------------------- |
+| P-B1: 吸附結果 `segment_id` 為 `null` 或屬於 Road_Whitelist                                                                      | R14.2    | `packages/domain/test/property/p_boundary_snap.test.ts`           |
+| P-B2: 相同輸入兩次執行結果相同（純函式性）                                                                                       | R14.3    | 同上                                                              |
+| P-B3: `OUT_OF_JURISDICTION` 時錨點為 `null`                                                                                      | R14.4    | 同上                                                              |
+| P-B4: Whitelist_Guard 分割集合聯集=輸入、交集=空                                                                                 | R14.5    | `packages/domain/test/unit/whitelist_guard.test.ts`               |
+| Sop_Coverage_Resolver 對照表全覆蓋 + ≥3 未知 type                                                                                | R14.6    | `packages/domain/test/unit/sop_coverage_resolver.test.ts`         |
+| Max_Snap_Distance 邊界（=、<、>門檻）                                                                                            | R14.7    | `packages/domain/test/unit/boundary_snapper_boundary.test.ts`     |
+| Containment_Assembler 整合：IN_SCOPE / OUT_OF_BOUNDS_SNAPPED / OUT_OF_JURISDICTION / (insufficient_data ∧ OUT_OF_BOUNDS_SNAPPED) | R14.8    | `packages/backend/test/decision/containment_assembler.test.ts`    |
+| No-regression：`IN_SCOPE` 事件 `decision_pipeline.ts` 輸出前後逐欄位相同                                                         | R14.9    | 同上（golden diff against 既有 ACC_001/EVT_002/EVT_003 fixtures） |
+| `prohibited-fields-sync.test.ts` 擴充涵蓋 `CONTAINMENT_PROHIBITED_KEYS`                                                          | R14.10   | `eslint-local-rules/test/prohibited-fields-sync.test.ts`          |
+| Bedrock 輸出嘗試覆寫保留欄位仍以決定性值為準                                                                                     | R14.11   | `packages/rag/test/schema_validator.test.ts`                      |
 
 ---
 

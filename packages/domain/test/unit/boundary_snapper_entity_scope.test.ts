@@ -41,7 +41,10 @@ describe('checkEntityScope', () => {
     });
 
     it('does not fall through to affected_road when affected_segment already matches (AC1 takes precedence)', () => {
-      const incident = makeIncident({ affected_segment: 'RD_TPE_002', affected_road: 'RD_TPE_004' });
+      const incident = makeIncident({
+        affected_segment: 'RD_TPE_002',
+        affected_road: 'RD_TPE_004',
+      });
       const result = checkEntityScope(incident, roadNetwork());
       expect(result.matched_field).toBe('affected_segment');
     });
@@ -63,15 +66,15 @@ describe('checkEntityScope', () => {
       expect(result.decision_anchor_segment_id).toBe('RD_TPE_004');
     });
 
-    it('matches a road-section alias without its 段 suffix (via intersectionAppearsInLocation)', () => {
+    it('does not accept a section-stripped alias that is not an exact whitelist name', () => {
       const incident = makeIncident({
         affected_segment: 'RD_TPE_099',
         affected_road: undefined,
         location: '忠孝東路發生事故', // segment lists '忠孝東路四段'
       });
       const result = checkEntityScope(incident, roadNetwork());
-      expect(result.coverage_status).toBe('IN_SCOPE_BY_INTERSECTION');
-      expect(result.matched_value).toBe('忠孝東路四段');
+      expect(result.coverage_status).toBe('OUT_OF_BOUNDS');
+      expect(result.matched_value).toBeNull();
     });
   });
 
@@ -107,8 +110,24 @@ describe('checkEntityScope', () => {
     it('tie-breaks equal-length matches by lexicographically smallest name', () => {
       // Build a network where two equal-length intersection names both appear in the text.
       const network = RoadNetworkModel.load([
-        { segment_id: 'RD_TPE_100', name: 'A路', flow_direction: '南北向', intersections: ['乙路口'], capacity_vph: 1000, alternatives: [], nearby_stations: [] },
-        { segment_id: 'RD_TPE_101', name: 'B路', flow_direction: '南北向', intersections: ['甲路口'], capacity_vph: 1000, alternatives: [], nearby_stations: [] },
+        {
+          segment_id: 'RD_TPE_100',
+          name: 'A路',
+          flow_direction: '南北向',
+          intersections: ['乙路口'],
+          capacity_vph: 1000,
+          alternatives: [],
+          nearby_stations: [],
+        },
+        {
+          segment_id: 'RD_TPE_101',
+          name: 'B路',
+          flow_direction: '南北向',
+          intersections: ['甲路口'],
+          capacity_vph: 1000,
+          alternatives: [],
+          nearby_stations: [],
+        },
       ]);
       const incident = makeIncident({
         affected_segment: 'RD_TPE_099',
@@ -133,8 +152,14 @@ describe('checkEntityScope', () => {
   });
 
   describe('regression against the official 3 live_incidents.json events (done_definition)', () => {
-    const ROAD_NETWORK_PATH = resolve(__dirname, '../../../../中華電信資料集/road_network_geometry.json');
-    const LIVE_INCIDENTS_PATH = resolve(__dirname, '../../../../中華電信資料集/live_incidents.json');
+    const ROAD_NETWORK_PATH = resolve(
+      __dirname,
+      '../../../../中華電信資料集/road_network_geometry.json',
+    );
+    const LIVE_INCIDENTS_PATH = resolve(
+      __dirname,
+      '../../../../中華電信資料集/live_incidents.json',
+    );
     const officialNetwork = RoadNetworkModel.load(
       parseRoadNetworkJson(readFileSync(ROAD_NETWORK_PATH, 'utf-8')),
     );

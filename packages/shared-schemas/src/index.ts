@@ -146,15 +146,19 @@ export type {
   UniversalPrinciple,
   SopCoverageResult,
 } from './sop_coverage.js';
-export { DEFAULT_UNIVERSAL_SOP } from './sop_coverage.js';
 
 export type {
+  ContainmentComposerValidation,
   MappedAnchorNode,
   PerimeterControl,
+  SafeContext,
   WhitelistViolation,
   ContainmentDecision,
   ContainmentDisclosure,
 } from './containment_disclosure.js';
-export { CONTAINMENT_PROHIBITED_KEYS, CONTAINMENT_PROHIBITED_PATHS } from './containment_disclosure.js';
+export {
+  CONTAINMENT_PROHIBITED_KEYS,
+  CONTAINMENT_PROHIBITED_PATHS,
+} from './containment_disclosure.js';
 
 export type { WhitelistPartition } from './whitelist_guard.js';
