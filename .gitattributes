@@ -1,28 +1,66 @@
-# Normalize line endings for every text file.
+# ─────────────────────────────────────────────────────────────────────────────
+# Source code — LF in the working tree on every platform.
 #
-# The index already stores LF (`git ls-files --eol` reports `i/lf`), but Windows
-# checkouts get CRLF in the working tree. Prettier is configured with
-# `endOfLine: "lf"`, so `prettier --check` reports false positives on Windows for
-# files that are byte-correct in git — which made `format:check` unreliable
-# locally and hid real formatting drift behind noise.
+# Prettier is configured with `endOfLine: "lf"`. Without these rules a Windows
+# checkout gets CRLF and `prettier --check` reports false positives on files that
+# are byte-correct in git, which made `format:check` unreliable locally and hid
+# real formatting drift behind the noise.
 #
-# `eol=lf` makes the working tree match the index on every platform, so a local
-# `format:check` result means the same thing as CI's.
-#
-# NOTE: taking effect on an existing clone requires a one-off
-# `git add --renormalize .` followed by a checkout. Since the index is already
-# LF, that should produce no content diff.
-* text=auto eol=lf
+# Scoped to code and docs BY EXTENSION rather than applied globally with
+# `* text=auto`. A global rule also captures the official contest data, whose
+# bytes are hash-verified — see the bottom of this file.
+# ─────────────────────────────────────────────────────────────────────────────
+*.ts   text eol=lf
+*.tsx  text eol=lf
+*.js   text eol=lf
+*.cjs  text eol=lf
+*.mjs  text eol=lf
+*.json text eol=lf
+*.md   text eol=lf
+*.yml  text eol=lf
+*.yaml text eol=lf
+*.sh   text eol=lf
+*.css  text eol=lf
+*.html text eol=lf
+.gitattributes text eol=lf
+.gitignore     text eol=lf
 
-# Binary files must never be normalized.
-*.png binary
-*.jpg binary
-*.jpeg binary
-*.gif binary
-*.webp binary
-*.pdf binary
-*.ico binary
-*.woff binary
+# ── Binary assets: never normalized ──
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.webp  binary
+*.ico   binary
+*.pdf   binary
+*.docx  binary
+*.woff  binary
 *.woff2 binary
-*.zip binary
-*.gz binary
+*.zip   binary
+*.gz    binary
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 官方競賽來源資料（SSOT hash 驗證對象）— 位元組完全不得轉換
+#
+# 這些檔案的 SHA-256 記錄在
+# packages/domain/src/source_manifest/official_source_manifest.ts
+# （DEFAULT_EXPECTED_HASHES）與 docs/data_audit.md。任何行尾轉換都會使 hash
+# 不符並觸發 SOURCE_INTEGRITY_STOP（decision pipeline 直接停止）。
+#
+# 使用 `-text` 而非 `text eol=lf`，這一點是刻意的且經過實測：
+#
+#   city_traffic_flow.csv 與 signaling_crowd_density.csv 是以 CRLF 提交的，
+#   且 manifest 記錄的 hash 正是 CRLF 位元組的 hash（已實算比對確認）：
+#     city_traffic_flow.csv        B31436B5...541D5F2A
+#     signaling_crowd_density.csv  BD9BC159...E9564073
+#
+#   `text eol=lf` 的語意是「這是文字檔，請把它轉成 LF」— 也就是會主動製造
+#   出它想防止的那種 hash 不符。轉成 LF 後實測為
+#     94B3B78F...AF30173D / FDCEA7BE...AA6CACAD，兩者皆與 manifest 不符。
+#
+#   `-text` 的語意是「完全不要做行尾轉換」，這才是 hash 驗證輸入需要的保證。
+#
+# 此規則刻意放在檔案最後：.gitattributes 是後者覆蓋前者，這樣上面的
+# `*.json` / `*.pdf` / `*.docx` 規則就不會蓋掉這批官方資料的保護。
+# ─────────────────────────────────────────────────────────────────────────────
+中華電信資料集/** -text
