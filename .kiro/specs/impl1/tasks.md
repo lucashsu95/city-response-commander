@@ -3334,7 +3334,7 @@ CHECKPOINT G (not a task): Ensure enrichment path + §9 boundary hold, and Bedro
   - competition_quality_floor: Report panel + multilingual public-alert panel (zh/en, +ja/ko when enabled) with citations; publish-confirmation flow; loading/empty/error states; no placeholder.
   - demo_or_evidence_output: Report + multilingual alert panels rendered for the official events with a publish-confirmation step.
 
-- [ ] TASK-133 Implement execution status/error display (execution summary + processing.failed)
+- [x] TASK-133 Implement execution status/error display (execution summary + processing.failed)
   - objective: Render the read-only `execution` summary (`status`/`last_error`/`retryable`/`attempt_count`) and `processing.failed` events, including terminal CORE_IDENTITY_CONFLICT (§10.11c, §13, FIX 1).
   - requirements_covered: REQ-003, REQ-004, R5
   - design_sections: §10.11c, §13, §12, FIX 1

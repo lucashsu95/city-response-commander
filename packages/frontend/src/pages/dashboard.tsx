@@ -19,12 +19,16 @@ import { CrowdPanel } from '../crowd/crowd_panel.js';
 import { useCrowdSnapshot } from '../crowd/use_crowd_snapshot.js';
 import { AlertPanel } from '../decision/alert_panel.js';
 import { EtePanel } from '../decision/ete_panel.js';
+import { ExecutionStatusPanel } from '../decision/execution_status.js';
+import { decodeProcessingFailed } from '../decision/execution_model.js';
+import type { ProcessingFailedView } from '../decision/execution_model.js';
 import { ExplanationChain } from '../decision/explanation_chain.js';
 import { ReportPanel } from '../decision/report_panel.js';
 import { RoutePanel } from '../decision/route_panel.js';
 import { useDecisionReadModel } from '../decision/use_decision_read_model.js';
 import { useEteView } from '../decision/use_ete_view.js';
 import { useEvidenceView } from '../decision/use_evidence_view.js';
+import { useExecutionStatus } from '../decision/use_execution_status.js';
 import { useRouteView } from '../decision/use_route_view.js';
 import { DashboardShell } from '../layout/dashboard_shell.js';
 import { useRealtimeConnection } from '../realtime/use_realtime.js';
@@ -83,6 +87,15 @@ export function DashboardPage(): ReactNode {
   // re-decoding the evidence block.
   const eteRoleEvidence = evidence.kind === 'ok' ? evidence.evidence.affectedSetConstruction : null;
 
+  // TASK-133: the latest `processing.failed` frame (§13). Kept as the decoded
+  // notification it is — the authoritative failure record stays the read-only
+  // `execution` projection re-read from `GET /decisions/{decision_id}`.
+  const [lastFailureEvent, setLastFailureEvent] = useState<ProcessingFailedView | null>(null);
+  const executionStatus = useExecutionStatus({
+    execution: decision.execution,
+    lastFailureEvent,
+  });
+
   // FIX 4: `timeline` is a fresh object every render (its state is spread
   // into a new object alongside its stable methods each time), so depending
   // on `[timeline]` would recreate these callbacks — and therefore the
@@ -108,6 +121,13 @@ export function DashboardPage(): ReactNode {
       // rather than through the dedup coordinator. They are still only
       // notifications: they name the decision and request an authoritative
       // re-read, and never supply decision state themselves.
+      if (envelope.eventType === 'processing.failed') {
+        // TASK-133: the frame's own `error_code` / `retryable` are displayed
+        // beside the authoritative projection (§13 fallback column), so the
+        // decoded notification is kept as well as triggering the re-read.
+        setLastFailureEvent(decodeProcessingFailed(envelope.payload));
+      }
+
       if (envelope.decisionId === null) return;
       setDecisionId((previous) => (previous === envelope.decisionId ? previous : envelope.decisionId));
       refreshDecision();
@@ -182,6 +202,11 @@ export function DashboardPage(): ReactNode {
           <ExplanationChain
             decision={decision}
             evidence={evidence}
+            onRetry={decision.refresh}
+          />
+          <ExecutionStatusPanel
+            decision={decision}
+            execution={executionStatus}
             onRetry={decision.refresh}
           />
         </>
