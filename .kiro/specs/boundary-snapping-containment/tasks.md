@@ -220,7 +220,7 @@ Task ID scheme: `TASK-BS-01..TASK-BS-19`, flat and sequential. `CHECKPOINT` line
   - tests_required: `packages/backend/test/decision/containment_assembler.test.ts` — Safe_Context construction cases.
   - done_definition: `allowed_road_whitelist` is provably ⊆ Road_Whitelist for every branch, asserted directly in tests.
 
-- [ ] TASK-BS-14 Wire Bedrock call + `Whitelist_Guard` output audit (Requirement 9 AC2–AC6, Requirement 5 AC5)
+- [x] TASK-BS-14 Wire Bedrock call + `Whitelist_Guard` output audit (Requirement 9 AC2–AC6, Requirement 5 AC5)
   - objective: Send Safe_Context to Bedrock, then filter its output through Whitelist_Guard so no fabricated road id ever reaches `decision.reroute_roads`.
   - requirements_covered: R9, R5 (AC5)
   - design_sections: §3.1, §4.4

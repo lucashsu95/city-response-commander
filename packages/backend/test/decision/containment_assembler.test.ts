@@ -5,7 +5,7 @@
  * coverage ordering, and the IN_SCOPE / runDeterministicDecision branch. The
  * `snap()` branch for OUT_OF_BOUNDS lands in TASK-BS-12.
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import {
   RoadNetworkModel,
   normalizeTimestamp,
@@ -26,7 +26,24 @@ import {
   type RawTrafficRecord,
   type RoadSegment,
 } from '@city-commander/shared-schemas';
-import { assembleContainment } from '../../src/decision/containment_assembler.js';
+import {
+  assembleContainment as assembleContainmentWithComposer,
+  type AssembleContainmentInput,
+  type BedrockComposerClient,
+} from '../../src/decision/containment_assembler.js';
+
+const defaultComposer: BedrockComposerClient = {
+  generate: async () => '',
+};
+
+type TestAssembleInput = Omit<AssembleContainmentInput, 'composer'> & {
+  readonly composer?: BedrockComposerClient;
+};
+
+function assembleContainment(input: TestAssembleInput) {
+  const { composer = defaultComposer, ...deterministicInput } = input;
+  return assembleContainmentWithComposer({ ...deterministicInput, composer });
+}
 
 /** Matches decision_pipeline.test.ts's fixture — evidence_trace_builder.ts requires a SOP citation for every triggered article. */
 function makeSopArticles(): SOPLoadResult {
@@ -167,7 +184,7 @@ const config = new LocalConfigProvider();
 
 describe('assembleContainment', () => {
   describe('R12 AC2 — STOP-gate short circuit', () => {
-    it('returns the ingestion insufficient_data/stop_reason verbatim without touching roadNetwork', () => {
+    it('returns the ingestion insufficient_data/stop_reason verbatim without touching roadNetwork', async () => {
       const ingestion = {
         data_status: 'insufficient_data',
         stop_reason: 'Source manifest hash mismatch for road_network_geometry.json.',
@@ -177,7 +194,7 @@ describe('assembleContainment', () => {
         },
       } as unknown as IngestionResult;
 
-      const result = assembleContainment({ ingestion, incident: incident(), config });
+      const result = await assembleContainment({ ingestion, incident: incident(), config });
 
       expect(result).toEqual({
         data_status: 'insufficient_data',
@@ -188,23 +205,31 @@ describe('assembleContainment', () => {
         data_scope_status: null,
         mapped_anchor_node: null,
         safe_context: null,
+        sop_coverage_status: null,
+        sop_authority: null,
+        decision: {
+          reroute_roads: [],
+          perimeter_control: null,
+          ai_reasoning: null,
+        },
+        whitelist_violations: [],
         facts: null,
       });
     });
 
-    it('is byte-identical to the existing insufficient_data shape backend handlers already rely on', () => {
+    it('is byte-identical to the existing insufficient_data shape backend handlers already rely on', async () => {
       const ingestion: IngestionResult = {
         data_status: 'insufficient_data',
         stop_reason: 'Domain pipeline reported insufficient_data.',
         source_manifest_hash: '',
       };
-      const result = assembleContainment({ ingestion, incident: incident(), config });
+      const result = await assembleContainment({ ingestion, incident: incident(), config });
       expect(result.data_status).toBe(ingestion.data_status);
       expect(result.stop_reason).toBe(ingestion.stop_reason);
       expect(result.source_manifest_hash).toBe(ingestion.source_manifest_hash);
     });
 
-    it('guards against a ready ingestion missing roadNetwork (invariant violation) without throwing', () => {
+    it('guards against a ready ingestion missing roadNetwork (invariant violation) without throwing', async () => {
       const ingestion = {
         data_status: 'ready',
         stop_reason: null,
@@ -212,8 +237,10 @@ describe('assembleContainment', () => {
         // roadNetwork intentionally absent despite data_status='ready'
       } as unknown as IngestionResult;
 
-      expect(() => assembleContainment({ ingestion, incident: incident(), config })).not.toThrow();
-      const result = assembleContainment({ ingestion, incident: incident(), config });
+      await expect(
+        assembleContainment({ ingestion, incident: incident(), config }),
+      ).resolves.toBeDefined();
+      const result = await assembleContainment({ ingestion, incident: incident(), config });
       expect(result.data_status).toBe('insufficient_data');
       expect(result.entity_scope).toBeNull();
       expect(result.sop_coverage).toBeNull();
@@ -222,7 +249,7 @@ describe('assembleContainment', () => {
   });
 
   describe('R1 AC1 — Entity_Scope_Check then SOP coverage resolution', () => {
-    it('resolves and snaps an incident outside both the network and the SOP table', () => {
+    it('resolves and snaps an incident outside both the network and the SOP table', async () => {
       const ingestion = readyIngestion();
       const outOfBoundsIncident = incident({
         affected_segment: 'RD_TPE_099',
@@ -232,7 +259,11 @@ describe('assembleContainment', () => {
         description: '未知化學氣體洩漏',
         timestamp: '2026-05-20 22:30',
       });
-      const result = assembleContainment({ ingestion, incident: outOfBoundsIncident, config });
+      const result = await assembleContainment({
+        ingestion,
+        incident: outOfBoundsIncident,
+        config,
+      });
 
       expect(result.entity_scope?.coverage_status).toBe('OUT_OF_BOUNDS');
       expect(result.sop_coverage?.sop_coverage_status).toBe('UNKNOWN_TYPE_UNIVERSAL_SOP');
@@ -266,8 +297,8 @@ describe('assembleContainment', () => {
         timestamp: '2026-05-20 22:30',
       });
 
-    it('returns snapped perimeter facts without Strategy D, evacuation, classification, or ETE', () => {
-      const result = assembleContainment({
+    it('returns snapped perimeter facts without Strategy D, evacuation, classification, or ETE', async () => {
+      const result = await assembleContainment({
         ingestion: readyIngestion(),
         incident: outsideIncident(),
         config,
@@ -289,7 +320,7 @@ describe('assembleContainment', () => {
       );
     });
 
-    it('returns OUT_OF_JURISDICTION with no mapped anchor when the network has no perimeter gateway', () => {
+    it('returns OUT_OF_JURISDICTION with no mapped anchor when the network has no perimeter gateway', async () => {
       const closedNetwork = RoadNetworkModel.load([
         {
           segment_id: 'RD_TPE_010',
@@ -301,7 +332,7 @@ describe('assembleContainment', () => {
           nearby_stations: [],
         },
       ]);
-      const result = assembleContainment({
+      const result = await assembleContainment({
         ingestion: readyIngestion({ roadNetwork: closedNetwork }),
         incident: outsideIncident(),
         config,
@@ -315,7 +346,7 @@ describe('assembleContainment', () => {
       expect(result.facts?.primary_evacuation).toBeNull();
     });
 
-    it('keeps SOP-3/4/6 station evaluations while the RD_ sub-pipeline stays skipped', () => {
+    it('keeps SOP-3/4/6 station evaluations while the RD_ sub-pipeline stays skipped', async () => {
       const ingestion = readyIngestion({
         crowd: [
           crowdRecord('BS_MRT_BL17', '2026-05-20 22:25', 31_000, 0.2, 0.1),
@@ -324,7 +355,7 @@ describe('assembleContainment', () => {
         ],
       });
       const testIncident = outsideIncident();
-      const result = assembleContainment({ ingestion, incident: testIncident, config });
+      const result = await assembleContainment({ ingestion, incident: testIncident, config });
 
       expect(result.facts?.triggered_articles).toEqual([3, 4, 6]);
       expect(result.facts?.invoked_procedures).toContain('article3_mrt_shuttle_mechanism');
@@ -336,9 +367,9 @@ describe('assembleContainment', () => {
   });
 
   describe('R8 — Safe_Context action-space restriction', () => {
-    it('keeps every in-scope evacuation candidate inside Road_Whitelist and uses official SOP text only', () => {
+    it('keeps every in-scope evacuation candidate inside Road_Whitelist and uses official SOP text only', async () => {
       const ingestion = readyIngestion();
-      const result = assembleContainment({ ingestion, incident: incident(), config });
+      const result = await assembleContainment({ ingestion, incident: incident(), config });
       const roadWhitelist = new Set(
         ingestion.roadNetwork?.getAllSegments().map((segment) => segment.segment_id),
       );
@@ -355,9 +386,9 @@ describe('assembleContainment', () => {
       expect(result.safe_context?.instruction).toContain('只可使用 allowed_road_whitelist');
     });
 
-    it('uses exactly anchor plus one-way whitelisted alternatives for a snapped incident', () => {
+    it('uses exactly anchor plus one-way whitelisted alternatives for a snapped incident', async () => {
       const ingestion = readyIngestion();
-      const result = assembleContainment({
+      const result = await assembleContainment({
         ingestion,
         incident: incident({
           affected_segment: 'RD_TPE_099',
@@ -517,11 +548,15 @@ describe('assembleContainment', () => {
 
     it.each(goldenCases)(
       '$eventId facts deep-equal a direct runDeterministicDecision call',
-      ({ build }) => {
+      async ({ build }) => {
         const { ingestion, incident: testIncident } = build();
 
         const direct = runDeterministicDecision({ ingestion, config, incident: testIncident });
-        const viaAssembler = assembleContainment({ ingestion, incident: testIncident, config });
+        const viaAssembler = await assembleContainment({
+          ingestion,
+          incident: testIncident,
+          config,
+        });
 
         expect(direct.data_status).toBe('ready');
         expect(direct.facts).not.toBeNull();
@@ -534,15 +569,15 @@ describe('assembleContainment', () => {
       },
     );
 
-    it('sets data_scope_status to the resolved Entity_Scope_Check status and mapped_anchor_node to null (R10 AC9)', () => {
+    it('sets data_scope_status to the resolved Entity_Scope_Check status and mapped_anchor_node to null (R10 AC9)', async () => {
       const ingestion = readyIngestion();
-      const result = assembleContainment({ ingestion, incident: incident(), config });
+      const result = await assembleContainment({ ingestion, incident: incident(), config });
 
       expect(result.data_scope_status).toBe('IN_SCOPE');
       expect(result.mapped_anchor_node).toBeNull();
     });
 
-    it('also proves the IN_SCOPE_BY_INTERSECTION path runs runDeterministicDecision unchanged', () => {
+    it('also proves the IN_SCOPE_BY_INTERSECTION path runs runDeterministicDecision unchanged', async () => {
       const ingestion = readyIngestion();
       // Not directly in the whitelist, but '光復南路' appears in RD_TPE_004's intersections.
       const byIntersectionIncident = incident({
@@ -556,7 +591,7 @@ describe('assembleContainment', () => {
         config,
         incident: byIntersectionIncident,
       });
-      const viaAssembler = assembleContainment({
+      const viaAssembler = await assembleContainment({
         ingestion,
         incident: byIntersectionIncident,
         config,
@@ -568,11 +603,87 @@ describe('assembleContainment', () => {
     });
   });
 
+  describe('R9 — Bedrock output whitelist audit and fallback', () => {
+    const outsideIncident = (): Incident =>
+      incident({
+        affected_segment: 'RD_TPE_099',
+        affected_road: undefined,
+        location: '完全不在路網範圍內的地點',
+        type: 'Unknown_Chemical_Leak' as unknown as Incident['type'],
+        description: '未知化學氣體洩漏',
+        timestamp: '2026-05-20 22:30',
+      });
+
+    it('records fabricated road ids with occurrence counts and excludes them from reroutes and reasoning', async () => {
+      const generate = vi
+        .fn<BedrockComposerClient['generate']>()
+        .mockResolvedValue('請改道 RD_TPE_004，禁止使用 RD_TPE_999；RD_TPE_999 不存在。');
+      const result = await assembleContainment({
+        ingestion: readyIngestion(),
+        incident: outsideIncident(),
+        config,
+        composer: { generate },
+      });
+
+      expect(generate).toHaveBeenCalledOnce();
+      expect(result.decision.reroute_roads).toEqual(['RD_TPE_004']);
+      expect(result.whitelist_violations).toEqual([{ road_id: 'RD_TPE_999', occurrences: 2 }]);
+      expect(result.decision.ai_reasoning).not.toContain('RD_TPE_999');
+      expect(result.decision.ai_reasoning).toContain('[已阻擋非白名單道路]');
+      expect(result.decision.perimeter_control?.target_gate).toBe('RD_TPE_002');
+    });
+
+    it('falls back to deterministic reroutes and marks AI reasoning unavailable on composer failure', async () => {
+      const generate = vi
+        .fn<BedrockComposerClient['generate']>()
+        .mockRejectedValue(new Error('Bedrock timeout'));
+      const result = await assembleContainment({
+        ingestion: readyIngestion(),
+        incident: outsideIncident(),
+        config,
+        composer: { generate },
+      });
+
+      expect(generate).toHaveBeenCalledOnce();
+      expect(result.decision.reroute_roads).toEqual(['RD_TPE_004']);
+      expect(result.decision.ai_reasoning).toBeNull();
+      expect(result.whitelist_violations).toEqual([]);
+      expect(result.decision.perimeter_control?.target_gate).toBe('RD_TPE_002');
+    });
+
+    it('skips composer entirely and returns only the static explanation when out of jurisdiction', async () => {
+      const generate = vi.fn<BedrockComposerClient['generate']>();
+      const closedNetwork = RoadNetworkModel.load([
+        {
+          segment_id: 'RD_TPE_010',
+          name: '封閉測試路段',
+          flow_direction: '南北向',
+          intersections: [],
+          capacity_vph: 1_000,
+          alternatives: [],
+          nearby_stations: [],
+        },
+      ]);
+      const result = await assembleContainment({
+        ingestion: readyIngestion({ roadNetwork: closedNetwork }),
+        incident: outsideIncident(),
+        config,
+        composer: { generate },
+      });
+
+      expect(generate).not.toHaveBeenCalled();
+      expect(result.decision.reroute_roads).toEqual([]);
+      expect(result.decision.perimeter_control).toBeNull();
+      expect(result.decision.ai_reasoning).toContain('超出本系統路網轄區');
+      expect(result.whitelist_violations).toEqual([]);
+    });
+  });
+
   describe('purity / determinism', () => {
-    it('returns equal results for repeated calls with the same input', () => {
+    it('returns equal results for repeated calls with the same input', async () => {
       const ingestion = readyIngestion();
-      const first = assembleContainment({ ingestion, incident: incident(), config });
-      const second = assembleContainment({ ingestion, incident: incident(), config });
+      const first = await assembleContainment({ ingestion, incident: incident(), config });
+      const second = await assembleContainment({ ingestion, incident: incident(), config });
       expect(first).toEqual(second);
     });
   });

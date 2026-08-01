@@ -43,6 +43,7 @@ import {
   buildEvidenceTrace,
   checkEntityScope,
   evaluateStationBasedArticles,
+  extractRoadIdLike,
   partitionByWhitelist,
   resolveSopCoverage,
   runDeterministicDecision,
@@ -56,6 +57,7 @@ import type {
 } from '@city-commander/domain';
 import type {
   BoundarySnapperConfig,
+  ContainmentDecision,
   DataScopeStatus,
   EntityScopeResult,
   Incident,
@@ -63,12 +65,19 @@ import type {
   SopCitation,
   SopCoverageResult,
   UniversalPrinciple,
+  WhitelistViolation,
 } from '@city-commander/shared-schemas';
+
+/** Minimal Layer-1 composer port; backend never imports ai-generator directly. */
+export interface BedrockComposerClient {
+  generate(context: SafeContext): Promise<string>;
+}
 
 export interface AssembleContainmentInput {
   readonly ingestion: IngestionResult;
   readonly incident: Incident;
   readonly config: PolicyStrategyConfigProvider;
+  readonly composer: BedrockComposerClient;
 }
 
 /** Restricted prompt context handed to Bedrock_Composer starting in TASK-BS-14. */
@@ -106,6 +115,10 @@ export interface ContainmentAssemblerResult {
   readonly mapped_anchor_node: MappedAnchorNode | null;
   /** `null` only on a STOP path; otherwise assembled deterministically (R8). */
   readonly safe_context: SafeContext | null;
+  readonly sop_coverage_status: SopCoverageResult['sop_coverage_status'] | null;
+  readonly sop_authority: SopCoverageResult['sop_authority'] | null;
+  readonly decision: ContainmentDecision;
+  readonly whitelist_violations: readonly WhitelistViolation[];
   /**
    * `IN_SCOPE*` receives the unchanged full deterministic facts. Coverage-gap
    * facts contain only SOP-3/4/6 station outcomes; every RD_-specific field is
@@ -128,6 +141,14 @@ function stoppedFromIngestion(ingestion: {
     data_scope_status: null,
     mapped_anchor_node: null,
     safe_context: null,
+    sop_coverage_status: null,
+    sop_authority: null,
+    decision: {
+      reroute_roads: [],
+      perimeter_control: null,
+      ai_reasoning: null,
+    },
+    whitelist_violations: [],
     facts: null,
   };
 }
@@ -286,6 +307,121 @@ function buildSafeContext(input: {
   };
 }
 
+type DeterministicAssemblerResult = Omit<
+  ContainmentAssemblerResult,
+  'sop_coverage_status' | 'sop_authority' | 'decision' | 'whitelist_violations'
+>;
+
+function deterministicReroutes(result: DeterministicAssemblerResult): readonly string[] {
+  const allowed = new Set(result.safe_context?.allowed_road_whitelist ?? []);
+  if (result.data_scope_status === 'OUT_OF_BOUNDS_SNAPPED') {
+    return [...allowed].filter((roadId) => roadId !== result.mapped_anchor_node?.segment_id).sort();
+  }
+  const candidates = [
+    ...(result.facts?.primary_evacuation === null || result.facts?.primary_evacuation === undefined
+      ? []
+      : [result.facts.primary_evacuation]),
+    ...(result.facts?.secondary_evacuation ?? []),
+  ];
+  return [...partitionByWhitelist(candidates, allowed).allowed].sort();
+}
+
+function perimeterControl(
+  result: DeterministicAssemblerResult,
+): ContainmentDecision['perimeter_control'] {
+  if (result.data_scope_status !== 'OUT_OF_BOUNDS_SNAPPED' || result.mapped_anchor_node === null) {
+    return null;
+  }
+  return {
+    action: '於周界錨點實施車流管制',
+    target_gate: result.mapped_anchor_node.segment_id,
+    reason: '事件位於既有路網涵蓋範圍外，於已驗證的周界錨點阻止車流繼續外溢。',
+  };
+}
+
+function countViolations(
+  extractedIds: readonly string[],
+  rejectedIds: ReadonlySet<string>,
+): readonly WhitelistViolation[] {
+  return [...rejectedIds].sort().map((roadId) => ({
+    road_id: roadId,
+    occurrences: extractedIds.filter((candidate) => candidate === roadId).length,
+  }));
+}
+
+function redactViolations(text: string, violations: readonly WhitelistViolation[]): string {
+  return violations.reduce(
+    (sanitized, violation) => sanitized.split(violation.road_id).join('[已阻擋非白名單道路]'),
+    text,
+  );
+}
+
+async function finalizeContainment(
+  result: DeterministicAssemblerResult,
+  composer: BedrockComposerClient,
+): Promise<ContainmentAssemblerResult> {
+  const authorityFields = {
+    sop_coverage_status: result.sop_coverage?.sop_coverage_status ?? null,
+    sop_authority: result.sop_coverage?.sop_authority ?? null,
+  };
+
+  if (result.data_scope_status === 'OUT_OF_JURISDICTION') {
+    return {
+      ...result,
+      ...authorityFields,
+      decision: {
+        reroute_roads: [],
+        perimeter_control: null,
+        ai_reasoning: '事件超出本系統路網轄區，未執行道路吸附或 AI 指揮建議生成。',
+      },
+      whitelist_violations: [],
+    };
+  }
+
+  if (result.safe_context === null) {
+    return {
+      ...result,
+      ...authorityFields,
+      decision: {
+        reroute_roads: deterministicReroutes(result),
+        perimeter_control: perimeterControl(result),
+        ai_reasoning: null,
+      },
+      whitelist_violations: [],
+    };
+  }
+
+  try {
+    const generatedText = await composer.generate(result.safe_context);
+    const extractedIds = extractRoadIdLike(generatedText);
+    const allowedWhitelist = new Set(result.safe_context.allowed_road_whitelist);
+    const partition = partitionByWhitelist(extractedIds, allowedWhitelist);
+    const violations = countViolations(extractedIds, partition.rejected);
+
+    return {
+      ...result,
+      ...authorityFields,
+      decision: {
+        reroute_roads: [...partition.allowed].sort(),
+        perimeter_control: perimeterControl(result),
+        ai_reasoning: redactViolations(generatedText, violations),
+      },
+      whitelist_violations: violations,
+    };
+  } catch {
+    return {
+      ...result,
+      ...authorityFields,
+      decision: {
+        reroute_roads: deterministicReroutes(result),
+        perimeter_control: perimeterControl(result),
+        ai_reasoning: null,
+      },
+      whitelist_violations: [],
+    };
+  }
+}
+
 /**
  * Run Entity_Scope_Check and SOP coverage resolution for an incident,
  * short-circuiting on the existing ingestion-level STOP gate first (R1 AC1,
@@ -301,8 +437,10 @@ function buildSafeContext(input: {
  * }
  * ```
  */
-export function assembleContainment(input: AssembleContainmentInput): ContainmentAssemblerResult {
-  const { ingestion, incident, config } = input;
+export async function assembleContainment(
+  input: AssembleContainmentInput,
+): Promise<ContainmentAssemblerResult> {
+  const { ingestion, incident, config, composer } = input;
 
   // R12 AC2 — STOP-gate short circuit, before touching roadNetwork/sopArticles.
   if (ingestion.data_status !== 'ready') {
@@ -351,17 +489,20 @@ export function assembleContainment(input: AssembleContainmentInput): Containmen
 
     // R12 AC4-AC6 — no call to runDeterministicDecision's RD_ branch. Only
     // the extracted BS_ID-keyed SOP-3/4/6 subset remains available in facts.
-    return {
-      data_status: 'ready',
-      stop_reason: null,
-      source_manifest_hash: ingestion.source_manifest_hash,
-      entity_scope: entityScope,
-      sop_coverage: sopCoverage,
-      data_scope_status: snapResult.coverage_status,
-      mapped_anchor_node: mappedAnchorNode,
-      safe_context: safeContext,
-      facts: coverageGapFacts,
-    };
+    return finalizeContainment(
+      {
+        data_status: 'ready',
+        stop_reason: null,
+        source_manifest_hash: ingestion.source_manifest_hash,
+        entity_scope: entityScope,
+        sop_coverage: sopCoverage,
+        data_scope_status: snapResult.coverage_status,
+        mapped_anchor_node: mappedAnchorNode,
+        safe_context: safeContext,
+        facts: coverageGapFacts,
+      },
+      composer,
+    );
   }
 
   // R12 AC3 — IN_SCOPE / IN_SCOPE_BY_INTERSECTION: run the existing
@@ -384,26 +525,37 @@ export function assembleContainment(input: AssembleContainmentInput): Containmen
       data_scope_status: null,
       mapped_anchor_node: null,
       safe_context: null,
+      sop_coverage_status: sopCoverage.sop_coverage_status,
+      sop_authority: sopCoverage.sop_authority,
+      decision: {
+        reroute_roads: [],
+        perimeter_control: null,
+        ai_reasoning: null,
+      },
+      whitelist_violations: [],
       facts: null,
     };
   }
 
-  return {
-    data_status: 'ready',
-    stop_reason: null,
-    source_manifest_hash: decision.source_manifest_hash,
-    entity_scope: entityScope,
-    sop_coverage: sopCoverage,
-    data_scope_status: entityScope.coverage_status,
-    mapped_anchor_node: null, // R10 AC9 — IN_SCOPE* never snaps.
-    safe_context: buildSafeContext({
-      ingestion,
-      incident,
-      sopCoverage,
-      dataScopeStatus: entityScope.coverage_status,
-      mappedAnchorNode: null,
+  return finalizeContainment(
+    {
+      data_status: 'ready',
+      stop_reason: null,
+      source_manifest_hash: decision.source_manifest_hash,
+      entity_scope: entityScope,
+      sop_coverage: sopCoverage,
+      data_scope_status: entityScope.coverage_status,
+      mapped_anchor_node: null, // R10 AC9 — IN_SCOPE* never snaps.
+      safe_context: buildSafeContext({
+        ingestion,
+        incident,
+        sopCoverage,
+        dataScopeStatus: entityScope.coverage_status,
+        mappedAnchorNode: null,
+        facts: decision.facts,
+      }),
       facts: decision.facts,
-    }),
-    facts: decision.facts,
-  };
+    },
+    composer,
+  );
 }
