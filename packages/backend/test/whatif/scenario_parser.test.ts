@@ -219,6 +219,70 @@ describe('parseScenario — prompt injection protection (§17)', () => {
   });
 });
 
+// ─── Entity mismatch guard ─────────────────────────────────────────────────
+
+describe('parseScenario — entity mismatch guard', () => {
+  it('raw_question 提到 BL16，Bedrock 卻回傳 BL17 → clarification_required（不信任 LLM 的替換）', async () => {
+    const json = JSON.stringify({
+      status: 'parsed',
+      assumptions: [{ entity_id: 'BS_MRT_BL17', field: 'User_Count', operator: '=', value: 40000 }],
+    });
+    const result = await parseScenario('若 BL16 人數增至 40000', makeBedrockSuccess(json));
+
+    expect(result.parse_status).toBe('clarification_required');
+    if (result.parse_status === 'clarification_required') {
+      expect(result.clarification_prompt).toContain('BS_MRT_BL17');
+    }
+  });
+
+  it('raw_question 提到完整 ID（BS_MRT_BL16）而 Bedrock 回傳不同站 → clarification_required', async () => {
+    const json = JSON.stringify({
+      status: 'parsed',
+      assumptions: [{ entity_id: 'BS_MRT_BL17', field: 'User_Count', operator: '=', value: 40000 }],
+    });
+    const result = await parseScenario(
+      '若 BS_MRT_BL16 人數增至 40000',
+      makeBedrockSuccess(json),
+    );
+
+    expect(result.parse_status).toBe('clarification_required');
+  });
+
+  it('entity_id 與原文提到的代碼一致 → 正常 parsed', async () => {
+    const json = JSON.stringify({
+      status: 'parsed',
+      assumptions: [{ entity_id: 'BS_MRT_BL16', field: 'User_Count', operator: '=', value: 40000 }],
+    });
+    const result = await parseScenario('若 BL16 人數增至 40000', makeBedrockSuccess(json));
+
+    expect(result.parse_status).toBe('parsed');
+  });
+
+  it('原文未提及任何可辨識的實體代碼（自然語言）→ 不強制比對，正常 parsed', async () => {
+    const json = JSON.stringify({
+      status: 'parsed',
+      assumptions: [{ entity_id: 'BS_MRT_BL17', field: 'User_Count', operator: '=', value: 40000 }],
+    });
+    const result = await parseScenario('如果國父紀念館站人潮暴增會怎樣？', makeBedrockSuccess(json));
+
+    expect(result.parse_status).toBe('parsed');
+  });
+
+  it('多個假設中有一個與原文不符 → 整體 clarification_required', async () => {
+    const json = JSON.stringify({
+      status: 'parsed',
+      assumptions: [
+        { entity_id: 'BS_MRT_BL16', field: 'User_Count', operator: '=', value: 40000 },
+        { entity_id: 'RD_TPE_002', field: 'Saturation_Score', operator: '>=', value: 0.95 },
+      ],
+    });
+    // 原文只提到 BL16，沒提到 RD_TPE_002
+    const result = await parseScenario('若 BL16 人數增至 40000', makeBedrockSuccess(json));
+
+    expect(result.parse_status).toBe('clarification_required');
+  });
+});
+
 // ─── buildScenarioParserPrompt — 外部行為 ────────────────────────────────
 
 describe('buildScenarioParserPrompt', () => {
