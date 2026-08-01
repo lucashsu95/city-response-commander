@@ -65,7 +65,7 @@ Task ID scheme: `TASK-UARE-01..TASK-UARE-11`, flat and sequential.
 
 ## Phase 1 — Domain Logic (Layer 1, pure functions)
 
-- [ ] TASK-UARE-04 Implement `resolveSopMatch` and `UNIVERSAL_DEFENSE_PRINCIPLES`
+- [x] TASK-UARE-04 Implement `resolveSopMatch` and `UNIVERSAL_DEFENSE_PRINCIPLES`
   - objective: Turn the existing `triggered_articles` output into an explicit, testable boolean judgment, and define the fixed universal-principle text.
   - requirements_covered: R1, R2
   - design_sections: §3, §4
@@ -78,7 +78,7 @@ Task ID scheme: `TASK-UARE-01..TASK-UARE-11`, flat and sequential.
   - tests_required: `packages/domain/test/unit/universal_defense.test.ts` — `resolveSopMatch([])` → `{sop_matched:false, sop_authority:'SYSTEM_DEFAULT_PRINCIPLE'}`; `resolveSopMatch([1])` → `{sop_matched:true, sop_authority:'OFFICIAL_SOP'}`; `UNIVERSAL_DEFENSE_PRINCIPLES.length === 3` with exactly the 3 specified `principle_id`s.
   - done_definition: Pure function, zero imports beyond `@city-commander/shared-schemas`.
 
-- [ ] TASK-UARE-05 Export `CAPACITY_THRESHOLD` from `article2.ts` for reuse
+- [x] TASK-UARE-05 Export `CAPACITY_THRESHOLD` from `article2.ts` for reuse
   - objective: Avoid a second, independently-maintained copy of the capacity threshold (design.md §5.1 explicitly requires reuse, not redeclaration).
   - requirements_covered: R3 AC3 (implicitly, via design.md §5.1)
   - design_sections: §5.1
@@ -91,7 +91,7 @@ Task ID scheme: `TASK-UARE-01..TASK-UARE-11`, flat and sequential.
   - tests_required: run existing article2 tests as regression proof; no new tests needed for this export-only change.
   - done_definition: `CAPACITY_THRESHOLD` importable from `universal_defense.ts` in the next task.
 
-- [ ] TASK-UARE-06 Implement `selectGroundingCandidates`
+- [x] TASK-UARE-06 Implement `selectGroundingCandidates`
   - objective: Deterministically ground "peripheral guidance" recommendations in real, currently-low-congestion road segments — the zero-hallucination core of the whole feature.
   - requirements_covered: R3, R6, R7
   - design_sections: §5
@@ -105,7 +105,7 @@ Task ID scheme: `TASK-UARE-01..TASK-UARE-11`, flat and sequential.
   - tests_required: `packages/domain/test/unit/universal_defense.test.ts` (extend) covering each AC, including the "no record → excluded, not defaulted to 0" case (R7 AC3) and the empty-alternatives case (R3 AC7).
   - done_definition: Function used against all 15 official road segments as anchor produces only `segment_id`s present in `road_network_geometry.json`.
 
-- [ ] TASK-UARE-07 Property tests for `selectGroundingCandidates`
+- [x] TASK-UARE-07 Property tests for `selectGroundingCandidates`
   - objective: Lock in the two invariants that matter most for the "zero hallucination" claim: whitelist membership and determinism.
   - requirements_covered: R9.3, R9.4
   - design_sections: §5, §9
