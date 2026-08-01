@@ -28,6 +28,7 @@ import type {
   ClassificationReasoning,
   ExcludedRouteReason,
 } from '@city-commander/shared-schemas';
+import { formatCitationLocation, ensureFallbackDisclosure } from '@city-commander/shared-schemas';
 import { validateBedrockPayload } from './schema_validator.js';
 import {
   putNarrative,
@@ -133,12 +134,19 @@ export async function composeExplanation(
       const rawText = validation.fields['explanation_text'];
       const effectiveText = rawText != null && rawText.trim().length > 0 ? rawText : null;
 
-      explanationPayload = {
-        type: 'EXPLANATION',
-        explanation_text: effectiveText ?? buildFallbackExplanationText(core, citations),
-      };
-      // text_source 只在 Bedrock 實際提供非空文字時才標記為 'bedrock'
-      textSource = effectiveText !== null ? 'bedrock' : 'template';
+      if (effectiveText !== null) {
+        explanationPayload = {
+          type: 'EXPLANATION',
+          explanation_text: effectiveText,
+        };
+        textSource = 'bedrock';
+      } else {
+        explanationPayload = {
+          type: 'EXPLANATION',
+          explanation_text: buildFallbackExplanationText(core, citations),
+        };
+        textSource = 'template';
+      }
     } else {
       // SchemaValidator 拒絕（含 core field overwrite 嘗試）→ template
       explanationPayload = buildTemplateExplanation(core, citations);
@@ -149,6 +157,16 @@ export async function composeExplanation(
     explanationPayload = buildTemplateExplanation(core, citations);
     textSource = 'template';
   }
+
+  // The canonical fallback caveat applies to every text source, including
+  // template fallbacks caused by invalid, empty, or unavailable Bedrock output.
+  explanationPayload = {
+    ...explanationPayload,
+    explanation_text: ensureFallbackDisclosure(
+      explanationPayload.explanation_text,
+      citations.some((c) => c.source === 's3_fallback'),
+    ),
+  };
 
   // ── 4. putNarrative → EXPLANATION item conditional Put ──────────────────
   let putResult: NarrativePutResult;
@@ -244,7 +262,8 @@ function buildExplanationPrompt(
 
   const citationLines = citations
     .map(
-      (c) => `  - 第 ${c.article_no} 條（來源：${c.source_location}）：${c.content.slice(0, 120)}`,
+      (c) =>
+        `  - 第 ${c.article_no} 條（來源：${formatCitationLocation(c)}）：${c.content.slice(0, 120)}`,
     )
     .join('\n');
 
@@ -335,7 +354,7 @@ function buildFallbackExplanationText(
 
   const articleList =
     citations.length > 0
-      ? citations.map((c) => `第 ${c.article_no} 條`).join('、')
+      ? citations.map((c) => `第 ${c.article_no} 條（${formatCitationLocation(c)}）`).join('、')
       : `第 ${triggeredArticles} 條`;
 
   const lines: string[] = [

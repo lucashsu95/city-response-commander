@@ -22,7 +22,11 @@
  * @module backend/whatif/explanation
  */
 
-import { NarrativeType } from '@city-commander/shared-schemas';
+import {
+  NarrativeType,
+  formatCitationLocation,
+  ensureFallbackDisclosure,
+} from '@city-commander/shared-schemas';
 import { validateBedrockPayload } from '@city-commander/rag';
 import type { SopRetriever, SopCitationResult } from '@city-commander/rag';
 import type { BedrockInvoker } from '@city-commander/rag';
@@ -173,6 +177,13 @@ export async function explainWhatIf(
     textSource = 'template';
   }
 
+  // The canonical fallback caveat applies to every text source, including
+  // template fallbacks caused by invalid, empty, or unavailable Bedrock output.
+  explanationText = ensureFallbackDisclosure(
+    explanationText,
+    citations.some((c) => c.source === 's3_fallback'),
+  );
+
   return {
     explanation_text: explanationText,
     sop_citations: citations,
@@ -263,7 +274,7 @@ function buildWhatIfExplanationPrompt(
       ? citations
           .map(
             (c) =>
-              `  - 第 ${c.article_no} 條（來源：${c.source_location}）：${c.content.slice(0, 120)}`,
+              `  - 第 ${c.article_no} 條（來源：${formatCitationLocation(c)}）：${c.content.slice(0, 120)}`,
           )
           .join('\n')
       : '  （無引用）';
@@ -316,7 +327,7 @@ function buildTemplateExplanationText(
 
   const articleList =
     citations.length > 0
-      ? citations.map((c) => `第 ${c.article_no} 條`).join('、')
+      ? citations.map((c) => `第 ${c.article_no} 條（${formatCitationLocation(c)}）`).join('、')
       : triggeredArticles;
 
   const actionLines =

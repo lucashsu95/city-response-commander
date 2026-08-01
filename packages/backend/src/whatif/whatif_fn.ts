@@ -332,10 +332,12 @@ export function createWhatIfHandler(
         ...(recomputeResult.ete_preview !== undefined && {
           ete_preview: recomputeResult.ete_preview,
         }),
-        // sop_citations：verbatim，來自 stage 4 SopRetriever
+        // sop_citations：verbatim + deterministic provenance，來自 stage 4 SopRetriever
         sop_citations: explanationResult.sop_citations.map((c) => ({
           article_no: c.article_no,
           content: c.content,
+          source_location: c.source_location,
+          source: c.source,
         })),
         // LLM-writable：stage 4 Bedrock 或 template fallback
         explanation_text: explanationResult.explanation_text,

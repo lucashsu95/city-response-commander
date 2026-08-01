@@ -69,8 +69,12 @@ function makeCore(): DecisionCore {
 }
 
 const SAMPLE_CITATIONS: readonly SopCitationResult[] = [
-  { article_no: 2, content: 'SOP 第 2 條原文', source_location: 's3://bucket/sop/article-2.json', relevancy_score: null },
-  { article_no: 7, content: 'SOP 第 7 條原文', source_location: 's3://bucket/sop/article-7.json', relevancy_score: null },
+  { article_no: 2, content: 'SOP 第 2 條原文', source_location: 's3://bucket/sop/article-2.json', relevancy_score: null, source: 'kb' },
+  { article_no: 7, content: 'SOP 第 7 條原文', source_location: 's3://bucket/sop/article-7.json', relevancy_score: null, source: 'kb' },
+];
+
+const SAMPLE_S3_FALLBACK_CITATIONS: readonly SopCitationResult[] = [
+  { article_no: 2, content: 'SOP 第 2 條原文', source_location: 's3://bucket/sop/article-2.json', relevancy_score: null, source: 's3_fallback' },
 ];
 
 function committedClient(): NarrativeTableClient {
@@ -208,6 +212,74 @@ describe('composeReport', () => {
     const before = JSON.stringify(core);
     await composeReport(makeInput({ core }));
     expect(JSON.stringify(core)).toBe(before);
+  });
+
+  it('s3_fallback citation → fallback report_text includes source_location AND 類比引用 marker', async () => {
+    const client = committedClient();
+    await composeReport(
+      makeInput({ citations: SAMPLE_S3_FALLBACK_CITATIONS, narrativeClient: client }),
+    );
+    const item = (client.conditionalPut as ReturnType<typeof vi.fn>).mock
+      .calls[0]?.[0] as NarrativeItem;
+    const payload = item.payload as { report_text: string };
+    expect(payload.report_text).toContain('s3://bucket/sop/article-2.json');
+    expect(payload.report_text).toContain('類比引用');
+  });
+
+  it('kb citation → fallback report_text includes source_location WITHOUT 類比引用 marker', async () => {
+    const client = committedClient();
+    await composeReport(makeInput({ citations: SAMPLE_CITATIONS, narrativeClient: client }));
+    const item = (client.conditionalPut as ReturnType<typeof vi.fn>).mock
+      .calls[0]?.[0] as NarrativeItem;
+    const payload = item.payload as { report_text: string };
+    expect(payload.report_text).toContain('s3://bucket/sop/article-2.json');
+    expect(payload.report_text).not.toContain('類比引用');
+  });
+
+  it('s3_fallback citation → citations_presentation includes source_location AND 類比引用 marker', async () => {
+    const client = committedClient();
+    await composeReport(
+      makeInput({ citations: SAMPLE_S3_FALLBACK_CITATIONS, narrativeClient: client }),
+    );
+    const item = (client.conditionalPut as ReturnType<typeof vi.fn>).mock
+      .calls[0]?.[0] as NarrativeItem;
+    const payload = item.payload as { citations_presentation: string };
+    expect(payload.citations_presentation).toContain('s3://bucket/sop/article-2.json');
+    expect(payload.citations_presentation).toContain('類比引用');
+  });
+
+  it('kb citation → citations_presentation includes source_location WITHOUT 類比引用 marker', async () => {
+    const client = committedClient();
+    await composeReport(makeInput({ citations: SAMPLE_CITATIONS, narrativeClient: client }));
+    const item = (client.conditionalPut as ReturnType<typeof vi.fn>).mock
+      .calls[0]?.[0] as NarrativeItem;
+    const payload = item.payload as { citations_presentation: string };
+    expect(payload.citations_presentation).toContain('s3://bucket/sop/article-2.json');
+    expect(payload.citations_presentation).not.toContain('類比引用');
+  });
+
+  it('Bedrock success + Bedrock-supplied citations_presentation → payload uses deterministic value, not Bedrock text', async () => {
+    const client = committedClient();
+    const json = JSON.stringify({
+      report_text: '交控中心建議書內容',
+      citations_presentation: 'BEDROCK_WROTE_THIS_WRONG_TEXT_NO_MARKER',
+    });
+    const result = await composeReport(
+      makeInput({
+        citations: SAMPLE_S3_FALLBACK_CITATIONS,
+        narrativeClient: client,
+        bedrockInvoker: makeBedrockSuccess(json),
+      }),
+    );
+    if (result.outcome !== 'failed') {
+      expect(result.text_source).toBe('bedrock');
+    }
+    const item = (client.conditionalPut as ReturnType<typeof vi.fn>).mock
+      .calls[0]?.[0] as NarrativeItem;
+    const payload = item.payload as { citations_presentation: string };
+    expect(payload.citations_presentation).not.toBe('BEDROCK_WROTE_THIS_WRONG_TEXT_NO_MARKER');
+    expect(payload.citations_presentation).toContain('s3://bucket/sop/article-2.json');
+    expect(payload.citations_presentation).toContain('類比引用');
   });
 });
 

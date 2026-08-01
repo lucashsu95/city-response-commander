@@ -114,6 +114,14 @@ export type {
 // ─── Config ────────────────────────────────────────────────
 export type { EnvironmentProfile, ConfigSchema, StrategyConfig } from './config.js';
 
+// ─── Citation Formatting (§14.1, §21) ──────────────────────
+export {
+  formatCitationLocation,
+  FALLBACK_DISCLOSURE,
+  ensureFallbackDisclosure,
+  type CitationLocationInput,
+} from './citation_formatting.js';
+
 // ─── Discriminated union for API/event payloads (§12/§13) ──
 export type {
   WebSocketEvent,
