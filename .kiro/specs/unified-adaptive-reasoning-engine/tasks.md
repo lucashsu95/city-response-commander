@@ -140,7 +140,7 @@ Task ID scheme: `TASK-UARE-01..TASK-UARE-11`, flat and sequential.
   - **scope note**: R9.2's fuller ≥3-unknown-type scenario matrix and the backend-level integration test are TASK-UARE-09's job, not this one; the 2 tests added here exist only to prove the wiring itself is correct end-to-end, on top of the pure-function coverage already in `universal_defense.test.ts`/`p_universal_grounding.test.ts` (TASK-UARE-06/07).
   - done_definition: All existing `decision_pipeline.ts` tests pass unmodified; new fields present and correct on every decision output.
 
-- [ ] TASK-UARE-09 Integration tests: unknown incident types and no-anchor edge case
+- [x] TASK-UARE-09 Integration tests: unknown incident types and no-anchor edge case
   - objective: Prove the feature actually solves the stated problem — novel incident types (drone strike on a bridge, unknown gas leak) get a grounded, non-refusing, non-hallucinated response.
   - requirements_covered: R9.2, R9.5
   - design_sections: §5.3, §6
@@ -152,7 +152,8 @@ Task ID scheme: `TASK-UARE-01..TASK-UARE-11`, flat and sequential.
     3. Construct 1 synthetic incident whose `affected_segment`/`affected_road` are both outside the whitelist; assert `recommended_routes` fields are all `null` and `data_status` is NOT `insufficient_data`.
   - acceptance_criteria: R9.2, R9.5.
   - tests_required: this task's own file.
-  - done_definition: All 4 scenarios pass; no test relies on network/LLM calls (pure pipeline output only — the prompt/LLM layer is covered separately in TASK-UARE-11).
+  - done_definition: `npx vitest run packages/backend/test/decision/universal_defense_integration.test.ts` — 4/4 pass. Full `packages/backend` suite: 1203 pass, 10 pre-existing failures in `whatif`/`explanation` code confirmed unrelated (`git diff main...feature/unified-adaptive-reasoning-engine -- packages/backend/src/whatif packages/rag/src` is empty — this branch never touched those files). `packages/backend` typechecks clean.
+  - **implementation note**: runs the REAL `DEFAULT_DECISION_COMPOSER` (not a mocked `decide`, unlike `decision_fn.test.ts`'s existing pattern) through the real `DefaultDomainPipelineAdapter`, against a real `RoadNetworkModel` built from a 5-segment fixture (mirrors `packages/domain/test/unit/decision_pipeline.test.ts`'s harness, duplicated locally since `packages/domain/test/helpers/*` isn't part of that package's public API). 3 novel-type scenarios (無人機墜落橋樑 / 未知毒氣外洩 / 地基下陷疑慮) plus the R6 unresolvable-location case. A 7-article SOP stub had to be added to the ingestion fixture — omitting it initially caused an unrelated `buildEvidenceTrace` failure ("article 7 has no SOP citation"), because ETE's `applied_formula_articles` always includes article 7 for RD_ events regardless of `sop_matched`.
 
 ---
 
