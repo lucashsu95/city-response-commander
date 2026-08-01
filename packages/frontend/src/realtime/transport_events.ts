@@ -163,7 +163,10 @@ export function parseRealtimeEvent(data: unknown): RealtimeEventParseResult {
   }
 
   if (!isRealtimeEventType(rawEventType)) {
-    return transportError('UNKNOWN_EVENT_TYPE', 'WebSocket 訊息的 event_type 不在 §13 事件表中，已忽略');
+    return transportError(
+      'UNKNOWN_EVENT_TYPE',
+      'WebSocket 訊息的 event_type 不在 §13 事件表中，已忽略',
+    );
   }
 
   return {

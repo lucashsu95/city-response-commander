@@ -114,6 +114,14 @@ interface DecisionRegionProps {
   readonly content?: ReactNode;
 }
 
+interface WhatIfRegionProps {
+  /**
+   * TASK-141 What-if dialog. `undefined` (the default) preserves the
+   * pre-TASK-141 empty state.
+   */
+  readonly content?: ReactNode;
+}
+
 /**
  * Decision command region - displays decision results and canonical context.
  *
@@ -139,6 +147,29 @@ function DecisionRegion({
         {content ?? <EmptyState message="目前尚無可顯示的決策結果" />}
         <SnapshotProvenance snapshot={selectedSnapshot} />
         <AffectedRoadContextView context={affectedRoadContext} />
+      </div>
+    </section>
+  );
+}
+
+/**
+ * What-if dialog region (§14.5, TASK-141).
+ *
+ * Renders the injected What-if dialog when supplied; otherwise falls back
+ * to an empty state. The dialog allows operators to submit hypothetical
+ * questions without mutating any persistent state.
+ */
+function WhatIfRegion({ content }: WhatIfRegionProps): ReactNode {
+  return (
+    <section
+      className="dashboard-region dashboard-region--whatif"
+      aria-labelledby="whatif-heading"
+    >
+      <h2 id="whatif-heading" className="dashboard-region__heading">
+        What-if 假設情境
+      </h2>
+      <div className="dashboard-region__content dashboard-region__content--stacked">
+        {content ?? <EmptyState message="尚無 What-if 假設情境" />}
       </div>
     </section>
   );
@@ -182,6 +213,10 @@ export interface DashboardShellProps {
    * Dashboard page for the same reason as `timelineContent`.
    */
   readonly decisionContent?: ReactNode;
+  /**
+   * TASK-141 What-if dialog content. Injected by the Dashboard page.
+   */
+  readonly whatifContent?: ReactNode;
 }
 
 /**
@@ -209,7 +244,7 @@ function resolveOperationalStatus(
 }
 
 /**
- * Main dashboard shell with header, status bar, and four regions.
+ * Main dashboard shell with header, status bar, and five regions.
  */
 export function DashboardShell({
   selectedSnapshot = null,
@@ -220,6 +255,7 @@ export function DashboardShell({
   timelineContent,
   crowdContent,
   decisionContent,
+  whatifContent,
 }: DashboardShellProps = {}): ReactNode {
   const operationalStatus = resolveOperationalStatus(selectedSnapshot, connectionMode);
 
@@ -244,6 +280,7 @@ export function DashboardShell({
             affectedRoadContext={affectedRoadContext}
             content={decisionContent}
           />
+          <WhatIfRegion content={whatifContent} />
         </div>
       </main>
 

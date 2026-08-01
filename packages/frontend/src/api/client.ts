@@ -12,6 +12,7 @@ import type {
   GetRoadsResponse,
   GetCrowdResponse,
   InjectIncidentRequest,
+  WhatIfRequest,
 } from '@city-commander/shared-schemas';
 import { normalizeEndpoint } from '../config/runtime_config.js';
 
@@ -19,11 +20,7 @@ import { normalizeEndpoint } from '../config/runtime_config.js';
 
 /** API error discriminator */
 export type ApiErrorCode =
-  | 'CONFIGURATION_ERROR'
-  | 'NETWORK_ERROR'
-  | 'HTTP_ERROR'
-  | 'INVALID_JSON'
-  | 'ABORTED';
+  'CONFIGURATION_ERROR' | 'NETWORK_ERROR' | 'HTTP_ERROR' | 'INVALID_JSON' | 'ABORTED';
 
 /** Base API error */
 interface ApiErrorBase {
@@ -60,16 +57,11 @@ export interface AbortedError extends ApiErrorBase {
 
 /** Union of all API error types */
 export type ApiError =
-  | ConfigurationError
-  | NetworkError
-  | HttpError
-  | InvalidJsonError
-  | AbortedError;
+  ConfigurationError | NetworkError | HttpError | InvalidJsonError | AbortedError;
 
 /** API response result discriminated union */
 export type ApiResult<T> =
-  | { readonly ok: true; readonly data: T }
-  | { readonly ok: false; readonly error: ApiError };
+  { readonly ok: true; readonly data: T } | { readonly ok: false; readonly error: ApiError };
 
 // ─── Error Factories ───────────────────────────────────────
 
@@ -104,6 +96,7 @@ function abortedError(): AbortedError {
 export interface RequestOptions {
   /** AbortSignal for request cancellation */
   readonly signal?: AbortSignal;
+  readonly authorizationHeader?: string;
 }
 
 /**
@@ -319,7 +312,7 @@ export function createApiClient(config: ApiClientConfig) {
   async function postForStatus(
     path: string,
     body: unknown,
-    options: AdminRequestOptions,
+    options: RequestOptions,
   ): Promise<ApiResult<{ readonly httpStatus: number; readonly body: unknown }>> {
     let url: URL;
     try {
@@ -335,7 +328,9 @@ export function createApiClient(config: ApiClientConfig) {
         headers: {
           Accept: 'application/json',
           'Content-Type': 'application/json',
-          Authorization: options.authorizationHeader,
+          ...(options.authorizationHeader !== undefined
+            ? { Authorization: options.authorizationHeader }
+            : {}),
         },
         body: JSON.stringify(body),
         signal: options.signal,
@@ -425,14 +420,29 @@ export function createApiClient(config: ApiClientConfig) {
      */
     postInject(
       eventId: string,
-      options: AdminRequestOptions,
+      options: RequestOptions,
     ): Promise<ApiResult<{ readonly httpStatus: number; readonly body: unknown }>> {
       const request: InjectIncidentRequest = { event_id: eventId };
-      return postForStatus(
-        `incidents/${encodeURIComponent(eventId)}/inject`,
-        request,
-        options,
-      );
+      return postForStatus(`incidents/${encodeURIComponent(eventId)}/inject`, request, options);
+    },
+
+    /**
+     * POST /what-if — Submit a hypothetical question (§14.5, TASK-141).
+     *
+     * Returns the raw `{httpStatus, body}` pair so the caller can handle
+     * transport errors and non-2xx responses without the client treating them
+     * as transport failures — the same pattern as {@link postInject}.
+     *
+     * The request body is `{ query: string }` (`WhatIfRequest`); the response
+     * body is `WhatIfResponse` when the HTTP status is 200. Non-200 responses
+     * are returned as-is so the dialog can render them distinctly.
+     */
+    postWhatIf(
+      query: string,
+      options?: RequestOptions,
+    ): Promise<ApiResult<{ readonly httpStatus: number; readonly body: unknown }>> {
+      const request: WhatIfRequest = { query };
+      return postForStatus('what-if', request, options ?? {});
     },
 
     /**

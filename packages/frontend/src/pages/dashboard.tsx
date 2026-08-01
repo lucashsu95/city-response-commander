@@ -26,6 +26,7 @@ import { ExplanationChain } from '../decision/explanation_chain.js';
 import { ReportPanel } from '../decision/report_panel.js';
 import { RoutePanel } from '../decision/route_panel.js';
 import { useDecisionReadModel } from '../decision/use_decision_read_model.js';
+import { WhatIfDialog } from '../whatif/whatif_dialog.js';
 import { useEteView } from '../decision/use_ete_view.js';
 import { useEvidenceView } from '../decision/use_evidence_view.js';
 import { useExecutionStatus } from '../decision/use_execution_status.js';
@@ -188,6 +189,7 @@ export function DashboardPage(): ReactNode {
         />
       }
       crowdContent={<CrowdPanel snapshot={crowd} onRetry={crowd.refresh} />}
+      whatifContent={<WhatIfDialog client={transport} />}
       decisionContent={
         <>
           <ReportPanel decision={decision} onRetry={decision.refresh} />

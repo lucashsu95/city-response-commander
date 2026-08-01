@@ -198,7 +198,13 @@ export function useRealtimeConnection(
   // identity between renders never tears down the live connection, never
   // recreates the dedup coordinator, and never clears already-seen
   // `ready_event_id`s.
-  const callbacksRef = useRef({ onEvent, onReadyEvent, onReadyEventOutcome, onError, onPollingCycle });
+  const callbacksRef = useRef({
+    onEvent,
+    onReadyEvent,
+    onReadyEventOutcome,
+    onError,
+    onPollingCycle,
+  });
   const injectedRef = useRef({ fallbackContext, socketFactory, scheduler, transport });
 
   useEffect(() => {

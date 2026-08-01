@@ -90,8 +90,7 @@ export function isValidTimelineTimestamp(value: string): boolean {
 
 /** Result of formatting one authoritative timestamp for display. */
 export type TimelineTimestampDisplay =
-  | { readonly ok: true; readonly text: string }
-  | { readonly ok: false };
+  { readonly ok: true; readonly text: string } | { readonly ok: false };
 
 /**
  * Formats an authoritative `YYYY-MM-DD HH:MM` timestamp for display.
@@ -193,10 +192,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
  * fail the whole decode; a wrong-typed present value is never silently
  * dropped or coerced).
  */
-function optionalString(
-  record: Record<string, unknown>,
-  key: string,
-): string | null | undefined {
+function optionalString(record: Record<string, unknown>, key: string): string | null | undefined {
   if (!(key in record)) {
     return null;
   }
@@ -410,10 +406,7 @@ export function decodeTimelineResponse(raw: unknown): TimelineDecodeResult {
 
   const timing = decodeTimingEvidence(raw);
   if (timing === 'MALFORMED') {
-    return decodeError(
-      'MALFORMED_OPTIONAL_FIELD',
-      'HG-001 timing 證據欄位型別不正確',
-    );
+    return decodeError('MALFORMED_OPTIONAL_FIELD', 'HG-001 timing 證據欄位型別不正確');
   }
 
   return {

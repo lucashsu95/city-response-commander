@@ -113,7 +113,10 @@ export interface ProcessNotificationResult {
   readonly readyEventId: string | null;
 }
 
-function outcome(result: ReadyEventOutcome, readyEventId: string | null): ProcessNotificationResult {
+function outcome(
+  result: ReadyEventOutcome,
+  readyEventId: string | null,
+): ProcessNotificationResult {
   return { outcome: result, readyEventId };
 }
 

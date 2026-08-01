@@ -41,12 +41,7 @@ export interface TimelineTransport {
 // ─── Public State Shape ─────────────────────────────────────
 
 export type TimelineControllerStateName =
-  | 'idle'
-  | 'loading'
-  | 'ready'
-  | 'empty'
-  | 'error'
-  | 'disposed';
+  'idle' | 'loading' | 'ready' | 'empty' | 'error' | 'disposed';
 
 export type TimelineControllerErrorCode = TimelineDecodeErrorCode | 'REQUEST_FAILED';
 
@@ -111,7 +106,10 @@ function selectedIndexOf(timestamps: readonly string[], selected: string | null)
  *   of `timestamps` for a non-empty model by the decoder's own invariant)
  * - is `null` for an empty timeline
  */
-function resolveSelection(model: TimelineReadModel, previousSelection: string | null): string | null {
+function resolveSelection(
+  model: TimelineReadModel,
+  previousSelection: string | null,
+): string | null {
   if (model.timestamps.length === 0) {
     return null;
   }
@@ -121,7 +119,10 @@ function resolveSelection(model: TimelineReadModel, previousSelection: string | 
   return model.current;
 }
 
-function applyModel(model: TimelineReadModel, previousSelection: string | null): TimelinePlaybackState {
+function applyModel(
+  model: TimelineReadModel,
+  previousSelection: string | null,
+): TimelinePlaybackState {
   const selectedTimestamp = resolveSelection(model, previousSelection);
   return {
     state: model.timestamps.length === 0 ? 'empty' : 'ready',
@@ -176,7 +177,9 @@ export interface TimelinePlaybackController extends TimelinePlaybackState {
  * the caller never recreate it or reset its state; only unmount tears it
  * down (aborting any in-flight request).
  */
-export function useTimelinePlayback(options: UseTimelinePlaybackOptions): TimelinePlaybackController {
+export function useTimelinePlayback(
+  options: UseTimelinePlaybackOptions,
+): TimelinePlaybackController {
   const [state, setState] = useState<TimelinePlaybackState>(initialState);
 
   // Mutable concurrency bookkeeping. Refs, not state: they must never trigger
@@ -192,16 +195,19 @@ export function useTimelinePlayback(options: UseTimelinePlaybackOptions): Timeli
   const everSucceededRef = useRef(false);
   const selectionRef = useRef<string | null>(null);
 
-  const applySafely = useCallback((updater: (previous: TimelinePlaybackState) => TimelinePlaybackState) => {
-    if (disposedRef.current) {
-      return;
-    }
-    setState((previous) => {
-      const next = updater(previous);
-      selectionRef.current = next.selectedTimestamp;
-      return next;
-    });
-  }, []);
+  const applySafely = useCallback(
+    (updater: (previous: TimelinePlaybackState) => TimelinePlaybackState) => {
+      if (disposedRef.current) {
+        return;
+      }
+      setState((previous) => {
+        const next = updater(previous);
+        selectionRef.current = next.selectedTimestamp;
+        return next;
+      });
+    },
+    [],
+  );
 
   const runFetch = useCallback(() => {
     if (disposedRef.current) {
@@ -249,7 +255,20 @@ export function useTimelinePlayback(options: UseTimelinePlaybackOptions): Timeli
           applySafely((previous) =>
             everSucceededRef.current
               ? { ...previous, refreshStatus: 'idle', error }
-              : { ...previous, state: 'error', refreshStatus: 'idle', error, timestamps: [], currentTimestamp: null, selectedTimestamp: null, selectedIndex: null, timing: null, schemaVersion: null, traceId: null, provisional: null }
+              : {
+                  ...previous,
+                  state: 'error',
+                  refreshStatus: 'idle',
+                  error,
+                  timestamps: [],
+                  currentTimestamp: null,
+                  selectedTimestamp: null,
+                  selectedIndex: null,
+                  timing: null,
+                  schemaVersion: null,
+                  traceId: null,
+                  provisional: null,
+                },
           );
           return;
         }
@@ -263,13 +282,28 @@ export function useTimelinePlayback(options: UseTimelinePlaybackOptions): Timeli
           applySafely((previous) =>
             everSucceededRef.current
               ? { ...previous, refreshStatus: 'idle', error }
-              : { ...previous, state: 'error', refreshStatus: 'idle', error, timestamps: [], currentTimestamp: null, selectedTimestamp: null, selectedIndex: null, timing: null, schemaVersion: null, traceId: null, provisional: null }
+              : {
+                  ...previous,
+                  state: 'error',
+                  refreshStatus: 'idle',
+                  error,
+                  timestamps: [],
+                  currentTimestamp: null,
+                  selectedTimestamp: null,
+                  selectedIndex: null,
+                  timing: null,
+                  schemaVersion: null,
+                  traceId: null,
+                  provisional: null,
+                },
           );
           return;
         }
 
         everSucceededRef.current = true;
-        applySafely((previous) => applyModel(decoded.model, selectionRef.current ?? previous.selectedTimestamp));
+        applySafely((previous) =>
+          applyModel(decoded.model, selectionRef.current ?? previous.selectedTimestamp),
+        );
       })
       .catch(() => {
         // Defensive backstop: a transport that throws instead of returning a
@@ -284,7 +318,7 @@ export function useTimelinePlayback(options: UseTimelinePlaybackOptions): Timeli
         applySafely((previous) =>
           everSucceededRef.current
             ? { ...previous, refreshStatus: 'idle', error }
-            : { ...previous, state: 'error', refreshStatus: 'idle', error }
+            : { ...previous, state: 'error', refreshStatus: 'idle', error },
         );
       })
       .finally(() => {
@@ -331,7 +365,9 @@ export function useTimelinePlayback(options: UseTimelinePlaybackOptions): Timeli
       }
 
       everSucceededRef.current = true;
-      applySafely((previous) => applyModel(decoded.model, selectionRef.current ?? previous.selectedTimestamp));
+      applySafely((previous) =>
+        applyModel(decoded.model, selectionRef.current ?? previous.selectedTimestamp),
+      );
     },
     [applySafely],
   );
@@ -367,7 +403,10 @@ export function useTimelinePlayback(options: UseTimelinePlaybackOptions): Timeli
 
   const selectNext = useCallback(() => {
     applySafely((previous) => {
-      if (previous.selectedIndex === null || previous.selectedIndex >= previous.timestamps.length - 1) {
+      if (
+        previous.selectedIndex === null ||
+        previous.selectedIndex >= previous.timestamps.length - 1
+      ) {
         return previous;
       }
       const nextIndex = previous.selectedIndex + 1;

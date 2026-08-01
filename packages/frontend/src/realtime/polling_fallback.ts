@@ -315,9 +315,7 @@ export function resolveFallbackPlan(context: RealtimeFallbackContext): FallbackP
 
 /** Polling failure discriminator. */
 export type PollingErrorCode =
-  | 'MISSING_POLLING_CONTEXT'
-  | 'TARGET_REQUEST_FAILED'
-  | 'INVALID_POLLING_RESPONSE';
+  'MISSING_POLLING_CONTEXT' | 'TARGET_REQUEST_FAILED' | 'INVALID_POLLING_RESPONSE';
 
 /**
  * Typed polling error. Carries the route and the transport error code only —
