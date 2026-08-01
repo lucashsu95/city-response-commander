@@ -62,11 +62,10 @@ jobs:
           npm run build --workspace packages/domain
           npm run build --workspace packages/config
           npm run build --workspace packages/ai-generator
-
-      - name: Build backend packages so esbuild can resolve them
-        run: |
-          npm run build --workspace packages/backend
           npm run build --workspace packages/rag
+
+      - name: Build backend so esbuild can resolve @city-commander/rag
+        run: npm run build --workspace packages/backend
 
       - name: Configure AWS credentials through OIDC
         uses: aws-actions/configure-aws-credentials@v4
