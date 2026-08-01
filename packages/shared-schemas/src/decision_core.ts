@@ -4,6 +4,7 @@ import type { EvidenceTrace } from './evidence.js';
 import type { PolicyMetadata } from './policy_metadata.js';
 import type { ETEResult } from './ete.js';
 import type { RouteCandidate } from './route_candidate.js';
+import type { UniversalPrinciple, GroundingCandidate } from './universal_defense.js';
 
 export interface SegmentClassification {
   readonly segment_id: string;
@@ -91,6 +92,20 @@ export interface DecisionCore {
   readonly evidence: EvidenceTrace;
   readonly policy: PolicyMetadata;
   readonly cms_core_text: string;
+
+  /**
+   * UARE (Unified Adaptive Reasoning Engine, §UARE-R1). `true` when
+   * `triggered_articles` is non-empty. Optional for backwards-compatible
+   * read models built before UARE wiring (decision_pipeline.ts, TASK-UARE-08).
+   */
+  readonly sop_matched?: boolean;
+  /** UARE (§UARE-R1). `OFFICIAL_SOP` when `sop_matched`, else `SYSTEM_DEFAULT_PRINCIPLE`. */
+  readonly sop_authority?: 'OFFICIAL_SOP' | 'SYSTEM_DEFAULT_PRINCIPLE';
+  /** UARE (§UARE-R2). Non-empty only when `sop_matched` is `false`. */
+  readonly universal_principles?: readonly UniversalPrinciple[];
+  /** UARE (§UARE-R3, R6). Non-empty only when `sop_matched` is `false` and a grounding anchor was resolvable. */
+  readonly grounding_candidates?: readonly GroundingCandidate[];
+
   readonly provisional: boolean;
   readonly schema_version: string;
 }
