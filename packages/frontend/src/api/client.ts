@@ -11,6 +11,7 @@ import type {
   GetDecisionResponse,
   GetRoadsResponse,
   GetCrowdResponse,
+  InjectIncidentRequest,
 } from '@city-commander/shared-schemas';
 import { normalizeEndpoint } from '../config/runtime_config.js';
 
@@ -103,6 +104,17 @@ function abortedError(): AbortedError {
 export interface RequestOptions {
   /** AbortSignal for request cancellation */
   readonly signal?: AbortSignal;
+}
+
+/**
+ * Options for an admin-gated write request (§17).
+ *
+ * `authorizationHeader` is the exact `Authorization` value to send, produced by
+ * `auth/admin_session.ts#adminAuthorizationHeader` (TASK-128's minimal auth
+ * seam). The client never derives or fabricates this value itself.
+ */
+export interface AdminRequestOptions extends RequestOptions {
+  readonly authorizationHeader: string;
 }
 
 /** API client configuration */
@@ -289,6 +301,65 @@ export function createApiClient(config: ApiClientConfig) {
     return { ok: true, data };
   }
 
+  /**
+   * Performs a POST to an admin-gated write route and returns the raw HTTP
+   * status plus parsed body, without treating a non-2xx status as a transport
+   * failure.
+   *
+   * `POST /incidents/{event_id}/inject` (§12) is a route whose *documented*
+   * outcomes span `202`/`200`/`503`/`409`, each carrying a meaningful JSON
+   * body (`decodeInjectionResponse` in `decision/execution_model.ts` reads all
+   * four). Reusing `get`'s `!response.ok → HttpError` short-circuit would
+   * collapse `503 WORKFLOW_START_FAILED` and `409 CORE_IDENTITY_CONFLICT` into
+   * a generic transport error before the caller ever saw the body — exactly
+   * the "409 shown as a generic error" outcome §12 forbids. So this helper
+   * always attempts to parse the body and always returns it, and only reports
+   * a `NetworkError`/`InvalidJsonError` for failures below the HTTP layer.
+   */
+  async function postForStatus(
+    path: string,
+    body: unknown,
+    options: AdminRequestOptions,
+  ): Promise<ApiResult<{ readonly httpStatus: number; readonly body: unknown }>> {
+    let url: URL;
+    try {
+      url = new URL(path, baseUrl + '/');
+    } catch {
+      return { ok: false, error: configurationError(`Invalid endpoint URL: ${baseUrl}`) };
+    }
+
+    let response: Response;
+    try {
+      response = await fetch(url.toString(), {
+        method: 'POST',
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+          Authorization: options.authorizationHeader,
+        },
+        body: JSON.stringify(body),
+        signal: options.signal,
+      });
+    } catch (err) {
+      if (err instanceof Error && err.name === 'AbortError') {
+        return { ok: false, error: abortedError() };
+      }
+      return {
+        ok: false,
+        error: networkError(err instanceof Error ? err.message : 'Network request failed'),
+      };
+    }
+
+    let parsedBody: unknown;
+    try {
+      parsedBody = await response.json();
+    } catch {
+      return { ok: false, error: invalidJsonError('Response body is not valid JSON') };
+    }
+
+    return { ok: true, data: { httpStatus: response.status, body: parsedBody } };
+  }
+
   return {
     /**
      * GET /decisions/{id} - Fetch decision read model
@@ -329,6 +400,39 @@ export function createApiClient(config: ApiClientConfig) {
      */
     getTimeline(options?: RequestOptions): Promise<ApiResult<unknown>> {
       return get<unknown>('timeline', options);
+    },
+
+    /**
+     * POST /incidents/{event_id}/inject — admin-only event injection (§12, §17,
+     * TASK-128).
+     *
+     * Returns the raw `{httpStatus, body}` pair, not a decoded
+     * `InjectionOutcome`: decoding belongs to
+     * `decision/execution_model.ts#decodeInjectionResponse` (already built for
+     * TASK-133), so this client stays a thin transport and does not duplicate
+     * that boundary logic. `body` is `unknown` until that decoder validates it.
+     *
+     * The request carries only `event_id` (`InjectIncidentRequest`, matching
+     * the live backend contract in `packages/backend/src/inject/`): the
+     * backend derives `idempotency_key` itself from
+     * `event_id|event_timestamp|policy_version`
+     * (`packages/backend/src/inject/idempotency_key.ts`) and this client never
+     * fabricates or reconstructs that key.
+     *
+     * @param options.authorizationHeader - built by
+     *   `auth/admin_session.ts#adminAuthorizationHeader`; this method never
+     *   constructs a header itself.
+     */
+    postInject(
+      eventId: string,
+      options: AdminRequestOptions,
+    ): Promise<ApiResult<{ readonly httpStatus: number; readonly body: unknown }>> {
+      const request: InjectIncidentRequest = { event_id: eventId };
+      return postForStatus(
+        `incidents/${encodeURIComponent(eventId)}/inject`,
+        request,
+        options,
+      );
     },
 
     /**
