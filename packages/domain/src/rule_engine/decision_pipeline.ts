@@ -24,6 +24,7 @@ import type {
   Art1Measures,
   CascadingRisk,
   ClassificationReasoning,
+  CrowdPreWarning,
   EvidenceTrace,
   GroundingCandidate,
   Incident,
@@ -55,7 +56,7 @@ import { classifySegments } from './classification_engine.js';
 import { evaluateArticle1 } from './article1.js';
 import { isArticle2Triggered, qualifyCandidates } from './article2.js';
 import { ARTICLE3_STATION_ID, evaluateArticle3 } from './article3.js';
-import { ARTICLE4_STATION_ID, evaluateArticle4 } from './article4.js';
+import { ARTICLE4_STATION_ID, DOME_PEAK_THRESHOLD, evaluateArticle4 } from './article4.js';
 import { evaluateArticle5, isArticle5Triggered } from './article5.js';
 import { evaluateArticle6 } from './article6.js';
 import { selectEvacuation } from './evacuation_selector.js';
@@ -74,7 +75,12 @@ import {
   detectSignalConflicts,
   buildAdjacencyGraph,
   detectCascadingRisk,
+  detectSop3UserCountPreWarning,
+  detectSop3GrowthRatePreWarning,
+  detectSop4GrowthRatePreWarning,
+  detectSop6RoamingPreWarning,
   type SaturationHistoryPoint,
+  type NumericHistoryPoint,
 } from './grey_zone_arbitration.js';
 
 // ─── Public Input / Result Types ───────────────────────────
@@ -158,6 +164,11 @@ export interface DeterministicDecisionFacts {
    * affects `classifications`.
    */
   readonly pre_warning_segments: readonly string[];
+  /**
+   * GZAE (§GZAE-R2 extension). Same grey-zone trend pre-warning as
+   * `pre_warning_segments`, generalized to SOP-3/4/6's crowd thresholds.
+   */
+  readonly crowd_pre_warnings: readonly CrowdPreWarning[];
   /** GZAE (§GZAE-R3). Cross-article traffic/crowd signal contradictions, advisory-only. */
   readonly signal_conflicts: readonly SignalConflict[];
   /** GZAE (§GZAE-R4). Adjacent, individually-non-escalating incidents; `null` when none detected. */
@@ -255,6 +266,7 @@ export function runDeterministicDecision(
   // GZAE (§GZAE-R1..R4) outputs — additive except self_blocked_exclusions,
   // which reflects R1's post-hoc correction of `candidates`/`excludedCandidates`.
   let preWarningSegments: readonly string[] = [];
+  const crowdPreWarnings: CrowdPreWarning[] = [];
   let selfBlockedExclusions: readonly string[] = [];
   const crowdTriggeredStationIds = new Set<string>();
 
@@ -396,6 +408,24 @@ export function runDeterministicDecision(
       evaluations.push({ article: 3, triggered: true });
       crowdTriggeredStationIds.add(ARTICLE3_STATION_ID);
     }
+
+    // GZAE §GZAE-R2 extension: User_Count / Growth_Rate grey-zone trend
+    // pre-warning. Additive-only — never affects article3's own trigger.
+    if (record !== null && record !== undefined) {
+      const userCountWarning = detectSop3UserCountPreWarning(
+        ARTICLE3_STATION_ID,
+        record.user_count,
+        recentCrowdHistoryBefore(bl17Records, eventDate, (r) => r.user_count),
+      );
+      if (userCountWarning !== null) crowdPreWarnings.push(userCountWarning);
+
+      const growthRateWarning = detectSop3GrowthRatePreWarning(
+        ARTICLE3_STATION_ID,
+        record.growth_rate,
+        recentCrowdHistoryBefore(bl17Records, eventDate, (r) => r.growth_rate),
+      );
+      if (growthRateWarning !== null) crowdPreWarnings.push(growthRateWarning);
+    }
   }
 
   // ─── SOP-4 (dome dispersal, links SOP-3) as applicable ──
@@ -420,6 +450,18 @@ export function runDeterministicDecision(
       });
       crowdTriggeredStationIds.add(ARTICLE4_STATION_ID);
     }
+
+    // GZAE §GZAE-R2 extension: Growth_Rate grey-zone trend pre-warning,
+    // gated on the historical-peak precondition already being met.
+    if (current !== null && current !== undefined) {
+      const growthRateWarning = detectSop4GrowthRatePreWarning(
+        ARTICLE4_STATION_ID,
+        article4.historical_peak !== null && article4.historical_peak >= DOME_PEAK_THRESHOLD,
+        current.growth_rate,
+        recentCrowdHistoryBefore(domeRecords, eventDate, (r) => r.growth_rate),
+      );
+      if (growthRateWarning !== null) crowdPreWarnings.push(growthRateWarning);
+    }
   }
 
   // ─── SOP-6 multilingual trigger (Strategy F) — always where in scope ──
@@ -430,6 +472,18 @@ export function runDeterministicDecision(
       bs_id: bsId,
       roaming_pct_value: selected.record?.roaming_pct_value ?? null,
     });
+
+    // GZAE §GZAE-R2 extension: Roaming_User_Pct grey-zone trend pre-warning,
+    // per in-scope station (mirrors this loop's existing per-station scope).
+    const roamingRecord = selected.record;
+    if (roamingRecord !== null && roamingRecord !== undefined) {
+      const roamingWarning = detectSop6RoamingPreWarning(
+        bsId,
+        roamingRecord.roaming_pct_value,
+        recentCrowdHistoryBefore(records, eventDate, (r) => r.roaming_pct_value),
+      );
+      if (roamingWarning !== null) crowdPreWarnings.push(roamingWarning);
+    }
   }
   const multilingualScopeResult = bundle.multilingualScope.stationsInScope(currentStations, {
     mode: bundle.metadata.multilingual_scope.mode,
@@ -550,6 +604,7 @@ export function runDeterministicDecision(
     universal_principles: universalPrinciples,
     grounding_candidates: groundingCandidates,
     pre_warning_segments: preWarningSegments,
+    crowd_pre_warnings: crowdPreWarnings,
     signal_conflicts: signalConflicts,
     cascading_risk: cascadingRisk,
     self_blocked_exclusions: selfBlockedExclusions,
@@ -635,6 +690,25 @@ function recentSaturationHistoryBefore(
     .sort((a, b) => a.timestamp_normalized.getTime() - b.timestamp_normalized.getTime())
     .slice(-3)
     .map((record) => ({ saturation_score: record.saturation_score }));
+}
+
+/**
+ * GZAE §GZAE-R2 extension: the most recent 3 raw crowd observations at or
+ * before `cutoff`, time-ascending, projected through `valueOf` to the field
+ * being trended (User_Count / Growth_Rate / Roaming_User_Pct). Mirrors
+ * `recentSaturationHistoryBefore` — reuses `groupCrowd`'s already-in-memory,
+ * per-station array; never interpolates or defaults a missing point.
+ */
+function recentCrowdHistoryBefore(
+  records: readonly CrowdSelectRecord[],
+  cutoff: Date,
+  valueOf: (record: CrowdSelectRecord) => number,
+): readonly NumericHistoryPoint[] {
+  return records
+    .filter((record) => record.timestamp_normalized.getTime() <= cutoff.getTime())
+    .sort((a, b) => a.timestamp_normalized.getTime() - b.timestamp_normalized.getTime())
+    .slice(-3)
+    .map((record) => ({ value: valueOf(record) }));
 }
 
 function groupCrowd(ingestion: IngestionResult): ReadonlyMap<string, CrowdSelectRecord[]> {

@@ -110,6 +110,9 @@ describe('validateBedrockPayload — REPORT', () => {
     const result = validateBedrockPayload(NarrativeType.REPORT, {
       report_text: 'ok',
       pre_warning_segments: ['RD_TPE_999'],
+      crowd_pre_warnings: [
+        { bs_id: 'BS_MRT_BL17', article: 3, field: 'User_Count', advisory_text: '虛構預警' },
+      ],
       signal_conflicts: [{ segment_id: 'RD_TPE_999', conflict_type: 'crowd_heavy_traffic_light' }],
       cascading_risk: { event_ids: ['FAKE_001'], advisory_text: '虛構建議' },
       self_blocked_exclusions: ['RD_TPE_999'],
@@ -120,6 +123,7 @@ describe('validateBedrockPayload — REPORT', () => {
       expect(result.offendingFields).toEqual(
         expect.arrayContaining([
           'pre_warning_segments',
+          'crowd_pre_warnings',
           'signal_conflicts',
           'cascading_risk',
           'self_blocked_exclusions',

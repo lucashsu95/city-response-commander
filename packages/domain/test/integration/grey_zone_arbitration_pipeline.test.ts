@@ -441,3 +441,192 @@ describe('GZAE R4 integration — cascading micro-incident risk (R5 AC8)', () =>
     expect(facts.triggered_articles).not.toContain(2);
   });
 });
+
+// ─── GZAE R2 extension integration — crowd pre-warnings (SOP-3/4/6) ────────
+
+describe('GZAE R2 extension integration — crowd pre-warnings (SOP-3/4/6)', () => {
+  it('flags SOP-3 User_Count pre-warning when BL17 rises through [23750,25000) without triggering art.3', () => {
+    const incident = makeIncident({
+      event_id: 'TPE_2026_EVT_PW1',
+      type: IncidentType.Crowd_Surge_Injury,
+      affected_segment: 'BS_MRT_BL17',
+      status: IncidentStatus.Caution,
+      severity: Severity.Medium,
+      timestamp: '2026-05-20 22:20',
+    });
+    const ingestion = makeIngestion({
+      incidents: [incident],
+      crowd: [
+        crowdRecord('BS_MRT_BL17', '2026-05-20 22:00', 23_800, 0.1, 0.1),
+        crowdRecord('BS_MRT_BL17', '2026-05-20 22:10', 23_900, 0.1, 0.1),
+        crowdRecord('BS_MRT_BL17', '2026-05-20 22:20', 24_000, 0.1, 0.1),
+      ],
+    });
+
+    const facts = runDeterministicDecision({ ingestion, config, incident }).facts;
+    expect(facts).not.toBeNull();
+    if (facts === null) return;
+
+    expect(facts.triggered_articles).not.toContain(3);
+    expect(facts.crowd_pre_warnings).toEqual([
+      {
+        bs_id: 'BS_MRT_BL17',
+        article: 3,
+        field: 'User_Count',
+        advisory_text: expect.stringContaining('SOP 第 3 條門檻（25,000 人）'),
+      },
+    ]);
+  });
+
+  it('flags SOP-3 Growth_Rate pre-warning when BL17 growth rate rises through [0.25,0.30)', () => {
+    const incident = makeIncident({
+      event_id: 'TPE_2026_EVT_PW2',
+      type: IncidentType.Crowd_Surge_Injury,
+      affected_segment: 'BS_MRT_BL17',
+      status: IncidentStatus.Caution,
+      severity: Severity.Medium,
+      timestamp: '2026-05-20 22:20',
+    });
+    const ingestion = makeIngestion({
+      incidents: [incident],
+      crowd: [
+        crowdRecord('BS_MRT_BL17', '2026-05-20 22:00', 10_000, 0.26, 0.1),
+        crowdRecord('BS_MRT_BL17', '2026-05-20 22:10', 10_000, 0.27, 0.1),
+        crowdRecord('BS_MRT_BL17', '2026-05-20 22:20', 10_000, 0.28, 0.1),
+      ],
+    });
+
+    const facts = runDeterministicDecision({ ingestion, config, incident }).facts;
+    expect(facts).not.toBeNull();
+    if (facts === null) return;
+
+    expect(facts.triggered_articles).not.toContain(3);
+    expect(facts.crowd_pre_warnings).toEqual([
+      {
+        bs_id: 'BS_MRT_BL17',
+        article: 3,
+        field: 'Growth_Rate',
+        advisory_text: expect.stringContaining('SOP 第 3 條門檻（0.30）'),
+      },
+    ]);
+  });
+
+  it('flags SOP-4 Growth_Rate pre-warning only once the historical-peak precondition is met', () => {
+    const incident = makeIncident({
+      event_id: 'TPE_2026_EVT_PW3',
+      type: IncidentType.Crowd_Surge_Injury,
+      affected_segment: 'BS_TPE_DOME',
+      status: IncidentStatus.Caution,
+      severity: Severity.Medium,
+      timestamp: '2026-05-20 22:20',
+    });
+    const ingestion = makeIngestion({
+      incidents: [incident],
+      crowd: [
+        crowdRecord('BS_TPE_DOME', '2026-05-20 21:00', 31_000, 0.5, 0.1),
+        crowdRecord('BS_TPE_DOME', '2026-05-20 22:00', 5_000, -0.14, 0.1),
+        crowdRecord('BS_TPE_DOME', '2026-05-20 22:10', 5_000, -0.16, 0.1),
+        crowdRecord('BS_TPE_DOME', '2026-05-20 22:20', 5_000, -0.18, 0.1),
+      ],
+    });
+
+    const facts = runDeterministicDecision({ ingestion, config, incident }).facts;
+    expect(facts).not.toBeNull();
+    if (facts === null) return;
+
+    expect(facts.triggered_articles).not.toContain(4);
+    expect(facts.crowd_pre_warnings).toEqual([
+      {
+        bs_id: 'BS_TPE_DOME',
+        article: 4,
+        field: 'Growth_Rate',
+        advisory_text: expect.stringContaining('SOP 第 4 條疏散門檻（-0.20）'),
+      },
+    ]);
+  });
+
+  it('does not flag SOP-4 pre-warning when the historical-peak precondition is not met', () => {
+    const incident = makeIncident({
+      event_id: 'TPE_2026_EVT_PW4',
+      type: IncidentType.Crowd_Surge_Injury,
+      affected_segment: 'BS_TPE_DOME',
+      status: IncidentStatus.Caution,
+      severity: Severity.Medium,
+      timestamp: '2026-05-20 22:20',
+    });
+    const ingestion = makeIngestion({
+      incidents: [incident],
+      crowd: [
+        // peak never reaches 30,000
+        crowdRecord('BS_TPE_DOME', '2026-05-20 22:00', 5_000, -0.14, 0.1),
+        crowdRecord('BS_TPE_DOME', '2026-05-20 22:10', 5_000, -0.16, 0.1),
+        crowdRecord('BS_TPE_DOME', '2026-05-20 22:20', 5_000, -0.18, 0.1),
+      ],
+    });
+
+    const facts = runDeterministicDecision({ ingestion, config, incident }).facts;
+    expect(facts).not.toBeNull();
+    if (facts === null) return;
+
+    expect(facts.crowd_pre_warnings).toEqual([]);
+  });
+
+  it('flags SOP-6 Roaming_User_Pct pre-warning for an in-scope station rising through [0.25,0.30)', () => {
+    const incident = makeIncident({
+      event_id: 'TPE_2026_EVT_PW5',
+      type: IncidentType.Crowd_Surge_Injury,
+      affected_segment: 'BS_MRT_BL18',
+      status: IncidentStatus.Caution,
+      severity: Severity.Medium,
+      timestamp: '2026-05-20 22:20',
+    });
+    const ingestion = makeIngestion({
+      incidents: [incident],
+      crowd: [
+        crowdRecord('BS_MRT_BL18', '2026-05-20 22:00', 5_000, 0.05, 0.26),
+        crowdRecord('BS_MRT_BL18', '2026-05-20 22:10', 5_000, 0.05, 0.27),
+        crowdRecord('BS_MRT_BL18', '2026-05-20 22:20', 5_000, 0.05, 0.28),
+      ],
+    });
+
+    const facts = runDeterministicDecision({ ingestion, config, incident }).facts;
+    expect(facts).not.toBeNull();
+    if (facts === null) return;
+
+    expect(facts.triggered_articles).not.toContain(6);
+    expect(facts.crowd_pre_warnings).toEqual([
+      {
+        bs_id: 'BS_MRT_BL18',
+        article: 6,
+        field: 'Roaming_User_Pct',
+        advisory_text: expect.stringContaining('SOP 第 6 條門檻（30%）'),
+      },
+    ]);
+  });
+
+  it('does not flag a pre-warning once the article has already triggered (value at/above threshold)', () => {
+    const incident = makeIncident({
+      event_id: 'TPE_2026_EVT_PW6',
+      type: IncidentType.Crowd_Surge_Injury,
+      affected_segment: 'BS_MRT_BL17',
+      status: IncidentStatus.Caution,
+      severity: Severity.Medium,
+      timestamp: '2026-05-20 22:20',
+    });
+    const ingestion = makeIngestion({
+      incidents: [incident],
+      crowd: [
+        crowdRecord('BS_MRT_BL17', '2026-05-20 22:00', 24_000, 0.1, 0.1),
+        crowdRecord('BS_MRT_BL17', '2026-05-20 22:10', 24_500, 0.1, 0.1),
+        crowdRecord('BS_MRT_BL17', '2026-05-20 22:20', 26_000, 0.1, 0.1),
+      ],
+    });
+
+    const facts = runDeterministicDecision({ ingestion, config, incident }).facts;
+    expect(facts).not.toBeNull();
+    if (facts === null) return;
+
+    expect(facts.triggered_articles).toContain(3);
+    expect(facts.crowd_pre_warnings).toEqual([]);
+  });
+});
