@@ -51,11 +51,21 @@ function TimelineRegion({ content }: TimelineRegionProps): ReactNode {
   );
 }
 
+interface RoadTrafficRegionProps {
+  /**
+   * TASK-125 road traffic panel. `undefined` (the default) preserves the
+   * pre-TASK-125 empty state so a `DashboardShell` rendered without a
+   * `roadsContent` prop is unchanged.
+   */
+  readonly content?: ReactNode;
+}
+
 /**
- * Road traffic region - displays per-segment traffic with A/B levels.
- * Empty state until TASK-125 implementation.
+ * Road traffic region - displays per-segment traffic with A/B levels
+ * (§12 GET /roads, §16, §22.1 P7). Renders the injected TASK-125 `RoadPanel`
+ * when supplied; otherwise falls back to the pre-TASK-125 empty state.
  */
-function RoadTrafficRegion(): ReactNode {
+function RoadTrafficRegion({ content }: RoadTrafficRegionProps): ReactNode {
   return (
     <section
       className="dashboard-region dashboard-region--roads"
@@ -64,8 +74,8 @@ function RoadTrafficRegion(): ReactNode {
       <h2 id="roads-heading" className="dashboard-region__heading">
         路段車流
       </h2>
-      <div className="dashboard-region__content">
-        <EmptyState message="尚無可顯示的路段資料" />
+      <div className="dashboard-region__content dashboard-region__content--stacked">
+        {content ?? <EmptyState message="尚無可顯示的路段資料" />}
       </div>
     </section>
   );
@@ -154,6 +164,12 @@ export interface DashboardShellProps {
    * controller logic of its own.
    */
   readonly timelineContent?: ReactNode;
+  /**
+   * TASK-125 road traffic panel content. Same injection pattern as
+   * `timelineContent`: `dashboard_shell.tsx` never fetches or classifies road
+   * data itself.
+   */
+  readonly roadsContent?: ReactNode;
 }
 
 /**
@@ -190,6 +206,7 @@ export function DashboardShell({
   pollingErrorMessage = null,
   pollingUpdateCount = 0,
   timelineContent,
+  roadsContent,
 }: DashboardShellProps = {}): ReactNode {
   const operationalStatus = resolveOperationalStatus(selectedSnapshot, connectionMode);
 
@@ -207,7 +224,7 @@ export function DashboardShell({
       <main className="dashboard-main" role="main">
         <div className="dashboard-grid">
           <TimelineRegion content={timelineContent} />
-          <RoadTrafficRegion />
+          <RoadTrafficRegion content={roadsContent} />
           <CrowdRegion />
           <DecisionRegion
             selectedSnapshot={selectedSnapshot}

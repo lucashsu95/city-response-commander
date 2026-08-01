@@ -655,3 +655,150 @@ a:focus-visible {
     flex-basis: 100%;
   }
 }
+
+/* ─── Road Traffic Panel (TASK-125) ─────────────────────── */
+
+.road-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  width: 100%;
+}
+
+.road-panel__heading {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: #f1f5f9;
+}
+
+.road-panel__status {
+  min-height: 1rem;
+  font-size: 0.75rem;
+  color: #93c5fd;
+}
+
+.road-panel__empty,
+.road-panel__insufficient {
+  color: #94a3b8;
+  font-size: 0.875rem;
+}
+
+.road-panel__insufficient {
+  color: #fbbf24;
+}
+
+.road-panel__snapshot-timestamp {
+  font-size: 0.75rem;
+  color: #94a3b8;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.road-panel__list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.road-panel__row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  padding: 0.625rem 0.75rem;
+  background-color: #172033;
+  border: 1px solid #334155;
+  border-radius: 0.375rem;
+}
+
+.road-panel__row-main {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.road-panel__road-name {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #f8fafc;
+}
+
+.road-panel__segment-id {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.75rem;
+  color: #93c5fd;
+}
+
+.road-panel__row-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  font-size: 0.8125rem;
+  color: #cbd5e1;
+}
+
+.road-panel__level {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  margin-left: auto;
+}
+
+.road-panel__level-dot {
+  width: 0.625rem;
+  height: 0.625rem;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* Colour is never the only classification signal: `.road-panel__level-text`
+   below always renders the level text alongside this dot. */
+.road-panel__level-dot--red {
+  background-color: #ef4444;
+}
+
+.road-panel__level-dot--yellow {
+  background-color: #eab308;
+}
+
+.road-panel__level-dot--neutral {
+  background-color: #64748b;
+}
+
+.road-panel__level-text {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #e2e8f0;
+}
+
+.road-panel__provenance {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  font-size: 0.75rem;
+  color: #94a3b8;
+}
+
+.road-panel__provenance--unavailable {
+  color: #64748b;
+  font-style: italic;
+}
+
+.road-panel__provenance-item--stale {
+  color: #fbbf24;
+}
+
+.road-panel__retry {
+  padding: 0.375rem 0.75rem;
+  background-color: #2563eb;
+  color: #f8fafc;
+  border: none;
+  border-radius: 0.25rem;
+  font-size: 0.8125rem;
+  cursor: pointer;
+  align-self: flex-start;
+}
+
+.road-panel__retry:hover {
+  background-color: #1d4ed8;
+}
