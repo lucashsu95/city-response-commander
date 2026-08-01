@@ -31,21 +31,28 @@ function buildUniversalDefenseSection(core: DecisionCore): string {
     .map((principle) => `  - ${principle.title}：${principle.description}`)
     .join('\n');
   const candidates = core.grounding_candidates ?? [];
-  const routes =
+
+  // R6 AC1/AC2: an empty grounding_candidates array (requirements.md R3 AC7 —
+  // no legal alternative could be found, whether because the location itself
+  // couldn't be anchored or because its alternatives all failed the capacity/
+  // observation filters) requires its own literal disclosure sentence, not
+  // the generic "here are your routes" framing used when candidates exist.
+  const routesSection =
     candidates.length > 0
-      ? candidates
-          .map(
-            (candidate) =>
-              `  - ${candidate.road_name}（${candidate.status_text}，即時壅塞度 ${candidate.saturation_score}）`,
-          )
-          .join('\n')
-      : '  - （無可用替代路段，僅能提供不依賴具體道路之通用處置建議）';
+      ? `- 僅得使用下列候選路段之名稱，禁止提及清單以外之任何路名或地點：
+${candidates
+  .map(
+    (candidate) =>
+      `  - ${candidate.road_name}（${candidate.status_text}，即時壅塞度 ${candidate.saturation_score}）`,
+  )
+  .join('\n')}`
+      : `- 無任何可用之真實候選路段資料，僅得產出不依賴具體道路之通用處置建議（如周界管制、資訊通報），禁止提及任何具體道路名稱
+- 請於說明文字中載明：「本事件地點資料亦無法定位可用替代路段，建議應變依通用原則執行並儘速人工確認」`;
 
   return `- 本事件類型未於 emergency_traffic_sop.txt 查得對應條款（sop_matched: false）
 - 請依下列通用防禦性交通處置原則進行應變推理，不得回覆「無法判斷」、「查無資料」或語意相近之拒答語句：
 ${principles}
-- 僅得使用下列候選路段之名稱，禁止提及清單以外之任何路名或地點：
-${routes}
+${routesSection}
 - 請於【判定依據】段落載明：「本事件無預設 SOP 條款，已啟動動態通用防衛模式，依據即時車流分析完成調度」`;
 }
 

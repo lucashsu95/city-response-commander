@@ -172,7 +172,7 @@ describe('buildRecommendationPrompt — UARE sop_matched branch', () => {
     expect(prompt).not.toContain('逸仙路');
   });
 
-  it('sop_matched:false with no grounding candidates forbids naming any specific road (R6)', () => {
+  it('sop_matched:false with no grounding candidates forbids naming any specific road and requires the R6 AC2 disclosure sentence', () => {
     const core: DecisionCore = {
       ...decisionFixture(),
       triggered_articles: [],
@@ -194,7 +194,15 @@ describe('buildRecommendationPrompt — UARE sop_matched branch', () => {
 
     const prompt = buildRecommendationPrompt(core);
 
-    expect(prompt).toContain('無可用替代路段，僅能提供不依賴具體道路之通用處置建議');
+    // requirements.md R6 AC2 — literal disclosure sentence for the case where
+    // grounding_candidates is empty (whether because the location itself
+    // couldn't be anchored or its alternatives were filtered to nothing).
+    expect(prompt).toContain(
+      '本事件地點資料亦無法定位可用替代路段，建議應變依通用原則執行並儘速人工確認',
+    );
+    expect(prompt).toContain('禁止提及任何具體道路名稱');
+    // Still carries the unconditional sop_matched:false disclosure (R4 AC6).
+    expect(prompt).toContain('本事件無預設 SOP 條款，已啟動動態通用防衛模式');
     expect(prompt).not.toContain('市民大道四段');
   });
 });
