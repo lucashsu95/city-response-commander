@@ -1,8 +1,12 @@
 # 進度追蹤 — 城市交通應變 AI 指揮台
 
-**最後更新**: 2026-07-24
+**最後更新**: 2026-08-01
 **比賽日期**: 2026-08-01
-**剩餘天數**: 7 天
+**剩餘天數**: 0 天（比賽日）
+
+> ⚠️ 本文件 7/25–7/31 的每日區塊自 7/24 起未再更新，狀態欄仍為初始規劃值，
+> **不代表實際進度**。目前唯一經過驗證的交付紀錄見下方「成員二交付紀錄」。
+> 其他成員的實際狀態請各自補齊。
 
 ---
 
@@ -17,6 +21,42 @@
 | M5 | 3 個事件全跑通 + 多語 | 7/30 | ❓ 待開始 |
 | M6 | What-if + 報告 + 錄影片 | 7/31 | ❓ 待開始 |
 | M7 | 提交 | 8/1 | ❓ 待開始 |
+
+---
+
+## 成員二（Backend Workflow Lead）交付紀錄
+
+**分支**: `80/backend-workflow-phase4-5` ｜ **狀態**: 已推送，待 Reviewer 11346082 進行 PR Review 與 Merge
+
+| 項目 | 內容 | 驗證方式 | 狀態 |
+|---|---|---|---|
+| **TASK-097** | Step Functions ASL 接線與 Workflow Wiring（`workflow/wiring.ts`），修復 ASL JSONPath 與缺口狀態處理 | 單元 + 整合測試 | ✅ 完成 |
+| **TASK-155** | 5 個官方 CloudWatch Counter 名稱對齊 | 135 tests；與 `infra/lib/constructs/observability.ts` 的 `METRIC_NAMES` 逐字比對確認 | ✅ 完成 |
+| **TASK-125** | `GET /roads` Canonical Contract 對齊（`RoadSegmentDTO` / `GetRoadsResponse` + runtime validator） | handler 輸出直接以 `GetRoadsResponseSchema.safeParse` 驗證（含 STOP-gate 路徑） | ✅ 完成 |
+| **Lambda Entry Points** | `src/entry/workflow_status.ts`、`src/entry/recovery_gate.ts`（lazy singleton，含測試接縫） | `tsc --build` 0 錯誤；runtime smoke 確認 import 不建立 AWS client | ✅ 完成 |
+| **Source Gate 防護** | 官方 CSV SHA-256 雜湊保護 + `.gitattributes` `-text` 修復 | 實算 SHA-256 = `official_source_manifest.ts` 的 `DEFAULT_EXPECTED_HASHES` | ✅ 完成 |
+
+**Commit 序列**（`80/backend-workflow-phase4-5`）
+
+| SHA | 內容 |
+|---|---|
+| `87ace0b` | `.gitattributes` LF 換行規範（其官方 CSV 副作用由 `fab8022` 修正） |
+| `40dc96e` | TASK-155 CloudWatch Counter 名稱對齊 |
+| `dfe1bc2` | APP_ENV 防禦性橋接、Table 常數契約、2 個 Lambda Entry Points（見 ADR-014） |
+| `41bb7ff` | TASK-125 `GET /roads` Canonical Contract |
+| `fab8022` | 官方資料集 SHA-256 保護與 `.gitattributes` `-text`（見 ADR-015） |
+
+**測試狀態**: `packages/backend` + `packages/shared-schemas` + `packages/domain` = 105 files / **1,521 tests 全綠**；`tsc --build` 0 型別錯誤；ESLint 乾淨。
+
+### 交接給 Reviewer 的未解項
+
+| # | 項目 | 說明 |
+|---|---|---|
+| 1 | `dashboard_query.ts` 版本分歧 | main 版本的 `CrowdStationView` 缺 provenance 欄位、僅涵蓋 SOP-3/4；本分支版本含 `SnapshotProvenance`、`in_multilingual_scope`、SOP-6。**已決議以本分支為權威版本**，但 git textual merge 不會報衝突，合併後需人工確認保留正確版本。 |
+| 2 | 合併衝突（預期） | `.gitattributes`（add/add，以 `fab8022` 為準）與 `package-lock.json`（content）。 |
+| 3 | 既有 CI 紅燈（非本分支造成） | 8 個失敗 / 4 檔：`scripts/test/verify_sources.test.ts`（3，Windows bash 路徑 bug）、`eslint-local-rules/test/no-llm-prohibited-field-write.test.ts`（2，LLM 禁寫守門在 computed/update writes 失效）、`infra/test/ssm_params.test.ts`（1，與 `config_schema.ts:278` 的 `required:false` 矛盾）。 |
+| 4 | ADR-003 已與實作不符 | ADR-003 決議「Lambda 直接編排，不用 Step Functions」，但 TASK-097 已交付 ASL 接線。該 ADR 狀態需由全隊決定是否標記為 Superseded。 |
+| 5 | `DataSourceProvider` 無 production 實作 | interface 已從 `@city-commander/domain` 正常匯出，但只有測試內臨時實作，LOCAL_MOCK 端到端目前跑不起來。歸屬待認領。 |
 
 ---
 

@@ -1,7 +1,7 @@
 # Architectural Decision Records (ADR)
 
 > 記錄本專案的關鍵技術決策。新 agent 读此文件可快速了解「为什么这么做」。
-> 最後更新：2026-07-31
+> 最後更新：2026-08-01
 
 ---
 
@@ -190,6 +190,49 @@
 - **理由**: 黑客松標準配置，足夠展示技術深度和產品價值。
 - **影響**: E 需要額外時間製作簡報和影片。
 - **替代方案**: 只做 README → 太簡陋。
+
+---
+
+## ADR-014: APP_ENV 環境變數橋接與 Fail-Fast 配置解析策略
+
+- **日期**: 2026-08-01
+- **狀態**: Accepted
+- **決策者**: B（後端 / Backend Workflow Lead）
+- **背景**: `infra/lib/constructs/lambdas.ts` 在每個 runtime Lambda 注入 `APP_ENV`，並將該 key 列為保留（`environment` prop 覆寫它會在 synth 時拋錯）；但 `packages/config/src/provider_factory.ts` 的 `resolveProfile()` 只讀 `CITY_COMMANDER_ENV`。兩者之間沒有任何橋接。結果是已部署的 Lambda 會有正確的 `APP_ENV`、沒有 `CITY_COMMANDER_ENV`，然後在第一次 `createConfigProvider()` 就拋 `ConfigLoadError` — **每次 invocation 冷啟動崩潰，而錯誤訊息指向一個基礎設施從未設定的變數**。
+- **決策**: 改為依序讀取 `PROFILE_ENV_KEYS = ['CITY_COMMANDER_ENV', 'APP_ENV']`。兩項附帶規則：
+  1. 值為空字串或全空白視為「未設定」，繼續往下一個 key（CloudFormation 未解析的 `Ref` 會渲染成空字串，而非省略變數）。
+  2. **有值但不是合法 profile 時立刻拋錯，不 fallback 到下一個 key**，錯誤訊息指名是哪個 key 出錯。
+- **理由**: `CITY_COMMANDER_ENV` 保留優先權，讓本機 shell 仍能覆寫平台注入的值。而第 2 條是關鍵：若 typo（例如 `CITY_COMMANDER_ENV=PERSONAL_AWS`）靜默落到 `APP_ENV`，可能讓 dev shell 指向 `COMPETITION_AWS` — 這正好違反本模組「Never silently falls back to hard-coded values」的存在理由。**寧可冷啟動拒絕啟動，也不要連到錯誤環境。**
+- **影響**: `packages/config` 匯出 `PROFILE_ENV_KEYS`。既有 88 個 config 測試全數通過（原有的錯誤訊息斷言使用 regex，新訊息仍相符）。長期建議統一為 `APP_ENV` 單一名稱，因為它是 CDK 自動注入且無法被誤蓋的那個；反向統一則需改動 `ai-generator/src/bedrock.ts`、`scripts/local_mock_rehearsal.sh`、`scripts/mock-bedrock-walkthrough.ts`、`.github/workflows/ci.yml`、`runbooks/00_local_mock_rehearsal.md` 共 5 處。
+- **替代方案**:
+  - 只改 CDK 改注入 `CITY_COMMANDER_ENV` → 需同時改動 `lambdas.ts` 的保留 key 驗證，且不解決已部署環境的問題。
+  - 給 profile 一個預設值（例如 `LOCAL_MOCK`）→ **拒絕**。預設值會讓設定缺失變成靜默的錯誤環境連線，這比崩潰危險得多。
+
+---
+
+## ADR-015: 官方競賽資料集 `.gitattributes` `-text` 雜湊保護策略
+
+- **日期**: 2026-08-01
+- **狀態**: Accepted
+- **決策者**: B（後端 / Backend Workflow Lead）
+- **背景**: `中華電信資料集/` 下的官方檔案是 SSOT，SHA-256 記錄在 `packages/domain/src/source_manifest/official_source_manifest.ts` 的 `DEFAULT_EXPECTED_HASHES`。為修正 Windows 上 `prettier --check` 誤報，曾加入全域 `* text=auto eol=lf`，並執行 `git add --renormalize .` — 這把兩個官方 CSV 由 CRLF 轉成 LF，**改變了它們的位元組，因此改變了 SHA-256**。實測證據：
+
+  | 檔案 | manifest expected | CRLF（正確） | LF（被破壞） |
+  |---|---|---|---|
+  | `city_traffic_flow.csv` | `B31436B5…541D5F2A` | `B31436B5…541D5F2A` ✅ | `94B3B78F…AF30173D` ❌ |
+  | `signaling_crowd_density.csv` | `BD9BC159…E9564073` | `BD9BC159…E9564073` ✅ | `FDCEA7BE…AA6CACAD` ❌ |
+
+  兩個檔案都是 runtime decision source，雜湊不符會觸發 `SOURCE_INTEGRITY_STOP`，**decision pipeline 整條停止**。
+
+- **決策**:
+  1. `中華電信資料集/** -text` — 完全禁用行尾轉換，位元組不做任何修飾。此規則**刻意放在 `.gitattributes` 最後**，因為後者覆蓋前者，確保上方的 `*.json` / `*.pdf` / `*.docx` 規則不會蓋掉這批資料的保護。
+  2. 移除全域 `* text=auto eol=lf`，改為按副檔名限定（`*.ts` / `*.tsx` / `*.js` / `*.json` / `*.md` / `*.yml` / `*.sh` 等），同樣達成 Prettier 一致性目的。
+- **理由**: **不可使用 `text eol=lf` 來「鎖定」雜湊驗證對象。** 該屬性的語意是「這是文字檔，請把它轉成 LF」，對一個以 CRLF 提交的檔案，它會**主動製造**它宣稱要防止的雜湊不符。這不是推論 — 在 `text eol=lf` 生效的狀態下實際觀察到三個症狀：(a) `git status` 永久顯示這兩個檔案為已修改；(b) `git checkout -- "中華電信資料集/"` 無法清除；(c) 切換分支被「local changes would be overwritten」擋住。`-text` 的語意才是「完全不做行尾轉換」，這是雜湊驗證輸入唯一正確的保證。
+- **影響**: 修復後 `git ls-files --eol` 顯示 `i/crlf w/crlf attr/-text`，狀態一致、工作目錄乾淨、切分支不再被擋。`.gitattributes` 內已寫入實測雜湊值與推理過程作為註解，避免重犯。合併至 main 時此檔案會是 add/add 衝突，**應以本版本為準**。
+- **替代方案**:
+  - `中華電信資料集/** binary` → 效果等同（`binary` 是 `-text -diff` 的別名），但會同時關閉 diff，不利於審視資料變更。
+  - 依 LF 內容更新 manifest 的 expected hash → **拒絕**。官方檔案是 SSOT，應該調整我們的工具設定去適應它，而不是改寫官方資料的雜湊紀錄。
+  - 保留全域 `* text=auto eol=lf` 並將官方資料排除 → 可行但脆弱：任何新增的官方資料若未同步加排除規則就會再次被破壞，且失效時症狀離成因很遠、極難追查。
 
 ---
 
