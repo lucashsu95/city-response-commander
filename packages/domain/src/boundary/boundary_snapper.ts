@@ -9,7 +9,7 @@
  * @module domain/boundary/boundary_snapper
  */
 
-import type { EntityScopeResult, Incident } from '@city-commander/shared-schemas';
+import type { EntityScopeResult, Incident, PerimeterAnchor } from '@city-commander/shared-schemas';
 import type { RoadNetworkModel } from '../road_network/road_network_model.js';
 import { intersectionAppearsInLocation } from '../road_network/intersection_text_match.js';
 
@@ -96,4 +96,51 @@ export function checkEntityScope(
     matched_field: 'location_intersection',
     matched_value: winningName,
   };
+}
+
+// ─── Perimeter_Anchor derivation (R4 AC1/AC2/AC6/AC7) ──────
+
+/**
+ * Cache keyed by RoadNetworkModel instance — topology is immutable once
+ * loaded (road_network_model.ts), so the derived anchor set never changes
+ * for a given instance and only needs to be computed once.
+ */
+const perimeterAnchorCache = new WeakMap<RoadNetworkModel, readonly PerimeterAnchor[]>();
+
+/**
+ * Derive every Perimeter_Anchor from road-network topology alone — no
+ * hardcoded anchor IDs (R4 AC1/AC2).
+ *
+ * A segment's `intersections` entry is a Perimeter_Gateway_Intersection when
+ * it does not match any segment's `name` in the network — i.e. it names a
+ * road the official dataset does not itself model, representing an opening
+ * to outside the mapped jurisdiction (Glossary: Perimeter_Gateway_Intersection).
+ *
+ * One PerimeterAnchor is emitted per (segment, gateway_intersection) pair
+ * (R4 AC2). Both fields are always real Road_Whitelist / Intersection_Whitelist
+ * members by construction (R4 AC6/AC7), since they are read directly off the
+ * RoadNetworkModel — never fabricated.
+ */
+export function derivePerimeterAnchors(roadNetwork: RoadNetworkModel): readonly PerimeterAnchor[] {
+  const cached = perimeterAnchorCache.get(roadNetwork);
+  if (cached !== undefined) return cached;
+
+  const segments = roadNetwork.getAllSegments();
+  const segmentNames = new Set(segments.map((segment) => segment.name));
+
+  const anchors: PerimeterAnchor[] = [];
+  for (const segment of segments) {
+    for (const intersectionName of segment.intersections) {
+      if (segmentNames.has(intersectionName)) continue; // not a gateway — resolves to a modeled segment
+      anchors.push({
+        segment_id: segment.segment_id,
+        gateway_intersection: intersectionName,
+        capacity_vph: segment.capacity_vph,
+      });
+    }
+  }
+
+  const frozen = Object.freeze(anchors);
+  perimeterAnchorCache.set(roadNetwork, frozen);
+  return frozen;
 }

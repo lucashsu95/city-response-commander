@@ -83,7 +83,7 @@ Task ID scheme: `TASK-BS-01..TASK-BS-19`, flat and sequential. `CHECKPOINT` line
   - tests_required: `packages/domain/test/unit/boundary_snapper_entity_scope.test.ts` covering each AC; property test P-B2 (pure-function determinism) from design.md §10.
   - done_definition: `checkEntityScope` used with the 3 `live_incidents.json` fixture records produces `IN_SCOPE` for all three (they are official in-network incidents) — captured as a fixture regression test.
 
-- [ ] TASK-BS-05 Implement `derivePerimeterAnchors` (Requirement 4 AC1–AC2)
+- [x] TASK-BS-05 Implement `derivePerimeterAnchors` (Requirement 4 AC1–AC2)
   - objective: Deterministically derive the set of real perimeter gateway nodes from road-network topology alone, with no hardcoded anchor IDs.
   - requirements_covered: R4 (AC1, AC2, AC6, AC7)
   - design_sections: §4.2
