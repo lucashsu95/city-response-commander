@@ -165,17 +165,22 @@ export class DemoBackendStack extends Stack {
     });
 
     // ── HTTP API Gateway ───────────────────────────────────────────────────
+    // CORS allowlist — CloudFront competition frontend + local dev hosts.
+    // The CloudFront URL is injected by the competition deployment script and
+    // must stay in sync with the integrated demo SPA origin.
     const httpApi = new HttpApi(this, 'DemoHttpApi', {
       apiName: 'CityCommanderDemoApi',
       corsPreflight: {
         allowOrigins: [
-          'https://demo.d1uqtrp9qafkl6.amplifyapp.com',
+          'https://d1uh6vh5ux6xaq.cloudfront.net',
+          'http://localhost:3000',
           'http://localhost:5173',
           'http://127.0.0.1:5173',
         ],
         allowMethods: [CorsHttpMethod.GET, CorsHttpMethod.POST, CorsHttpMethod.OPTIONS],
-        allowHeaders: ['content-type'],
+        allowHeaders: ['content-type', 'authorization'],
         allowCredentials: false,
+        maxAge: Duration.hours(1),
       },
     });
 
