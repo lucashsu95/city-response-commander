@@ -298,8 +298,16 @@ export interface WhatIfResponse {
   readonly expected_actions: readonly string[];
   /** ETE preview if applicable */
   readonly ete_preview?: { readonly ete_minutes: number };
-  /** SOP citations */
-  readonly sop_citations: readonly { readonly article_no: number; readonly content: string }[];
+  /**
+   * Verbatim SOP citations with deterministic provenance. `source` distinguishes
+   * a Knowledge Base match from a non-exact S3 fallback citation.
+   */
+  readonly sop_citations: readonly {
+    readonly article_no: number;
+    readonly content: string;
+    readonly source_location: string;
+    readonly source: 'kb' | 's3_fallback';
+  }[];
   /** Stage 4 Bedrock explanation (LLM-writable) */
   readonly explanation_text?: string;
   /** Clarification prompt when status=clarification_required */

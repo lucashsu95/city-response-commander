@@ -63,3 +63,8 @@ venv/
 
 # One-time recovery/scratch artifacts
 fix_utf8/
+
+# Harness Engine (agent infrastructure)
+.opencode/
+docs/handoff-notes/
+boulder.json

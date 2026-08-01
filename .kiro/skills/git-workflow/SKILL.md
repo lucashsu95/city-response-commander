@@ -70,22 +70,31 @@ Use package name for changes within a specific package:
 - `infra`
 - `docs`
 
+### Language Rule
+
+The Conventional Commits **type prefix and scope** (`feat`, `fix`, `docs`, `refactor`, `test`, `chore`, `style`, `perf`, and the `(scope)` part) **stay in English exactly as documented above**. The **description** — and any body/footer prose — must be written in **Traditional Chinese (繁體中文)**.
+
+```
+<type>(<scope>): <繁體中文描述>
+```
+
 ### Description Rules
 
-- Use imperative mood ("add feature" not "added feature")
-- Don't capitalize first letter
-- No period at end
-- Max 72 characters for subject line
+- Use imperative mood (in Chinese, phrase it as a direct action, e.g. "新增" not "新增了")
+- The "don't capitalize first letter" rule only applies to the English type/scope prefix — Chinese has no capitalization concept
+- No period at end — this also applies to Chinese descriptions (no trailing `。`)
+- Max 72 characters for subject line — this is a technical character-count limit; Chinese characters are visually wider, so a shorter character count is fine, but the same 72-character limit still applies
+- The description itself must be in Traditional Chinese (繁體中文)
 
 ### Examples
 
 ```bash
-git commit -m "feat(domain): implement SOP-3 MRT shuttle evacuation"
-git commit -m "fix(domain): correct ETE formula decimal precision"
-git commit -m "docs: update demo scenario with EVT_003"
-git commit -m "refactor(ai-generator): extract multilingual template logic"
-git commit -m "test(domain): add property tests for article2 trigger"
-git commit -m "chore: update TypeScript to 5.5"
+git commit -m "feat(domain): 實作 SOP-3 捷運接駁疏散邏輯"
+git commit -m "fix(domain): 修正 ETE 公式小數精度"
+git commit -m "docs: 更新 demo 情境加入 EVT_003"
+git commit -m "refactor(ai-generator): 抽取多語系模板邏輯"
+git commit -m "test(domain): 新增 article2 觸發條件的 property tests"
+git commit -m "chore: 更新 TypeScript 至 5.5"
 ```
 
 ### Multi-line Commits
@@ -93,11 +102,11 @@ git commit -m "chore: update TypeScript to 5.5"
 For complex changes, add body and footer:
 
 ```bash
-git commit -m "feat(domain): implement affected road strategy (Strategy B)
+git commit -m "feat(domain): 實作受影響道路策略（Strategy B）
 
-- Add AffectedRoadStrategy class
-- Implement downstream segment selection
-- Handle congested road exclusion
+- 新增 AffectedRoadStrategy 類別
+- 實作下游路段選取邏輯
+- 處理壅塞道路排除規則
 
 Closes #42"
 ```
@@ -206,11 +215,11 @@ git checkout -b feat/my-feature
 git push -u origin feat/my-feature
 # Then create PR on GitHub
 
-# Correct: Conventional commit
-git commit -m "feat(domain): implement SOP-3 shuttle route selection"
+# Correct: Conventional commit (English type/scope, Chinese description)
+git commit -m "feat(domain): 實作 SOP-3 接駁路線選取邏輯"
 
 # Correct: Descriptive scope
-git commit -m "test(domain): add property test P16 for SOP-3 OR trigger"
+git commit -m "test(domain): 新增 SOP-3 OR 觸發條件的 property test P16"
 ```
 
 ## Integration with Kiro

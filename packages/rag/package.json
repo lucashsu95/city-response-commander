@@ -7,13 +7,20 @@
   "types": "dist/index.d.ts",
   "scripts": {
     "build": "tsc",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
   },
   "dependencies": {
-    "@city-commander/shared-schemas": "*",
-    "@city-commander/config": "*"
+    "@aws-sdk/client-bedrock-agent-runtime": "^3.1100.0",
+    "@aws-sdk/client-bedrock-runtime": "^3.1100.0",
+    "@aws-sdk/client-s3": "^3.1100.0",
+    "@city-commander/config": "*",
+    "@city-commander/domain": "*",
+    "@city-commander/shared-schemas": "*"
   },
   "devDependencies": {
-    "typescript": "^5.4.0"
+    "fast-check": "^3.19.0",
+    "typescript": "^5.4.0",
+    "vitest": "^1.6.0"
   }
 }

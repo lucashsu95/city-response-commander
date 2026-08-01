@@ -34,10 +34,10 @@ export * from './ete/ete_calculator.js';
 export * from './rule_engine/article_aggregation.js';
 export * from './evidence/evidence_trace_builder.js';
 export * from './rule_engine/evacuation_selector.js';
+export * from './rule_engine/decision_pipeline.js';
 
 export * from './core_hash/canonical_core_hash.js';
 export * from './decision/decision_core_builder.js';
 export * from './monitoring/alert_monitor.js';
 export * from './presentation/traffic_light.js';
-export * from './content/decision_content.js';
 export * from './content/multilingual_template_renderer.js';

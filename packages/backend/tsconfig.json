@@ -8,6 +8,7 @@
   "references": [
     { "path": "../shared-schemas" },
     { "path": "../domain" },
-    { "path": "../config" }
+    { "path": "../config" },
+    { "path": "../rag" }
   ]
 }
