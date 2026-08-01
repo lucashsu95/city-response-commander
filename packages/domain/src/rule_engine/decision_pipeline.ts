@@ -24,6 +24,7 @@ import type {
   Art1Measures,
   ClassificationReasoning,
   EvidenceTrace,
+  GroundingCandidate,
   Incident,
   IncidentAnchor,
   PolicyMetadata,
@@ -31,6 +32,8 @@ import type {
   SegmentClassification,
   Severity,
   SopCitation,
+  SopMatchResult,
+  UniversalPrinciple,
 } from '@city-commander/shared-schemas';
 
 import type { IngestionDataStatus, IngestionResult } from '../ingestion/data_ingestion_service.js';
@@ -41,6 +44,7 @@ import {
 } from '../strategies/policy_strategy_bundle.js';
 import type { AffectedRoadStrategyResult } from '../strategies/affected_road_strategy.js';
 import type { CurrentStationSnapshot } from '../strategies/multilingual_scope_strategy.js';
+import type { RoadNetworkModel } from '../road_network/road_network_model.js';
 import {
   selectLatestCommonExactSnapshot,
   type EteTrafficReading,
@@ -56,6 +60,11 @@ import { selectEvacuation } from './evacuation_selector.js';
 import { aggregateArticles, type ArticleEvaluationSummary } from './article_aggregation.js';
 import { calculateEte, type EteCalculationResult } from '../ete/ete_calculator.js';
 import { buildEvidenceTrace } from '../evidence/evidence_trace_builder.js';
+import {
+  resolveSopMatch,
+  selectGroundingCandidates,
+  UNIVERSAL_DEFENSE_PRINCIPLES,
+} from './universal_defense.js';
 
 // ─── Public Input / Result Types ───────────────────────────
 
@@ -117,6 +126,20 @@ export interface DeterministicDecisionFacts {
   /** Official CMS core text; only SOP-5 produces one deterministically. */
   readonly cms_core_text: string | null;
   readonly policy: PolicyMetadata;
+
+  /**
+   * UARE (Unified Adaptive Reasoning Engine, spec:
+   * .kiro/specs/unified-adaptive-reasoning-engine/). `sop_matched` is a pure
+   * projection of `triggered_articles` (§UARE-R1) — always populated, never
+   * `undefined`, unlike its optional counterpart on `DecisionCore`.
+   */
+  readonly sop_matched: boolean;
+  readonly sop_authority: SopMatchResult['sop_authority'];
+  /** Non-empty only when `sop_matched` is `false` (§UARE-R2). */
+  readonly universal_principles: readonly UniversalPrinciple[];
+  /** Non-empty only when `sop_matched` is `false` and a grounding anchor was resolvable (§UARE-R3, R6). */
+  readonly grounding_candidates: readonly GroundingCandidate[];
+
   readonly provisional: true;
 }
 
@@ -362,6 +385,27 @@ export function runDeterministicDecision(
     applied_formula_articles: appliedFormulaArticles,
   });
 
+  // ─── UARE: SOP-match judgment + grounding candidates when no article triggered ──
+  // (spec: .kiro/specs/unified-adaptive-reasoning-engine/, design.md §3, §5.2, §5.3)
+  const sopMatch = resolveSopMatch(articles.triggered_articles);
+  let universalPrinciples: readonly UniversalPrinciple[] = [];
+  let groundingCandidates: readonly GroundingCandidate[] = [];
+  if (!sopMatch.sop_matched) {
+    universalPrinciples = UNIVERSAL_DEFENSE_PRINCIPLES;
+    const anchorSegmentId = resolveGroundingAnchor(incident, roadNetwork);
+    if (anchorSegmentId !== null && roadNetwork !== undefined) {
+      groundingCandidates = selectGroundingCandidates(
+        anchorSegmentId,
+        roadNetwork,
+        selectSaturation,
+      ).candidates;
+    }
+    // anchorSegmentId === null (neither affected_segment nor affected_road is in
+    // Road_Whitelist) → groundingCandidates stays [] per design.md §5.3; this is
+    // NOT insufficient_data (R6 AC3) — the caller (backend prompt layer) is
+    // expected to fall back to a route-free universal advisory.
+  }
+
   // ─── Evidence trace (deterministic facts only) ──
   const classificationReasoning: ClassificationReasoning[] = classifications
     .filter((classification) => saturationBySegment.has(classification.segment_id))
@@ -417,6 +461,10 @@ export function runDeterministicDecision(
     evidence,
     cms_core_text: cmsCoreText,
     policy: bundle.metadata,
+    sop_matched: sopMatch.sop_matched,
+    sop_authority: sopMatch.sop_authority,
+    universal_principles: universalPrinciples,
+    grounding_candidates: groundingCandidates,
     provisional: true,
   };
 
@@ -442,6 +490,28 @@ function resolveIncident(input: DeterministicDecisionInput): Incident {
     return found;
   }
   throw new Error('runDeterministicDecision requires either `incident` or `event_id`.');
+}
+
+/**
+ * UARE anchor precedence (design.md §5.1): prefer `affected_segment` when it is
+ * in the Road_Whitelist, else `affected_road`, else `null` (no legal anchor —
+ * caller must not call `selectGroundingCandidates`, design.md §5.3).
+ */
+function resolveGroundingAnchor(
+  incident: Incident,
+  roadNetwork: RoadNetworkModel | undefined,
+): string | null {
+  if (roadNetwork === undefined) return null;
+  if (roadNetwork.getSegment(incident.affected_segment) !== undefined) {
+    return incident.affected_segment;
+  }
+  if (
+    incident.affected_road !== undefined &&
+    roadNetwork.getSegment(incident.affected_road) !== undefined
+  ) {
+    return incident.affected_road;
+  }
+  return null;
 }
 
 function groupTraffic(ingestion: IngestionResult): ReadonlyMap<string, TrafficSelectRecord[]> {

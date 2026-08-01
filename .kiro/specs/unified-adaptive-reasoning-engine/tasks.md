@@ -122,7 +122,7 @@ Task ID scheme: `TASK-UARE-01..TASK-UARE-11`, flat and sequential.
 
 ## Phase 2 — Pipeline Wiring
 
-- [ ] TASK-UARE-08 Wire `resolveSopMatch` and `selectGroundingCandidates` into `runDeterministicDecision`
+- [x] TASK-UARE-08 Wire `resolveSopMatch` and `selectGroundingCandidates` into `runDeterministicDecision`
   - objective: Populate the 4 new `DecisionCore` fields from the existing pipeline without altering any pre-existing output.
   - requirements_covered: R1 AC1, R5 AC1–AC2, R6
   - design_sections: §3, §5.2, §5.3, §7
@@ -134,7 +134,10 @@ Task ID scheme: `TASK-UARE-01..TASK-UARE-11`, flat and sequential.
     3. When `sop_matched === true`: set `universal_principles: []`, `grounding_candidates: []` (R5 AC2) — do not call `selectGroundingCandidates` at all (avoids wasted computation and keeps the branch's cost proportional to when it's needed).
     4. Add the 4 fields to the `facts: DeterministicDecisionFacts` / `DecisionCore` object being assembled at decision_pipeline.ts:400+.
   - acceptance_criteria: R1 AC1–AC3; R5 AC1, AC2; R6 AC1, AC3 (no `insufficient_data` triggered by an empty grounding result).
-  - tests_required: extend `packages/domain/test/golden/dome_and_sop6.golden.test.ts` or add a new golden test file asserting the 4 new fields for all 3 official `live_incidents.json` events (all `sop_matched: true`, per R9.1).
+  - tests_required: extended `packages/domain/test/unit/decision_pipeline.test.ts` (not `dome_and_sop6.golden.test.ts`, which doesn't call the facade) — added `sop_matched`/`sop_authority` assertions to all 4 existing golden-reproduction tests (R9.1: 3 official events + DOME), plus 2 new end-to-end tests in a new `describe` block: one unmatched incident with real, capacity-filtered, saturation-ranked `grounding_candidates`, and one R6 no-anchor-resolvable case proving `data_status` stays `'ready'`.
+  - done_definition: `npx vitest run packages/domain/test/unit/decision_pipeline.test.ts` — 7/7 pass. Full `packages/domain` suite: 453 pass (up from 451), same 11 pre-existing unrelated `DataIngestionService` failures. `packages/domain`, `backend`, `ai-generator`, `rag` all typecheck clean.
+  - **implementation note**: unlike `DecisionCore`'s optional UARE fields (TASK-UARE-02), the 4 fields on `DeterministicDecisionFacts` are **required** — this interface is only ever constructed inside `runDeterministicDecision` itself (the sole non-test producer), so there was no legacy-literal blast radius to protect against, and requiring them here means a future edit that forgets to populate one fails to compile instead of silently defaulting. `DeterministicDecisionFacts.sop_authority` is typed as `SopMatchResult['sop_authority']` (indexed access) rather than importing a separate `SopAuthority` type, because `shared-schemas/src/universal_defense.ts` doesn't export one as a standalone name — only inline on `SopMatchResult`.
+  - **scope note**: R9.2's fuller ≥3-unknown-type scenario matrix and the backend-level integration test are TASK-UARE-09's job, not this one; the 2 tests added here exist only to prove the wiring itself is correct end-to-end, on top of the pure-function coverage already in `universal_defense.test.ts`/`p_universal_grounding.test.ts` (TASK-UARE-06/07).
   - done_definition: All existing `decision_pipeline.ts` tests pass unmodified; new fields present and correct on every decision output.
 
 - [ ] TASK-UARE-09 Integration tests: unknown incident types and no-anchor edge case
