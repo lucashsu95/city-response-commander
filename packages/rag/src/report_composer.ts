@@ -282,9 +282,7 @@ function buildTemplateReport(
  */
 function buildCitationsPresentation(citations: readonly SopCitationResult[]): string | null {
   if (citations.length === 0) return null;
-  return citations
-    .map((c) => `第 ${c.article_no} 條 | ${formatCitationLocation(c)}`)
-    .join('\n');
+  return citations.map((c) => `第 ${c.article_no} 條 | ${formatCitationLocation(c)}`).join('\n');
 }
 
 /**
