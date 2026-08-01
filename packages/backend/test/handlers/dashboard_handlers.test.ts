@@ -30,6 +30,7 @@ import {
   createGetTimelineHandler,
 } from '../../src/index.js';
 import type { DashboardPolicyPort, DashboardPorts, HttpGetEvent } from '../../src/index.js';
+import { GetRoadsResponseSchema } from '@city-commander/shared-schemas';
 import type { PolicyMetadata } from '@city-commander/shared-schemas';
 
 const TRACE = 'req-abc-123';
@@ -275,13 +276,15 @@ describe('every dashboard response carries the §12 envelope', () => {
     },
   );
 
-  it.each(handlers)('%s reports insufficient_data as 200, not 404', async (_name, create) => {
+  it.each(handlers)('%s reports insufficient_data as 200, not 404', async (name, create) => {
     const result = await create(createPorts(stopped))(event);
 
     // A STOP-gate failure is a state to render, not a missing resource.
     expect(result.statusCode).toBe(200);
     expect(body(result)).toMatchObject({
-      data_status: 'insufficient_data',
+      // TASK-125 moved /roads to the UPPERCASE published vocabulary. The other
+      // three routes still speak the internal lowercase form.
+      data_status: name === 'roads' ? 'INSUFFICIENT_DATA' : 'insufficient_data',
       stop_reason: 'SHA-256 mismatch: live_incidents.json',
       decision_cutoff_timestamp: null,
     });
@@ -393,30 +396,68 @@ describe('GET /timeline', () => {
 // ─── GET /roads ────────────────────────────────────────────
 
 describe('GET /roads', () => {
-  it('returns the §12 segment shape plus HG-001 provenance', async () => {
+  it('returns the TASK-125 canonical segment shape in snake_case', async () => {
     const result = await createGetRoadsHandler(createPorts())(event);
 
     expect(Object.keys(rows(result, 'segments')[0] ?? {}).sort()).toEqual([
-      'Lane_Status',
-      'Road_Name',
-      'Saturation_Score',
-      'Segment_ID',
       'data_status',
       'exact_match',
+      'is_stale',
+      'lane_status',
       'level',
       'observation_timestamp',
-      'stale',
+      'observation_timestamp_iso',
+      'road_name',
+      'saturation_score',
+      'segment_id',
       'staleness_minutes',
     ]);
   });
 
-  it('selects the row at the replay position, not a later one', async () => {
+  it('satisfies GetRoadsResponseSchema — the single source of shape truth', async () => {
+    // The strongest form of the three-way alignment TASK-125 asks for: the
+    // handler output is validated against the published contract itself, so the
+    // test cannot drift from the schema the way a hand-copied key list can.
     const result = await createGetRoadsHandler(createPorts())(event);
 
-    expect(rows(result, 'segments').find((s) => s.Segment_ID === 'RD_TPE_002')).toMatchObject({
-      Saturation_Score: 0.97,
-      Lane_Status: 'Closed',
-      Road_Name: '光復南路',
+    const parsed = GetRoadsResponseSchema.safeParse(body(result));
+    expect(parsed.success ? [] : parsed.error.issues).toEqual([]);
+    expect(parsed.success).toBe(true);
+  });
+
+  it('satisfies the contract on the STOP-gate path too', async () => {
+    const result = await createGetRoadsHandler(createPorts(stopped))(event);
+
+    const parsed = GetRoadsResponseSchema.safeParse(body(result));
+    expect(parsed.success ? [] : parsed.error.issues).toEqual([]);
+  });
+
+  it('maps the official PascalCase columns onto snake_case', async () => {
+    const result = await createGetRoadsHandler(createPorts())(event);
+
+    // Segment_ID→segment_id, Road_Name→road_name, Saturation_Score→
+    // saturation_score, Lane_Status→lane_status.
+    expect(rows(result, 'segments').find((s) => s.segment_id === 'RD_TPE_002')).toMatchObject({
+      segment_id: 'RD_TPE_002',
+      road_name: '光復南路',
+      saturation_score: 0.97,
+      lane_status: 'Closed',
+    });
+  });
+
+  it('publishes data_status in the UPPERCASE wire vocabulary', async () => {
+    const result = await createGetRoadsHandler(createPorts())(event);
+
+    expect(body(result)).toMatchObject({ data_status: 'READY', insufficient_data: false });
+    expect(rows(result, 'segments')[0]?.data_status).toBe('READY');
+  });
+
+  it('keeps insufficient_data consistent with data_status', async () => {
+    const stoppedResult = await createGetRoadsHandler(createPorts(stopped))(event);
+
+    expect(body(stoppedResult)).toMatchObject({
+      data_status: 'INSUFFICIENT_DATA',
+      insufficient_data: true,
     });
   });
 
@@ -426,29 +467,35 @@ describe('GET /roads', () => {
 
     // The thresholds live in classifySegments; this asserts delegation, not a
     // second copy of the boundary.
-    expect(segments.find((s) => s.Segment_ID === 'RD_TPE_002')?.level).toBe('A');
-    expect(segments.find((s) => s.Segment_ID === 'RD_TPE_004')?.level).toBe('B');
+    expect(segments.find((s) => s.segment_id === 'RD_TPE_002')?.level).toBe('A');
+    expect(segments.find((s) => s.segment_id === 'RD_TPE_004')?.level).toBe('B');
   });
 
   it('grades every segment present in the data, sorted', async () => {
     const result = await createGetRoadsHandler(createPorts())(event);
 
-    expect(rows(result, 'segments').map((s) => s.Segment_ID)).toEqual(['RD_TPE_002', 'RD_TPE_004']);
+    expect(rows(result, 'segments').map((s) => s.segment_id)).toEqual(['RD_TPE_002', 'RD_TPE_004']);
   });
 
-  it('reports an exact-match row as not stale, with the observation timestamp', async () => {
+  it('reports an exact-match row as not stale, with both timestamp spellings', async () => {
     const result = await createGetRoadsHandler(createPorts())(event);
 
-    expect(rows(result, 'segments').find((s) => s.Segment_ID === 'RD_TPE_002')).toMatchObject({
+    expect(rows(result, 'segments').find((s) => s.segment_id === 'RD_TPE_002')).toMatchObject({
+      // Raw official format preserved verbatim (§10.1) so it matches /timeline.
       observation_timestamp: CUTOFF,
       exact_match: true,
       staleness_minutes: 0,
-      stale: false,
-      data_status: 'ready',
+      is_stale: false,
+      data_status: 'READY',
     });
+    // ISO companion for machine consumption, same instant.
+    expect(
+      rows(result, 'segments').find((s) => s.segment_id === 'RD_TPE_002')
+        ?.observation_timestamp_iso,
+    ).toBe(new Date(2026, 4, 20, 22, 10).toISOString());
   });
 
-  it('marks a latest-prior row stale with its own observation timestamp', async () => {
+  it('marks a latest-prior row stale while keeping data_status READY', async () => {
     // RD_TPE_004 has no row at 22:10 here, so Strategy A falls back to 21:10.
     const traffic = trafficRows().filter(
       (row) => !(row.Segment_ID === 'RD_TPE_004' && row.timestamp_raw === CUTOFF),
@@ -457,14 +504,46 @@ describe('GET /roads', () => {
 
     const result = await createGetRoadsHandler(ports)(event);
 
-    // The frontend must not derive this from a literal window: the window is
-    // policy.time_alignment.max_staleness_minutes, which is configuration.
-    expect(rows(result, 'segments').find((s) => s.Segment_ID === 'RD_TPE_004')).toMatchObject({
+    // is_stale=true alongside READY is the whole point: the value is usable AND
+    // old, and the client shows both instead of choosing. The frontend must not
+    // derive this — the window is policy.max_staleness_minutes, configuration.
+    expect(rows(result, 'segments').find((s) => s.segment_id === 'RD_TPE_004')).toMatchObject({
       observation_timestamp: '2026-05-20 21:10',
       exact_match: false,
       staleness_minutes: 60,
-      stale: true,
-      data_status: 'ready',
+      is_stale: true,
+      data_status: 'READY',
+    });
+  });
+
+  it('hoists max_staleness_minutes onto the policy view', async () => {
+    const result = await createGetRoadsHandler(createPorts())(event);
+    const policyView = body(result).policy as Record<string, unknown>;
+
+    expect(policyView.max_staleness_minutes).toBe(60);
+    // The provisional badge fields survive the hoist.
+    expect(policyView).toMatchObject({
+      classification: 'PROVISIONAL_TEAM_POLICY',
+      guidance_id: 'HG-001',
+    });
+  });
+
+  it('aggregates response-level staleness as the worst case', async () => {
+    const traffic = trafficRows().filter(
+      (row) => !(row.Segment_ID === 'RD_TPE_004' && row.timestamp_raw === CUTOFF),
+    );
+    const ports = createPorts({ traffic, trafficTimestamps: instantsFor(traffic) });
+
+    const result = await createGetRoadsHandler(ports)(event);
+
+    // RD_TPE_002 is exact (0 min), RD_TPE_004 is 60 min stale. Reporting the
+    // response as fresh would understate the age of the data being decided on.
+    expect(body(result)).toMatchObject({
+      staleness_minutes: 60,
+      is_stale: true,
+      data_status: 'READY',
+      observation_timestamp: CUTOFF,
+      provenance: { stale: true, staleness_minutes: 60, exact_match: false },
     });
   });
 
@@ -481,20 +560,21 @@ describe('GET /roads', () => {
 
     const result = await createGetRoadsHandler(ports)(event);
     const segments = rows(result, 'segments');
-    const gap = segments.find((s) => s.Segment_ID === 'RD_TPE_002');
+    const gap = segments.find((s) => s.segment_id === 'RD_TPE_002');
 
     // 0.0 renders as free-flowing traffic — the opposite of "unknown".
     expect(gap).toMatchObject({
-      Saturation_Score: null,
+      saturation_score: null,
       level: null,
-      Lane_Status: null,
-      Road_Name: null,
+      lane_status: null,
+      road_name: null,
       observation_timestamp: null,
-      data_status: 'insufficient_data',
-      stale: false,
+      observation_timestamp_iso: null,
+      data_status: 'INSUFFICIENT_DATA',
+      is_stale: false,
     });
     // The healthy segment is unaffected.
-    expect(segments.find((s) => s.Segment_ID === 'RD_TPE_004')?.level).toBe('B');
+    expect(segments.find((s) => s.segment_id === 'RD_TPE_004')?.level).toBe('B');
   });
 
   it('serialises an unmeasurable staleness as null, not as a coerced value', async () => {
@@ -505,6 +585,7 @@ describe('GET /roads', () => {
     // Strategy A returns Infinity when no legal row exists; JSON.stringify would
     // coerce that to null silently, so it is mapped explicitly.
     expect(rows(result, 'segments')[0]?.staleness_minutes).toBeNull();
+    expect(body(result).staleness_minutes).toBeNull();
   });
 
   it('drops surplus rows rather than pairing them with the wrong instant', async () => {

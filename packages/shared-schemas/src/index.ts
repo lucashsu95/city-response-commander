@@ -108,6 +108,25 @@ export type {
   MultilingualAlert,
 } from './api-contracts.js';
 
+// ─── GET /roads canonical contract (TASK-125) ──────────────
+export type {
+  RoadSegmentDTO,
+  RoadsDataStatus,
+  RoadsProvenance,
+  RoadsPolicyView,
+  SchemaIssue,
+  SafeParseResult,
+  RuntimeSchema,
+} from './api-contracts.js';
+
+export {
+  ROADS_DATA_STATUSES,
+  RoadSegmentDTOSchema,
+  GetRoadsResponseSchema,
+  SchemaValidationError,
+  toRoadsDataStatus,
+} from './api-contracts.js';
+
 // ─── Config ────────────────────────────────────────────────
 export type { EnvironmentProfile, ConfigSchema, StrategyConfig } from './config.js';
 

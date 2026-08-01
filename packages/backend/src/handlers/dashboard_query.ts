@@ -54,8 +54,15 @@ import type {
   MultilingualScopeResult,
   PolicyStrategyConfigProvider,
 } from '@city-commander/domain';
-import { SCHEMA_VERSION } from '@city-commander/shared-schemas';
-import type { Incident, PolicyMetadata } from '@city-commander/shared-schemas';
+import { SCHEMA_VERSION, toRoadsDataStatus } from '@city-commander/shared-schemas';
+import type {
+  GetRoadsResponse,
+  Incident,
+  PolicyMetadata,
+  RoadSegmentDTO,
+  RoadsPolicyView,
+  RoadsProvenance,
+} from '@city-commander/shared-schemas';
 
 /** Ingestion port (TASK-019). Synchronous, matching `ingestData`. */
 export interface DashboardIngestionPort {
@@ -195,22 +202,25 @@ export interface TimelineResponse extends ResponseEnvelope {
   readonly current: string | null;
 }
 
-/** One row of `GET /roads`. */
-export interface RoadSegmentView extends SnapshotProvenance {
-  readonly Segment_ID: string;
-  /** Official road name, for labelling. `null` when no legal row exists. */
-  readonly Road_Name: string | null;
-  /** `null` when no legal row exists at the cutoff — never a default. */
-  readonly Saturation_Score: number | null;
-  /** A/B grading from `classifySegments`. `null` means "no level", not "normal". */
-  readonly level: string | null;
-  readonly Lane_Status: string | null;
-}
+/**
+ * One row of `GET /roads`.
+ *
+ * TASK-125: the canonical DTO now lives in `@city-commander/shared-schemas` so
+ * the wire shape has exactly one definition. This alias is kept so existing
+ * imports of `RoadSegmentView` keep resolving.
+ */
+export type RoadSegmentView = RoadSegmentDTO;
 
-/** `GET /roads` — `{segments:[...]}` (§12). */
-export interface RoadsResponse extends ResponseEnvelope {
-  readonly segments: readonly RoadSegmentView[];
-}
+/**
+ * `GET /roads` — the canonical TASK-125 response.
+ *
+ * Note this deliberately does NOT extend {@link ResponseEnvelope}: the roads
+ * contract publishes UPPERCASE `data_status` and adds `insufficient_data`,
+ * `is_stale`, `provenance` and the ISO timestamp companions. `/timeline`,
+ * `/crowd` and `/incidents` still use `ResponseEnvelope` and are unchanged by
+ * this task.
+ */
+export type RoadsResponse = GetRoadsResponse;
 
 /**
  * Station flag names.
@@ -466,10 +476,13 @@ export function queryTimeline(ports: DashboardPorts, traceId: string): TimelineR
  * Grades every segment present in the official data rather than a hard-coded list,
  * so a change in the source cannot silently drop a segment from the view.
  */
-export function queryRoads(ports: DashboardPorts, traceId: string): RoadsResponse {
+export function queryRoads(ports: DashboardPorts, traceId: string): GetRoadsResponse {
   const { ingested, traffic, cutoff, cutoffRaw } = load(ports);
   const base = envelope(traceId, ingested, ports.policy.metadata, cutoffRaw);
-  if (base.data_status !== 'ready' || cutoff === null) return { ...base, segments: [] };
+
+  if (base.data_status !== 'ready' || cutoff === null) {
+    return roadsResponseOf(base, [], null);
+  }
 
   const segmentIds = [...new Set(traffic.map((row) => row.Segment_ID))].sort();
 
@@ -494,21 +507,139 @@ export function queryRoads(ports: DashboardPorts, traceId: string): RoadsRespons
     ]),
   );
 
-  return {
-    ...base,
-    segments: selected.map(({ segmentId, result }) => {
-      const provenance = provenanceOf(result);
-      const row = provenance.data_status === 'ready' ? result.record : null;
+  const segments: RoadSegmentDTO[] = selected.map(({ segmentId, result }) => {
+    const provenance = provenanceOf(result);
+    const usable = provenance.data_status === 'ready';
+    const row = usable ? result.record : null;
 
-      return {
-        ...provenance,
-        Segment_ID: segmentId,
-        Road_Name: row?.Road_Name ?? null,
-        Saturation_Score: row?.Saturation_Score ?? null,
-        level: levelBySegment.get(segmentId) ?? null,
-        Lane_Status: row?.Lane_Status ?? null,
-      };
-    }),
+    return {
+      // Official PascalCase columns mapped to the canonical snake_case contract.
+      segment_id: segmentId,
+      road_name: row?.Road_Name ?? null,
+      saturation_score: row?.Saturation_Score ?? null,
+      lane_status: row?.Lane_Status ?? null,
+      level: levelBySegment.get(segmentId) ?? null,
+      observation_timestamp: provenance.observation_timestamp,
+      observation_timestamp_iso: isoOf(row),
+      staleness_minutes: provenance.staleness_minutes,
+      // Backend staleness verdict. The frontend is forbidden from deriving this:
+      // the window is policy.time_alignment.max_staleness_minutes (§9).
+      is_stale: provenance.stale,
+      exact_match: provenance.exact_match,
+      data_status: toRoadsDataStatus(provenance.data_status),
+    };
+  });
+
+  return roadsResponseOf(base, segments, cutoff);
+}
+
+/** ISO-8601 form of a selected row's normalized instant. */
+function isoOf(row: AlignedTraffic | null): string | null {
+  return row === null ? null : row.timestamp_normalized.toISOString();
+}
+
+/**
+ * Aggregate the segment set into the response-level staleness fields.
+ *
+ * Worst-case by design: `staleness_minutes` is the MAXIMUM across usable
+ * segments and `is_stale` is `true` if ANY of them is stale. Summarising a
+ * response as fresh while it carries a stale segment would understate the age of
+ * the data the operator is deciding against.
+ *
+ * `observation_timestamp` is the NEWEST selected observation, because it answers
+ * "how current is this response at best", which is the pair to the worst-case
+ * staleness above.
+ */
+function aggregateProvenance(segments: readonly RoadSegmentDTO[]): {
+  readonly observation_timestamp: string | null;
+  readonly observation_timestamp_iso: string | null;
+  readonly staleness_minutes: number | null;
+  readonly is_stale: boolean;
+  readonly exact_match: boolean;
+} {
+  const usable = segments.filter((segment) => segment.data_status === 'READY');
+
+  if (usable.length === 0) {
+    return {
+      observation_timestamp: null,
+      observation_timestamp_iso: null,
+      staleness_minutes: null,
+      is_stale: false,
+      exact_match: false,
+    };
+  }
+
+  let newest: RoadSegmentDTO | null = null;
+  let newestMs = -Infinity;
+  let worstStaleness: number | null = null;
+
+  for (const segment of usable) {
+    const iso = segment.observation_timestamp_iso;
+    if (iso !== null) {
+      const ms = Date.parse(iso);
+      if (Number.isFinite(ms) && ms > newestMs) {
+        newestMs = ms;
+        newest = segment;
+      }
+    }
+    const staleness = segment.staleness_minutes;
+    if (staleness !== null && (worstStaleness === null || staleness > worstStaleness)) {
+      worstStaleness = staleness;
+    }
+  }
+
+  return {
+    observation_timestamp: newest?.observation_timestamp ?? null,
+    observation_timestamp_iso: newest?.observation_timestamp_iso ?? null,
+    staleness_minutes: worstStaleness,
+    is_stale: usable.some((segment) => segment.is_stale),
+    exact_match: usable.every((segment) => segment.exact_match),
+  };
+}
+
+/**
+ * Assemble the canonical `GET /roads` response from the shared envelope.
+ *
+ * Kept separate from {@link envelope} so `/timeline`, `/crowd` and `/incidents`
+ * keep their existing §12 envelope untouched while `/roads` publishes the
+ * TASK-125 shape.
+ */
+function roadsResponseOf(
+  base: ResponseEnvelope,
+  segments: readonly RoadSegmentDTO[],
+  cutoff: Date | null,
+): GetRoadsResponse {
+  const dataStatus = toRoadsDataStatus(base.data_status);
+  const aggregate = aggregateProvenance(segments);
+
+  const policy: RoadsPolicyView = {
+    ...base.policy,
+    max_staleness_minutes: base.policy.time_alignment?.max_staleness_minutes ?? null,
+  };
+
+  const provenance: RoadsProvenance = {
+    exact_match: aggregate.exact_match,
+    staleness_minutes: aggregate.staleness_minutes,
+    stale: aggregate.is_stale,
+    data_status: dataStatus,
+  };
+
+  return {
+    schema_version: base.schema_version,
+    trace_id: base.trace_id,
+    data_status: dataStatus,
+    insufficient_data: dataStatus === 'INSUFFICIENT_DATA',
+    ...(base.stop_reason === undefined ? {} : { stop_reason: base.stop_reason }),
+    decision_cutoff_timestamp: base.decision_cutoff_timestamp,
+    decision_cutoff_timestamp_iso: cutoff === null ? null : cutoff.toISOString(),
+    observation_timestamp: aggregate.observation_timestamp,
+    observation_timestamp_iso: aggregate.observation_timestamp_iso,
+    staleness_minutes: aggregate.staleness_minutes,
+    is_stale: aggregate.is_stale,
+    policy,
+    provisional: base.provisional,
+    provenance,
+    segments,
   };
 }
 
