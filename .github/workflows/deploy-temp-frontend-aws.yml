@@ -57,6 +57,17 @@ jobs:
       - name: Build shared schemas
         run: npm run build --workspace packages/shared-schemas
 
+      - name: Build domain and configuration (backend deps)
+        run: |
+          npm run build --workspace packages/domain
+          npm run build --workspace packages/config
+          npm run build --workspace packages/ai-generator
+
+      - name: Build backend packages so esbuild can resolve them
+        run: |
+          npm run build --workspace packages/backend
+          npm run build --workspace packages/rag
+
       - name: Configure AWS credentials through OIDC
         uses: aws-actions/configure-aws-credentials@v4
         with:
