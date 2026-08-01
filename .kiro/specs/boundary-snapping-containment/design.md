@@ -384,7 +384,7 @@ export const CONTAINMENT_PROHIBITED_PATHS: readonly string[] = [
 
 | key | type | required | provisionalDefault | 備註 |
 | --- | --- | --- | --- | --- |
-| `boundary_snapping.max_snap_distance_meters` | number | true | **無**（比照 `orchestration.state_machine_arn` 慣例，缺值即顯式錯誤，不給假值） | Req 5 AC1/AC2 |
+| `boundary_snapping.max_snap_distance_meters` | number | **false**（TASK-BS-02 修正：`required:true` 會違反既有 `config_schema.test.ts`「所有必填項目都要有 `provisionalDefault`」不變量；`required:false`＋無預設值＋由 `Boundary_Snapper` 自身在使用時顯式檢查缺失並報錯，才是與 `orchestration.state_machine_arn` 完全一致的既有模式） | **無** | Req 5 AC1/AC2 |
 | `boundary_snapping.coordinate_path_enabled` | boolean | true | `false` | Req 11 AC2 |
 | `boundary_snapping.anchor_gazetteer_source` | string | false（僅 `coordinate_path_enabled=true` 時必填） | 無 | Req 11 AC3 |
 | `containment.universal_sop_enabled` | boolean | true | `true` | Req 11 AC4/AC5 |
