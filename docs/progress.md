@@ -129,6 +129,7 @@
 | TASK-BS-16：containment prohibited keys ESLint drift guard | Codex | ✅ |
 | TASK-BS-17：Containment_Assembler four-case integration matrix | Codex | ✅ |
 | TASK-BS-18：Boundary_Snapper + Whitelist_Guard property suite（31 tests × 3） | Codex | ✅ |
+| TASK-BS-19：ACC_001 / EVT_002 / EVT_003 assembler golden zero-diff gate | Codex | ✅ |
 
 ---
 

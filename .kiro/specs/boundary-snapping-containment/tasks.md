@@ -296,7 +296,7 @@ Task ID scheme: `TASK-BS-01..TASK-BS-19`, flat and sequential. `CHECKPOINT` line
   - tests_required: (this task IS the test task)
   - done_definition: `npm run test` (domain package) is green and deterministic.
 
-- [ ] TASK-BS-19 No-regression golden diff against existing ACC_001 / EVT_002 / EVT_003 fixtures (Requirement 12 AC7, Requirement 14.9)
+- [x] TASK-BS-19 No-regression golden diff against existing ACC_001 / EVT_002 / EVT_003 fixtures (Requirement 12 AC7, Requirement 14.9)
   - objective: Final release gate — mechanically prove this feature is additive-only for every existing golden scenario before it can be considered complete.
   - requirements_covered: R12 (AC7), R14 (AC9)
   - design_sections: §3.2, §10
