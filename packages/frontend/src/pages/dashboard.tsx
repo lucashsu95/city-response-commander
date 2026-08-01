@@ -18,10 +18,12 @@ import { createApiClient } from '../api/client.js';
 import { CrowdPanel } from '../crowd/crowd_panel.js';
 import { useCrowdSnapshot } from '../crowd/use_crowd_snapshot.js';
 import { AlertPanel } from '../decision/alert_panel.js';
+import { EtePanel } from '../decision/ete_panel.js';
 import { ExplanationChain } from '../decision/explanation_chain.js';
 import { ReportPanel } from '../decision/report_panel.js';
 import { RoutePanel } from '../decision/route_panel.js';
 import { useDecisionReadModel } from '../decision/use_decision_read_model.js';
+import { useEteView } from '../decision/use_ete_view.js';
 import { useEvidenceView } from '../decision/use_evidence_view.js';
 import { useRouteView } from '../decision/use_route_view.js';
 import { DashboardShell } from '../layout/dashboard_shell.js';
@@ -72,6 +74,14 @@ export function DashboardPage(): ReactNode {
   // TASK-130: the route blocks (`excluded_candidates`, `incident_anchor`) are
   // decoded once per core as well.
   const routes = useRouteView(decision.core);
+
+  // TASK-131: `core.ete` carries the authoritative ETE operands (the live
+  // EvidenceTrace has no `formula_substitution` block), decoded once per core.
+  const ete = useEteView(decision.core);
+  // Second authoritative source of an affected road's ETE role (§10.10), when
+  // the backend supplies it. Reused from the TASK-129 decode rather than
+  // re-decoding the evidence block.
+  const eteRoleEvidence = evidence.kind === 'ok' ? evidence.evidence.affectedSetConstruction : null;
 
   // FIX 4: `timeline` is a fresh object every render (its state is spread
   // into a new object alongside its stable methods each time), so depending
@@ -163,6 +173,12 @@ export function DashboardPage(): ReactNode {
           <ReportPanel decision={decision} onRetry={decision.refresh} />
           <AlertPanel decision={decision} onRetry={decision.refresh} />
           <RoutePanel decision={decision} routes={routes} onRetry={decision.refresh} />
+          <EtePanel
+            decision={decision}
+            ete={ete}
+            roleEvidence={eteRoleEvidence}
+            onRetry={decision.refresh}
+          />
           <ExplanationChain
             decision={decision}
             evidence={evidence}

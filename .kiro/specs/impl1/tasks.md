@@ -3282,7 +3282,7 @@ CHECKPOINT G (not a task): Ensure enrichment path + §9 boundary hold, and Bedro
   - competition_quality_floor: Primary/secondary/excluded routes each with a non-empty exclusion reason; provisional badge where policy-dependent (Strategy D); `manual_confirmation_required` flow shown when the anchor is unresolved (no fabricated ranking).
   - demo_or_evidence_output: Route panel showing primary RD_TPE_004 / secondary RD_TPE_005 / excluded reasons + provisional badge (ACC_001).
 
-- [ ] TASK-131 Implement ETE display + provisional markers
+- [x] TASK-131 Implement ETE display + provisional markers
   - objective: Render the ETE value, full calculation basis, timing and affected-set evidence, `formula_applicability`, and organizer-guidance provenance without presenting the selected policy as an OFFICIAL_SOP-mandated unique algorithm (§16, R12).
   - requirements_covered: REQ-009, REQ-020, R12
   - design_sections: §16, §10.9, §11.4
