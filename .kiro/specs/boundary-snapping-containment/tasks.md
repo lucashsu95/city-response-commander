@@ -132,7 +132,7 @@ Task ID scheme: `TASK-BS-01..TASK-BS-19`, flat and sequential. `CHECKPOINT` line
 
 ## Phase 2 — Sop_Coverage_Resolver & Whitelist_Guard (Layer 1)
 
-- [ ] TASK-BS-08 Implement `Sop_Coverage_Resolver` and `DEFAULT_UNIVERSAL_SOP` (Requirement 6)
+- [x] TASK-BS-08 Implement `Sop_Coverage_Resolver` and `DEFAULT_UNIVERSAL_SOP` (Requirement 6)
   - objective: Deterministically decide whether an incident's `type` maps to an official SOP article or must fall back to the system-default universal containment principles, without ever producing a refusal.
   - requirements_covered: R6
   - design_sections: §5

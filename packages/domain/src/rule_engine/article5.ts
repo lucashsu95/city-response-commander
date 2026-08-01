@@ -18,13 +18,20 @@ export interface Article5Result {
   readonly manual_command_actions: readonly string[];
 }
 
+/**
+ * SOP-5's description-text trigger keywords, per emergency_traffic_sop.txt
+ * §5: "觸發：事件 type = 'Power_Failure'，或描述含「號誌失效 / 故障」".
+ * Exported so Sop_Coverage_Resolver (spec: boundary-snapping-containment,
+ * R6 AC3) can reuse the exact same textual-trigger check instead of
+ * duplicating these keywords in a second location.
+ */
+export function articleFiveDescriptionTrigger(description: string): boolean {
+  return description.includes('號誌失效') || description.includes('故障');
+}
+
 /** SOP-5 is triggered by the official type OR either Chinese failure keyword. */
 export function isArticle5Triggered(incident: Incident): boolean {
-  return (
-    incident.type === IncidentType.Power_Failure ||
-    incident.description.includes('號誌失效') ||
-    incident.description.includes('故障')
-  );
+  return incident.type === IncidentType.Power_Failure || articleFiveDescriptionTrigger(incident.description);
 }
 
 export function evaluateArticle5(input: Article5Input): Article5Result {

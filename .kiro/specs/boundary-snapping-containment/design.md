@@ -271,11 +271,22 @@ export const DEFAULT_UNIVERSAL_SOP: readonly UniversalPrinciple[] = [
 export function resolveSopCoverage(
   incidentType: string,
   incidentDescription: string,
-  sopArticleTable: SopTypeToArticleTable, // 由 emergency_traffic_sop.txt 條文回溯之對照表
 ): SopCoverageResult;
 ```
 
-對照表內容需可回溯到 `emergency_traffic_sop.txt` 的 7 條條文（Req 6 AC1）——沿用既有 `ingestion.sopArticles`（`sop_loader.ts` 已解析的條文 chunk），不重新解析 SOP 文字。`principle_id` 與官方條號欄位（`sop_citations[].article_no`）分屬不同欄位、不得混用（Req 6 AC6）。
+> **實作期修正（TASK-BS-08）**：原規劃的 `sopArticleTable` 參數已移除。`ingestion.sopArticles`（`sop_loader.ts` 已解析的條文 chunk）只以 `article_no` 為鍵存放條文標題與原文，並不記錄「哪個 `incident.type` 對應哪個條號」——這個對映本來就不是可從 SOP 文字結構解析出來的資料，而是需要人工判讀 7 條條文內容後撰寫的知識，因此改為在 `sop_coverage_resolver.ts` 內以常數表 `TYPE_TO_ARTICLE_TABLE` 直接寫死並附上條文出處註解，而非以執行期參數傳入形同虛設的表格。
+>
+> 對照表內容需可回溯到 `emergency_traffic_sop.txt` 的 7 條條文（Req 6 AC1），並與既有 `.kiro/specs/impl1/tasks.md` 的三個 golden walkthrough 交叉核對：
+>
+> | `incident.type` | 對應條號 | 依據 |
+> | --- | --- | --- |
+> | `Road_Collapse_Accident` | 2 | §2「車禍與路障應變」條件三「`affected_segment` 以 RD_ 開頭」；golden ACC_001 |
+> | `Crowd_Surge_Injury` | 3 | §3「捷運與接駁分流」；golden EVT_002（TASK-054 標題即為 "SOP-3 evaluation, must-compute"） |
+> | `Power_Failure` | 5 | §5「號誌故障應變」明文以 `type = "Power_Failure"` 為觸發條件之一；golden EVT_003 |
+>
+> 條文 1（適用全 15 路段，非因特定事件觸發）、3/4/6（純由 `BS_` 基地台數值門檻觸發，非由 `incident.type` 決定）、7（ETE 公式，非「條號比對」性質）不列入此對照表。事件 `description` 的文字觸發後備檢查僅適用於條文 5（唯一在 SOP 文字中寫明「或描述含...」的條文），重用既有 `article5.ts` 抽出的 `articleFiveDescriptionTrigger`，避免重複定義關鍵字字串。
+>
+> `principle_id` 與官方條號欄位（`sop_citations[].article_no`）分屬不同欄位、不得混用（Req 6 AC6）。
 
 ---
 
