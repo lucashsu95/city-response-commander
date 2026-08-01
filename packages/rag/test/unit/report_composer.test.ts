@@ -254,7 +254,32 @@ describe('composeReport', () => {
     const item = (client.conditionalPut as ReturnType<typeof vi.fn>).mock
       .calls[0]?.[0] as NarrativeItem;
     const payload = item.payload as { citations_presentation: string };
+    expect(payload.citations_presentation).toContain('s3://bucket/sop/article-2.json');
     expect(payload.citations_presentation).not.toContain('類比引用');
+  });
+
+  it('Bedrock success + Bedrock-supplied citations_presentation → payload uses deterministic value, not Bedrock text', async () => {
+    const client = committedClient();
+    const json = JSON.stringify({
+      report_text: '交控中心建議書內容',
+      citations_presentation: 'BEDROCK_WROTE_THIS_WRONG_TEXT_NO_MARKER',
+    });
+    const result = await composeReport(
+      makeInput({
+        citations: SAMPLE_S3_FALLBACK_CITATIONS,
+        narrativeClient: client,
+        bedrockInvoker: makeBedrockSuccess(json),
+      }),
+    );
+    if (result.outcome !== 'failed') {
+      expect(result.text_source).toBe('bedrock');
+    }
+    const item = (client.conditionalPut as ReturnType<typeof vi.fn>).mock
+      .calls[0]?.[0] as NarrativeItem;
+    const payload = item.payload as { citations_presentation: string };
+    expect(payload.citations_presentation).not.toBe('BEDROCK_WROTE_THIS_WRONG_TEXT_NO_MARKER');
+    expect(payload.citations_presentation).toContain('s3://bucket/sop/article-2.json');
+    expect(payload.citations_presentation).toContain('類比引用');
   });
 });
 

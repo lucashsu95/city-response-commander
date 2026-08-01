@@ -3,7 +3,7 @@
  *
  * 職責（§10.11b, §14.3, competition_quality_floor）：
  * - 讀取 DecisionCore 決定性事實（read-only）+ SOP citations
- * - 組裝 prompt → invoke Bedrock → 產生 report_text / cms_explanation_text / citations_presentation
+ * - 組裝 prompt → invoke Bedrock → 產生 report_text / cms_explanation_text
  * - 透過 SchemaValidator 確保 LLM 只填文字欄位；`cms_core_text` 絕不可被修改
  * - Bedrock 失敗或 SchemaValidator 拒絕（含 core field overwrite 嘗試）→ template fallback（§21.3）
  * - 呼叫 `putNarrative` 寫入 REPORT item（`attribute_not_exists(decision_id)` conditional Put）
@@ -12,8 +12,11 @@
  * 界線（§9）：
  * - ReportComposer 不計算任何數值、不判斷 SOP 觸發、不選路
  * - 唯一寫入目標是 DecisionNarrativeTable 的 REPORT item
- * - LLM 只能寫 `report_text`、`cms_explanation_text`、`citations_presentation`
+ * - LLM 只能寫 `report_text`、`cms_explanation_text`
  * - `cms_core_text` 永遠不會出現在 REPORT payload（它屬於 DecisionCore，LLM-prohibited）
+ * - `citations_presentation` 是 citation 來源事實（source_location + s3_fallback 類比
+ *   引用標記）的呈現，永遠由 `citations` 陣列決定性推導（`buildCitationsPresentation`），
+ *   Bedrock 即使回傳此欄位也會被忽略，不採用其原始文字
  *
  * @module rag/report_composer
  */
@@ -128,10 +131,6 @@ export async function composeReport(input: ReportComposerInput): Promise<ReportC
         ...(validation.fields['cms_explanation_text'] !== undefined && {
           cms_explanation_text: validation.fields['cms_explanation_text'],
         }),
-        // citations_presentation 僅在 Bedrock 有提供時才寫入，避免空字串語意混淆
-        ...(validation.fields['citations_presentation'] !== undefined && {
-          citations_presentation: validation.fields['citations_presentation'],
-        }),
       };
       textSource = 'bedrock';
     } else {
@@ -143,6 +142,18 @@ export async function composeReport(input: ReportComposerInput): Promise<ReportC
     // Bedrock 失敗（timeout / model_not_supported 等） → template
     reportPayload = buildTemplateReport(core, citations);
     textSource = 'template';
+  }
+
+  // citations_presentation 是 citation source 的決定性事實呈現（來源位置 + s3_fallback
+  // 類比引用標記），不論 report_text / cms_explanation_text 來自 Bedrock 或 template，
+  // 一律由 citations 陣列決定性推導；絕不採用 Bedrock 自行填寫的 citations_presentation
+  // 原始文字（LLM 不得改動 citation 來源事實）。
+  const citationsPresentation = buildCitationsPresentation(citations);
+  if (citationsPresentation !== null) {
+    reportPayload = {
+      ...reportPayload,
+      citations_presentation: citationsPresentation,
+    };
   }
 
   // ── 4. putNarrative → REPORT item conditional Put ────────────────────────
@@ -231,13 +242,12 @@ ${citationLines || '  （無引用）'}
 請回傳 JSON 物件，只包含以下欄位：
 - report_text：完整建議書文字（繁體中文，含事件辨識、分級依據、路線建議、號誌調整、跨系統協調）
 - cms_explanation_text（選填）：補充 CMS 說明（不可改動 cms_core_text 的道路名稱或 ETE 數值）
-- citations_presentation（選填）：SOP 引用格式化呈現
 
 禁止事項：
 - 不可改動任何數值（ETE、飽和度、容量等）
 - 不可更改路線選擇結果
 - 不可虛構 SOP 條款或資料
-- 不可回傳上述三個欄位以外的任何欄位`;
+- 不可回傳上述兩個欄位以外的任何欄位（SOP 引用格式化呈現由系統決定性產生，不由你填寫）`;
 }
 
 // ─── Template fallback ────────────────────────────────────────────────────────
@@ -247,27 +257,34 @@ ${citationLines || '  （無引用）'}
  *
  * 當 Bedrock 失敗或 SchemaValidator 拒絕時使用。
  * 只插入決定性事實，不虛構任何內容。
- * `citations_presentation` 僅在有 citations 時寫入，避免空字串語意混淆。
+ * `citations_presentation` 由呼叫端（composeReport）統一附加。
  */
 function buildTemplateReport(
   core: DecisionCore,
   citations: readonly SopCitationResult[],
 ): ReportPayload {
-  const payload: ReportPayload = {
+  return {
     type: 'REPORT',
     report_text: buildFallbackReportText(core, citations),
   };
+}
 
-  if (citations.length > 0) {
-    return {
-      ...payload,
-      citations_presentation: citations
-        .map((c) => `第 ${c.article_no} 條 | ${formatCitationLocation(c)}`)
-        .join('\n'),
-    };
-  }
-
-  return payload;
+/**
+ * 決定性推導 `citations_presentation`（citation 來源事實的呈現格式）。
+ *
+ * `citations_presentation` 是 citation source 的決定性事實（來源位置 + s3_fallback
+ * 類比引用標記），必須永遠由 `citations` 陣列推導，絕不採用 Bedrock 自行填寫的文字
+ * —— 否則 Bedrock 可能省略 `source_location` 或「（類比引用，非精準比對）」標記，
+ * 使 citation 溯源失去意義。
+ *
+ * 僅在有 citations 時回傳文字，避免空字串語意混淆；無 citations 時回傳 `null`，
+ * 呼叫端應省略此欄位。
+ */
+function buildCitationsPresentation(citations: readonly SopCitationResult[]): string | null {
+  if (citations.length === 0) return null;
+  return citations
+    .map((c) => `第 ${c.article_no} 條 | ${formatCitationLocation(c)}`)
+    .join('\n');
 }
 
 /**
