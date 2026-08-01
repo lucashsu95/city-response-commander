@@ -30,16 +30,13 @@ function bashCompatiblePath(path: string): string {
 function verify(directory: string, manifest: string): string {
   return execFileSync(
     'bash',
-    [
-      verifier,
-      '--manifest-test-only',
-      bashCompatiblePath(manifest),
-      bashCompatiblePath(directory),
-    ], {
-    cwd: root,
-    encoding: 'utf8',
-    env: { ...process.env, VERIFY_SOURCES_TEST_MANIFEST: '1' },
-  });
+    [verifier, '--manifest-test-only', bashCompatiblePath(manifest), bashCompatiblePath(directory)],
+    {
+      cwd: root,
+      encoding: 'utf8',
+      env: { ...process.env, VERIFY_SOURCES_TEST_MANIFEST: '1' },
+    },
+  );
 }
 
 afterEach(() => {
