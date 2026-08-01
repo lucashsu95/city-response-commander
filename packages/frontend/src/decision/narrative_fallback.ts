@@ -32,6 +32,7 @@
  */
 
 import type { DecisionCoreView } from './decision_read_model.js';
+import type { EvidenceTraceView } from './evidence_model.js';
 
 /** Languages this module can produce a deterministic template for. */
 export type FallbackLanguage = 'zh' | 'en';
@@ -213,5 +214,61 @@ export function buildReportTemplate(core: DecisionCoreView): FallbackTemplate {
   omitted.push(...delay.omitted);
 
   const body = joinClauses(clauses, '；');
+  return { text: body === null ? null : `${body}。`, omittedFields: omitted };
+}
+
+/**
+ * Builds the deterministic explanation template (§21.3, R15) used when the
+ * `EXPLANATION` narrative has not been committed yet.
+ *
+ * Added by TASK-129 alongside the report/alert templates so all three §21.3
+ * fallbacks stay in one place. Same three rules apply: substitution only, a
+ * missing fact drops its clause and is disclosed, nothing is computed. In
+ * particular the grading conclusions and exclusion reasons are quoted from
+ * `EvidenceTrace` — the template never re-derives a level from the value beside
+ * it.
+ */
+export function buildExplanationTemplate(
+  core: DecisionCoreView,
+  evidence: EvidenceTraceView,
+): FallbackTemplate {
+  const omitted: string[] = [];
+  const clauses: string[] = [];
+
+  if (core.triggeredArticles.length > 0) {
+    clauses.push(`依 SOP 第 ${core.triggeredArticles.join('、')} 條判定`);
+  } else {
+    omitted.push('triggered_articles');
+  }
+
+  if (evidence.classificationReasoning.length > 0) {
+    const gradings = evidence.classificationReasoning.map((row) => {
+      const value = row.value === null ? '（無數值）' : String(row.value);
+      const threshold = row.threshold === null ? '（無門檻說明）' : row.threshold;
+      const conclusion = row.conclusion === null ? '（無結論）' : row.conclusion;
+      return `${row.segmentId} 飽和度 ${value}（門檻 ${threshold}）→ ${conclusion}`;
+    });
+    clauses.push(gradings.join('；'));
+  } else {
+    omitted.push('evidence.classification_reasoning');
+  }
+
+  if (evidence.excludedRoutes.length > 0) {
+    const exclusions = evidence.excludedRoutes.map(
+      (row) => `${row.segmentId}：${row.reason ?? '（後端未提供排除理由）'}`,
+    );
+    clauses.push(`排除候選 — ${exclusions.join('；')}`);
+  }
+
+  if (evidence.sopCitations.length > 0) {
+    const articles = [...new Set(evidence.sopCitations.map((citation) => citation.articleNo))].sort(
+      (left, right) => left - right,
+    );
+    clauses.push(`引用條款第 ${articles.join('、')} 條`);
+  } else {
+    omitted.push('evidence.sop_citations');
+  }
+
+  const body = joinClauses(clauses, '。');
   return { text: body === null ? null : `${body}。`, omittedFields: omitted };
 }

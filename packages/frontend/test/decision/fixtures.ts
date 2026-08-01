@@ -79,6 +79,65 @@ export function wirePolicy(overrides: WireRecord = {}): WireRecord {
   };
 }
 
+export function wireEvidence(overrides: WireRecord = {}): WireRecord {
+  return {
+    decision_id: 'dec-acc001',
+    classification_reasoning: [
+      {
+        segment_id: 'RD_TPE_002',
+        value: 1.0,
+        threshold: '>= 0.95',
+        conclusion: 'A',
+      },
+      {
+        segment_id: 'RD_TPE_004',
+        value: 0.78,
+        threshold: '0.85 <= score < 0.95',
+        conclusion: 'normal',
+      },
+    ],
+    excluded_routes: [
+      { segment_id: 'RD_TPE_008', reason: 'capacity_vph 600 < 1000' },
+      { segment_id: 'RD_TPE_006', reason: '不在 RD_TPE_002 的 intersections（非直接相交）' },
+    ],
+    sop_citations: [
+      {
+        article_no: 1,
+        source_location: 's3://sop/emergency_traffic_sop.txt#article-1',
+        content: '第 1 條：壅塞分級與應變措施。',
+        score: 0.94,
+      },
+      {
+        article_no: 2,
+        source_location: 's3://sop/emergency_traffic_sop.txt#article-2',
+        content: '第 2 條：車禍與路障主疏散路徑。',
+        score: 0.91,
+      },
+      {
+        article_no: 7,
+        source_location: 's3://sop/emergency_traffic_sop.txt#article-7',
+        content: '第 7 條：ETE 計算公式。',
+        score: 0.88,
+      },
+    ],
+    data_points: [
+      {
+        source: 'city_traffic_flow.csv',
+        field: 'Saturation_Score',
+        value: 1.0,
+        timestamp: '2026-05-20 22:00',
+      },
+      {
+        source: 'live_incidents.json',
+        field: 'severity',
+        value: 'Critical',
+        timestamp: '2026-05-20 22:10',
+      },
+    ],
+    ...overrides,
+  };
+}
+
 export function wireCore(overrides: WireRecord = {}): WireRecord {
   return {
     decision_id: 'dec-acc001',
@@ -111,13 +170,7 @@ export function wireCore(overrides: WireRecord = {}): WireRecord {
     excluded_candidates: [],
     ete: wireEte(),
     multilingual_required: true,
-    evidence: {
-      decision_id: 'dec-acc001',
-      classification_reasoning: [],
-      excluded_routes: [],
-      sop_citations: [],
-      data_points: [],
-    },
+    evidence: wireEvidence(),
     policy: wirePolicy(),
     cms_core_text: 'RD_TPE_002 封閉，請改道 RD_TPE_004，預計延誤 78.6 分鐘',
     provisional: true,

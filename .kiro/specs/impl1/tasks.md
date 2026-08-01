@@ -3232,7 +3232,7 @@ CHECKPOINT G (not a task): Ensure enrichment path + §9 boundary hold, and Bedro
   - competition_quality_floor: Admin-only injection with an explicit command-confirmation step before POST; renders 202 / 503 (start_failed) / 409 (non-retryable CORE_IDENTITY_CONFLICT) outcomes distinctly; loading/error states; no placeholder.
   - demo_or_evidence_output: Injection flow with confirmation + correct outcome rendering for 202/503/409.
 
-- [ ] TASK-129 Implement explanation-chain display (EvidenceTrace + citations)
+- [x] TASK-129 Implement explanation-chain display (EvidenceTrace + citations)
   - objective: Render the reasoning chain (classification reasoning + data points + exclusion reasons + SOP citations) from the read model (§16, R15, P26/P27).
   - requirements_covered: REQ-008, R15
   - design_sections: §16, §10.10, §22.1 (P26/P27)
