@@ -20,8 +20,10 @@ import { useCrowdSnapshot } from '../crowd/use_crowd_snapshot.js';
 import { AlertPanel } from '../decision/alert_panel.js';
 import { ExplanationChain } from '../decision/explanation_chain.js';
 import { ReportPanel } from '../decision/report_panel.js';
+import { RoutePanel } from '../decision/route_panel.js';
 import { useDecisionReadModel } from '../decision/use_decision_read_model.js';
 import { useEvidenceView } from '../decision/use_evidence_view.js';
+import { useRouteView } from '../decision/use_route_view.js';
 import { DashboardShell } from '../layout/dashboard_shell.js';
 import { useRealtimeConnection } from '../realtime/use_realtime.js';
 import type { PollingCycleResult } from '../realtime/polling_fallback.js';
@@ -66,6 +68,10 @@ export function DashboardPage(): ReactNode {
 
   // TASK-129: `core.evidence` is decoded once per core, not once per render.
   const evidence = useEvidenceView(decision.core);
+
+  // TASK-130: the route blocks (`excluded_candidates`, `incident_anchor`) are
+  // decoded once per core as well.
+  const routes = useRouteView(decision.core);
 
   // FIX 4: `timeline` is a fresh object every render (its state is spread
   // into a new object alongside its stable methods each time), so depending
@@ -156,6 +162,7 @@ export function DashboardPage(): ReactNode {
         <>
           <ReportPanel decision={decision} onRetry={decision.refresh} />
           <AlertPanel decision={decision} onRetry={decision.refresh} />
+          <RoutePanel decision={decision} routes={routes} onRetry={decision.refresh} />
           <ExplanationChain
             decision={decision}
             evidence={evidence}

@@ -3257,7 +3257,7 @@ CHECKPOINT G (not a task): Ensure enrichment path + §9 boundary hold, and Bedro
   - competition_quality_floor: EvidenceTrace viewing (grading reasoning + data points) AND SOP citation viewing (art.1/2/7 with source location) AND excluded-route reasons; empty/loading states; no placeholder panel.
   - demo_or_evidence_output: Reasoning panel for ACC_001 showing why A-level and why alternates excluded, with citations {1,2,7}.
 
-- [ ] TASK-130 Implement route display (primary/secondary/excluded reasons)
+- [x] TASK-130 Implement route display (primary/secondary/excluded reasons)
   - objective: Render primary/secondary evacuation and excluded candidates with reasons, marking provisional route facts (§16, R6/R13).
   - requirements_covered: REQ-013, REQ-014, R6, R13
   - design_sections: §16, §10.8, §10.12

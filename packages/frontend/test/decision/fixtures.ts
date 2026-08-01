@@ -79,6 +79,41 @@ export function wirePolicy(overrides: WireRecord = {}): WireRecord {
   };
 }
 
+/**
+ * One `excluded_candidates[]` entry in the live `RouteCandidate` wire shape
+ * (§10.8). `RD_TPE_008` is the ACC_001 capacity failure.
+ */
+export function wireRouteCandidate(overrides: WireRecord = {}): WireRecord {
+  return {
+    segment_id: 'RD_TPE_008',
+    capacity_vph: 600,
+    passes_capacity: false,
+    is_direct_intersection: true,
+    upstream_or_downstream: 'upstream',
+    saturation_at_snapshot: 0.32,
+    role: 'excluded',
+    exclusion_reason: 'capacity_vph 600 < 1000',
+    ...overrides,
+  };
+}
+
+/** `incident_anchor` in the live wire shape (§10.8a); resolved by default. */
+export function wireIncidentAnchor(overrides: WireRecord = {}): WireRecord {
+  return {
+    affected_road: 'RD_TPE_002',
+    anchor_intersection: '忠孝東路四段',
+    anchor_index: 1,
+    travel_direction: '南下',
+    position_relative_to_intersection: 'south',
+    resolution_confidence: 'high',
+    source_evidence: "location='光復南路與忠孝東路口南側'",
+    manual_confirmation_required: false,
+    unranked_direct_intersections: [],
+    provisional: true,
+    ...overrides,
+  };
+}
+
 export function wireEvidence(overrides: WireRecord = {}): WireRecord {
   return {
     decision_id: 'dec-acc001',
