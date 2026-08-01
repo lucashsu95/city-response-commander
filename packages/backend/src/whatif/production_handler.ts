@@ -12,15 +12,9 @@
  * @module backend/whatif/production_handler
  */
 
-import type {
-  APIGatewayProxyEventV2,
-  APIGatewayProxyResultV2,
-} from 'aws-lambda';
+import type { APIGatewayProxyEventV2, APIGatewayProxyResultV2 } from 'aws-lambda';
 
-import {
-  ingestData,
-  type DataSourceProvider,
-} from '@city-commander/domain';
+import { ingestData, type DataSourceProvider } from '@city-commander/domain';
 
 import type { SopRetriever } from '@city-commander/rag';
 

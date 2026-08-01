@@ -32,11 +32,7 @@
  */
 
 import type { APIGatewayProxyEventV2 } from 'aws-lambda';
-import type {
-  Incident,
-  RawCrowdRecord,
-  RawTrafficRecord,
-} from '@city-commander/shared-schemas';
+import type { Incident, RawCrowdRecord, RawTrafficRecord } from '@city-commander/shared-schemas';
 import {
   IncidentStatus,
   IncidentType,
@@ -120,9 +116,7 @@ export class ProductionRuleEngineWhatIfFacade implements RuleEngineWhatIfFacade 
     // never silently serves unverified data.
     const ingestion = ingestData(provider);
     if (ingestion.data_status !== 'ready') {
-      throw new Error(
-        `What-if baseline ingestion failed: ${ingestion.stop_reason ?? 'unknown'}`,
-      );
+      throw new Error(`What-if baseline ingestion failed: ${ingestion.stop_reason ?? 'unknown'}`);
     }
     this.snapshot = Object.freeze({
       ingestion,
@@ -160,10 +154,7 @@ export class ProductionRuleEngineWhatIfFacade implements RuleEngineWhatIfFacade 
 
     // 3. Build a synthetic incident that points to the requested entity so
     //    the deterministic pipeline runs end-to-end.
-    const incident = synthesizeScenarioIncident(
-      input.assumptions,
-      clonedIngestion,
-    );
+    const incident = synthesizeScenarioIncident(input.assumptions, clonedIngestion);
 
     // 4. Re-run the full deterministic decision pipeline.
     const result = runDeterministicDecision({
@@ -218,9 +209,7 @@ function buildEntityCatalog(ingestion: IngestionResult): LoadedEntityCatalog {
 
 // ─── Helpers: assumption application ─────────────────────────────────
 
-function buildModificationMap(
-  assumptions: readonly WhatIfAssumption[],
-): EntityModificationMap {
+function buildModificationMap(assumptions: readonly WhatIfAssumption[]): EntityModificationMap {
   const result = new Map<string, Map<ModifiableField, number>>();
   for (const a of assumptions) {
     const field = a.field as ModifiableField;
@@ -234,10 +223,7 @@ function buildModificationMap(
   return result;
 }
 
-function applyModificationsToCrowd(
-  ingestion: IngestionResult,
-  mods: EntityModificationMap,
-): void {
+function applyModificationsToCrowd(ingestion: IngestionResult, mods: EntityModificationMap): void {
   const crowd = ingestion.crowd as unknown as MutableCrowdRecord[] | undefined;
   if (crowd === undefined) return;
 
@@ -275,11 +261,7 @@ function applyModificationsToTraffic(
   }
 }
 
-function assignCrowdField(
-  record: MutableCrowdRecord,
-  field: ModifiableField,
-  value: number,
-): void {
+function assignCrowdField(record: MutableCrowdRecord, field: ModifiableField, value: number): void {
   switch (field) {
     case 'User_Count':
       record.User_Count = value;
@@ -333,8 +315,7 @@ function synthesizeScenarioIncident(
 
   if (targetEntity === undefined) {
     const stations = ingestion.crowd ?? [];
-    targetEntity =
-      stations.length > 0 ? (stations[0] as RawCrowdRecord).BS_ID : 'BS_MRT_BL17';
+    targetEntity = stations.length > 0 ? (stations[0] as RawCrowdRecord).BS_ID : 'BS_MRT_BL17';
   }
 
   const isBs = targetEntity.startsWith(BASE_STATION_PREFIX);

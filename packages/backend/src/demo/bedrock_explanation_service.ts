@@ -47,7 +47,12 @@ export class BedrockExplanationError extends Error {
   public readonly code: string;
   public readonly aws_request_id: string | null;
   public readonly cause?: unknown;
-  constructor(code: string, message: string, aws_request_id: string | null = null, cause?: unknown) {
+  constructor(
+    code: string,
+    message: string,
+    aws_request_id: string | null = null,
+    cause?: unknown,
+  ) {
     super(message);
     this.name = 'BedrockExplanationError';
     this.code = code;
@@ -146,9 +151,15 @@ export async function generateExplanation(
     });
   } catch (e) {
     const latency = Date.now() - t0;
-    const code = (e as { name?: string; $metadata?: { requestId?: string } }).name ?? 'CLIENT_ERROR';
+    const code =
+      (e as { name?: string; $metadata?: { requestId?: string } }).name ?? 'CLIENT_ERROR';
     const awsReqId = (e as { $metadata?: { requestId?: string } }).$metadata?.requestId ?? null;
-    throw new BedrockExplanationError(code, `Bedrock invoke failed: ${(e as Error).message ?? code}`, awsReqId, e);
+    throw new BedrockExplanationError(
+      code,
+      `Bedrock invoke failed: ${(e as Error).message ?? code}`,
+      awsReqId,
+      e,
+    );
   } finally {
     clearTimeout(timer);
   }
@@ -159,7 +170,11 @@ export async function generateExplanation(
   // Extract first valid text content block safely
   const text = extractFirstText(response);
   if (!text) {
-    throw new BedrockExplanationError('EMPTY_RESPONSE', 'Bedrock returned no usable text content', awsRequestId);
+    throw new BedrockExplanationError(
+      'EMPTY_RESPONSE',
+      'Bedrock returned no usable text content',
+      awsRequestId,
+    );
   }
 
   const usage = (response.usage ?? {}) as { inputTokens?: number; outputTokens?: number };

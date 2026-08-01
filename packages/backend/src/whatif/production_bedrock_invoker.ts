@@ -35,11 +35,7 @@ import {
   type ConverseCommandOutput,
 } from '@aws-sdk/client-bedrock-runtime';
 
-import type {
-  BedrockInvoker,
-  BedrockResult,
-  BedrockInvokeOptions,
-} from '@city-commander/rag';
+import type { BedrockInvoker, BedrockResult, BedrockInvokeOptions } from '@city-commander/rag';
 
 const DEFAULT_REGION = 'us-west-2';
 const DEFAULT_MODEL_ID = 'us.anthropic.claude-sonnet-4-6';

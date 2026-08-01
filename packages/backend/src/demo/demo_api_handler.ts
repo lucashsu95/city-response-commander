@@ -7,12 +7,7 @@
  * @module backend/demo/demo_api_handler
  */
 
-import {
-  IncidentStatus,
-  IncidentType,
-  Severity,
-  Language,
-} from '@city-commander/shared-schemas';
+import { IncidentStatus, IncidentType, Severity, Language } from '@city-commander/shared-schemas';
 import type {
   RawTrafficRecord,
   RawCrowdRecord,
@@ -91,10 +86,7 @@ const CORS_HEADERS: Record<string, string> = {
 
 // ─── JSON helper ───────────────────────────────────────────────────────────
 
-function jsonResponse(
-  statusCode: number,
-  body: unknown,
-): APIGatewayProxyResult {
+function jsonResponse(statusCode: number, body: unknown): APIGatewayProxyResult {
   return {
     statusCode,
     headers: { 'Content-Type': 'application/json; charset=utf-8', ...CORS_HEADERS },
@@ -315,7 +307,13 @@ const DEMO_CONFIG_DEFAULTS: Record<string, string | number> = {
   'policy.multilingual_scope.mode': 'current_snapshot_all_available_stations',
 };
 function makeConfig(): DemoConfig {
-  return { get: (key: string) => DEMO_CONFIG_DEFAULTS[key] ?? (() => { throw new Error(`missing ${key}`); })() };
+  return {
+    get: (key: string) =>
+      DEMO_CONFIG_DEFAULTS[key] ??
+      (() => {
+        throw new Error(`missing ${key}`);
+      })(),
+  };
 }
 
 function findIncident(incidents: readonly Incident[], eventId: string): Incident {
@@ -353,10 +351,11 @@ function handleIncident(body: string | null | undefined): APIGatewayProxyResult 
 
   // Traffic classification — RawTrafficRecord uses Segment_ID and Saturation_Score
   const primaryTraffic = data.traffic.filter((r) => r.Segment_ID === incident.affected_segment);
-  const satScore = primaryTraffic.length > 0
-    ? primaryTraffic[primaryTraffic.length - 1].Saturation_Score
-    : 0;
-  const classifications = classifySegments([{ segment_id: incident.affected_segment, saturation_score: satScore }]);
+  const satScore =
+    primaryTraffic.length > 0 ? primaryTraffic[primaryTraffic.length - 1].Saturation_Score : 0;
+  const classifications = classifySegments([
+    { segment_id: incident.affected_segment, saturation_score: satScore },
+  ]);
 
   // Article evaluations
   const art1 = evaluateArticle1(classifications);
@@ -391,7 +390,9 @@ function handleIncident(body: string | null | undefined): APIGatewayProxyResult 
   }
 
   // Evacuation
-  const anchor = incidentAnchorFromLocationText.resolve(incident, data.roadNetwork, { mode: 'incident_anchor_from_location_text' });
+  const anchor = incidentAnchorFromLocationText.resolve(incident, data.roadNetwork, {
+    mode: 'incident_anchor_from_location_text',
+  });
   const candidateScores = new Map<string, number>();
   const allSegments = data.roadNetwork.getAllSegments();
   for (const seg of allSegments) {
@@ -400,18 +401,34 @@ function handleIncident(body: string | null | undefined): APIGatewayProxyResult 
       if (rec) candidateScores.set(seg.segment_id, rec.Saturation_Score);
     }
   }
-  const candidates = qualifyCandidates(incident.affected_segment, anchor.anchor_intersection, data.roadNetwork, candidateScores);
+  const candidates = qualifyCandidates(
+    incident.affected_segment,
+    anchor.anchor_intersection,
+    data.roadNetwork,
+    candidateScores,
+  );
   const evacuation = selectEvacuation(candidates);
 
   // Article aggregation
   const triggeredArticles: number[] = [1];
   const invokedProcedures: string[] = [];
   if (art1.triggered) invokedProcedures.push('article1_signal_control');
-  if (art2Trig) { triggeredArticles.push(2); invokedProcedures.push('article2_alternative_route_guidance'); }
-  if (art3Trig) { art3Adds.forEach((a) => { if (!triggeredArticles.includes(a)) triggeredArticles.push(a); }); }
+  if (art2Trig) {
+    triggeredArticles.push(2);
+    invokedProcedures.push('article2_alternative_route_guidance');
+  }
+  if (art3Trig) {
+    art3Adds.forEach((a) => {
+      if (!triggeredArticles.includes(a)) triggeredArticles.push(a);
+    });
+  }
 
   const articles = aggregateArticles({
-    evaluations: triggeredArticles.map((a) => ({ article: a, triggered: true, invoked_procedures: invokedProcedures })),
+    evaluations: triggeredArticles.map((a) => ({
+      article: a,
+      triggered: true,
+      invoked_procedures: invokedProcedures,
+    })),
     applied_formula_articles: [7] as const,
   });
 
@@ -436,7 +453,11 @@ function handleIncident(body: string | null | undefined): APIGatewayProxyResult 
     event_timestamp: incident.timestamp ?? new Date().toISOString().slice(0, 16),
     traffic_readings: trafficReadings,
   });
-  const ete = calculateEte({ severity: incident.severity ?? Severity.Critical, affected_set: affectedSet, snapshot_provenance: snapshot });
+  const ete = calculateEte({
+    severity: incident.severity ?? Severity.Critical,
+    affected_set: affectedSet,
+    snapshot_provenance: snapshot,
+  });
 
   // Evidence trace
   const evidence = buildEvidenceTrace({
@@ -473,9 +494,14 @@ function handleIncident(body: string | null | undefined): APIGatewayProxyResult 
     event_id: incident.event_id,
     occurred_at: baseTime,
     event_facts: {
-      type: incident.type, location: incident.location ?? '', affected_segment: incident.affected_segment,
-      affected_road: incident.affected_road ?? '', status: incident.status,
-      severity: incident.severity, description: incident.description ?? '', timestamp: baseTime,
+      type: incident.type,
+      location: incident.location ?? '',
+      affected_segment: incident.affected_segment,
+      affected_road: incident.affected_road ?? '',
+      status: incident.status,
+      severity: incident.severity,
+      description: incident.description ?? '',
+      timestamp: baseTime,
     },
     triggered_articles: articles.triggered_articles,
     applied_formula_articles: articles.applied_formula_articles,
@@ -489,10 +515,18 @@ function handleIncident(body: string | null | undefined): APIGatewayProxyResult 
     ete,
     evidence,
     policy: {
-      classification: 'PROVISIONAL_TEAM_POLICY', status: 'AWAITING_HOST_REPLY', is_official: false,
-      guidance_id: 'HG-001', official_golden_answer: false,
-      time_alignment: { mode: 'exact_or_latest_prior_per_entity', max_staleness_minutes: 30, on_insufficient: 'insufficient_data' },
-      affected_road: { role: 'display_only' }, ete: { affected_set: 'incident_primary_and_selected_secondary' },
+      classification: 'PROVISIONAL_TEAM_POLICY',
+      status: 'AWAITING_HOST_REPLY',
+      is_official: false,
+      guidance_id: 'HG-001',
+      official_golden_answer: false,
+      time_alignment: {
+        mode: 'exact_or_latest_prior_per_entity',
+        max_staleness_minutes: 30,
+        on_insufficient: 'insufficient_data',
+      },
+      affected_road: { role: 'display_only' },
+      ete: { affected_set: 'incident_primary_and_selected_secondary' },
       incident_anchor: { mode: 'incident_anchor_from_location_text' },
       affected_intersection_scope: { mode: 'unresolved_manual_confirmation' },
       multilingual_scope: { mode: 'current_snapshot_all_available_stations' },
@@ -543,7 +577,12 @@ function handleDeprecatedWhatIf(): APIGatewayProxyResult {
 // ─── Route: POST /demo/alerts ─────────────────────────────────────────────
 
 function handleAlert(body: string | null | undefined): APIGatewayProxyResult {
-  let parsed: { station_id?: unknown; roaming_users?: unknown; station_capacity?: unknown; languages?: unknown };
+  let parsed: {
+    station_id?: unknown;
+    roaming_users?: unknown;
+    station_capacity?: unknown;
+    languages?: unknown;
+  };
   try {
     parsed = JSON.parse(body ?? '{}');
   } catch {
@@ -563,10 +602,18 @@ function handleAlert(body: string | null | undefined): APIGatewayProxyResult {
   const messages: Record<string, string> = {};
   if (triggered) {
     const ratioPct = (roaming_ratio * 100).toFixed(1);
-    if (languages.includes('zh')) messages['zh'] = `【緊急通知】${station_id} 站目前人數已達容量的 ${ratioPct}%，請旅客注意安全，建議改至相鄰站點搭乘。`;
-    if (languages.includes('en')) messages['en'] = `[URGENT] ${station_id} station is at ${ratioPct}% capacity. Please use caution and consider adjacent stations.`;
-    if (languages.includes('ja')) messages['ja'] = `【緊急通知】${station_id}駅は現在:${ratioPct}%の容量に達しています。ホームの安全にご注意いただき，近隣駅の利用をご検討ください。`;
-    if (languages.includes('ko')) messages['ko'] = `[긴급] ${station_id}역이 현재 수용량의 ${ratioPct}%에 도달했습니다. 플랫폼에서 안전에 주의하고 인접 역 이용을 고려해 주세요.`;
+    if (languages.includes('zh'))
+      messages['zh'] =
+        `【緊急通知】${station_id} 站目前人數已達容量的 ${ratioPct}%，請旅客注意安全，建議改至相鄰站點搭乘。`;
+    if (languages.includes('en'))
+      messages['en'] =
+        `[URGENT] ${station_id} station is at ${ratioPct}% capacity. Please use caution and consider adjacent stations.`;
+    if (languages.includes('ja'))
+      messages['ja'] =
+        `【緊急通知】${station_id}駅は現在:${ratioPct}%の容量に達しています。ホームの安全にご注意いただき，近隣駅の利用をご検討ください。`;
+    if (languages.includes('ko'))
+      messages['ko'] =
+        `[긴급] ${station_id}역이 현재 수용량의 ${ratioPct}%에 도달했습니다. 플랫폼에서 안전에 주의하고 인접 역 이용을 고려해 주세요.`;
   }
 
   return jsonResponse(200, {
@@ -583,7 +630,9 @@ function handleAlert(body: string | null | undefined): APIGatewayProxyResult {
 
 // ─── Main handler factory ───────────────────────────────────────────────────
 
-export function createDemoApiHandler(): (event: APIGatewayProxyEvent) => Promise<APIGatewayProxyResult> {
+export function createDemoApiHandler(): (
+  event: APIGatewayProxyEvent,
+) => Promise<APIGatewayProxyResult> {
   return async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
     try {
       const path = event.rawPath ?? event.requestContext?.http?.path ?? '/';

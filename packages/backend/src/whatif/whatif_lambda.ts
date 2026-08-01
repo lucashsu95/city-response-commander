@@ -14,28 +14,18 @@
  * @module backend/whatif/whatif_lambda
  */
 
-import {
-  BedrockRuntimeClient,
-} from '@aws-sdk/client-bedrock-runtime';
+import { BedrockRuntimeClient } from '@aws-sdk/client-bedrock-runtime';
 import { S3Client, GetObjectCommand } from '@aws-sdk/client-s3';
-import {
-  ingestData,
-  RUNTIME_SOURCE_FILES,
-} from '@city-commander/domain';
-import type {
-  APIGatewayProxyEventV2,
-  APIGatewayProxyResultV2,
-  Context,
-} from 'aws-lambda';
+import { ingestData, RUNTIME_SOURCE_FILES } from '@city-commander/domain';
+import type { APIGatewayProxyEventV2, APIGatewayProxyResultV2, Context } from 'aws-lambda';
 
 import { createProductionWhatIfHandler } from './production_handler.js';
 
 const BUCKET = process.env['DEMO_DATA_BUCKET'] ?? '';
 const REGION = process.env['BEDROCK_REGION'] ?? 'us-west-2';
 
-let cachedHandler:
-  | ((event: APIGatewayProxyEventV2) => Promise<APIGatewayProxyResultV2>)
-  | null = null;
+let cachedHandler: ((event: APIGatewayProxyEventV2) => Promise<APIGatewayProxyResultV2>) | null =
+  null;
 
 async function buildHandler(): Promise<
   (event: APIGatewayProxyEventV2) => Promise<APIGatewayProxyResultV2>

@@ -11,7 +11,13 @@
  * @module infra/lib/demo_backend_stack
  */
 
-import { Role, ServicePrincipal, PolicyDocument, PolicyStatement, Effect } from 'aws-cdk-lib/aws-iam';
+import {
+  Role,
+  ServicePrincipal,
+  PolicyDocument,
+  PolicyStatement,
+  Effect,
+} from 'aws-cdk-lib/aws-iam';
 import { HttpApi, HttpMethod, CorsHttpMethod } from '@aws-cdk/aws-apigatewayv2-alpha';
 import { HttpLambdaIntegration } from '@aws-cdk/aws-apigatewayv2-integrations-alpha';
 import { Stack, CfnOutput, Duration, RemovalPolicy } from 'aws-cdk-lib';
@@ -38,7 +44,12 @@ export class DemoBackendStack extends Stack {
     const dataBucket = new Bucket(this, 'DemoDataBucket', {
       bucketName: `city-commander-demo-data-${this.account}-${this.region}`,
       encryption: BucketEncryption.S3_MANAGED,
-      blockPublicAccess: { blockPublicAcls: true, blockPublicPolicy: true, ignorePublicAcls: true, restrictPublicBuckets: true },
+      blockPublicAccess: {
+        blockPublicAcls: true,
+        blockPublicPolicy: true,
+        ignorePublicAcls: true,
+        restrictPublicBuckets: true,
+      },
       enforceSSL: true,
       removalPolicy: RemovalPolicy.DESTROY,
     });
@@ -157,7 +168,11 @@ export class DemoBackendStack extends Stack {
     const httpApi = new HttpApi(this, 'DemoHttpApi', {
       apiName: 'CityCommanderDemoApi',
       corsPreflight: {
-        allowOrigins: ['https://demo.d1uqtrp9qafkl6.amplifyapp.com', 'http://localhost:5173', 'http://127.0.0.1:5173'],
+        allowOrigins: [
+          'https://demo.d1uqtrp9qafkl6.amplifyapp.com',
+          'http://localhost:5173',
+          'http://127.0.0.1:5173',
+        ],
         allowMethods: [CorsHttpMethod.GET, CorsHttpMethod.POST, CorsHttpMethod.OPTIONS],
         allowHeaders: ['content-type'],
         allowCredentials: false,
@@ -170,14 +185,34 @@ export class DemoBackendStack extends Stack {
 
     httpApi.addRoutes({ path: '/test', methods: [HttpMethod.GET], integration: demoIntegration });
     httpApi.addRoutes({ path: '/health', methods: [HttpMethod.GET], integration: demoIntegration });
-    httpApi.addRoutes({ path: '/demo/timeseries', methods: [HttpMethod.GET], integration: demoIntegration });
-    httpApi.addRoutes({ path: '/demo/incidents', methods: [HttpMethod.POST], integration: demoIntegration });
+    httpApi.addRoutes({
+      path: '/demo/timeseries',
+      methods: [HttpMethod.GET],
+      integration: demoIntegration,
+    });
+    httpApi.addRoutes({
+      path: '/demo/incidents',
+      methods: [HttpMethod.POST],
+      integration: demoIntegration,
+    });
     // /demo/what-if is kept for backward compatibility but now returns 410.
-    httpApi.addRoutes({ path: '/demo/what-if', methods: [HttpMethod.POST], integration: demoIntegration });
-    httpApi.addRoutes({ path: '/demo/alerts', methods: [HttpMethod.POST], integration: demoIntegration });
+    httpApi.addRoutes({
+      path: '/demo/what-if',
+      methods: [HttpMethod.POST],
+      integration: demoIntegration,
+    });
+    httpApi.addRoutes({
+      path: '/demo/alerts',
+      methods: [HttpMethod.POST],
+      integration: demoIntegration,
+    });
 
     // Production What-if pipeline (deterministic Rule Engine + Bedrock).
-    httpApi.addRoutes({ path: '/what-if', methods: [HttpMethod.POST], integration: whatifIntegration });
+    httpApi.addRoutes({
+      path: '/what-if',
+      methods: [HttpMethod.POST],
+      integration: whatifIntegration,
+    });
 
     // ── Deploy official data files to S3 ──────────────────────────────────
     // NOTE: BucketDeployment is intentionally omitted to avoid CDK v2.114's
@@ -187,12 +222,36 @@ export class DemoBackendStack extends Stack {
     // ── CloudFormation Outputs ────────────────────────────────────────────
     this.apiUrl = httpApi.url!;
 
-    new CfnOutput(this, 'DemoApiUrl', { value: this.apiUrl, description: 'Base URL for the Demo HTTP API', exportName: 'CityCommanderDemoApiUrl' });
-    new CfnOutput(this, 'DemoTestPageUrl', { value: `${this.apiUrl}test`, description: 'Browser test page URL', exportName: 'CityCommanderDemoTestPageUrl' });
-    new CfnOutput(this, 'DemoDataBucketOutput', { value: dataBucket.bucketName, description: 'S3 bucket containing demo data', exportName: 'CityCommanderDemoDataBucket' });
-    new CfnOutput(this, 'DemoApiFnArn', { value: demoFn.functionArn, description: 'ARN of the Demo API Lambda function', exportName: 'CityCommanderDemoApiFnArn' });
-    new CfnOutput(this, 'WhatIfFnArn', { value: whatifFn.functionArn, description: 'ARN of the production What-if Lambda function', exportName: 'CityCommanderWhatIfFnArn' });
-    new CfnOutput(this, 'WhatIfApiUrl', { value: `${this.apiUrl}what-if`, description: 'POST /what-if production endpoint', exportName: 'CityCommanderWhatIfApiUrl' });
+    new CfnOutput(this, 'DemoApiUrl', {
+      value: this.apiUrl,
+      description: 'Base URL for the Demo HTTP API',
+      exportName: 'CityCommanderDemoApiUrl',
+    });
+    new CfnOutput(this, 'DemoTestPageUrl', {
+      value: `${this.apiUrl}test`,
+      description: 'Browser test page URL',
+      exportName: 'CityCommanderDemoTestPageUrl',
+    });
+    new CfnOutput(this, 'DemoDataBucketOutput', {
+      value: dataBucket.bucketName,
+      description: 'S3 bucket containing demo data',
+      exportName: 'CityCommanderDemoDataBucket',
+    });
+    new CfnOutput(this, 'DemoApiFnArn', {
+      value: demoFn.functionArn,
+      description: 'ARN of the Demo API Lambda function',
+      exportName: 'CityCommanderDemoApiFnArn',
+    });
+    new CfnOutput(this, 'WhatIfFnArn', {
+      value: whatifFn.functionArn,
+      description: 'ARN of the production What-if Lambda function',
+      exportName: 'CityCommanderWhatIfFnArn',
+    });
+    new CfnOutput(this, 'WhatIfApiUrl', {
+      value: `${this.apiUrl}what-if`,
+      description: 'POST /what-if production endpoint',
+      exportName: 'CityCommanderWhatIfApiUrl',
+    });
   }
 }
 
@@ -208,7 +267,10 @@ function bundleLambdaAsset(opts: BundleOptions): string {
   const rootDir = path.resolve(__dirname, '../..');
   let lambdaEntry: string | null = null;
   for (const c of opts.entryCandidates) {
-    if (fs.existsSync(c)) { lambdaEntry = c; break; }
+    if (fs.existsSync(c)) {
+      lambdaEntry = c;
+      break;
+    }
   }
   if (!lambdaEntry) {
     throw new Error(`[${opts.label}] Could not find entry in: ${opts.entryCandidates.join(', ')}`);
