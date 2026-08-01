@@ -31,7 +31,10 @@ export function articleFiveDescriptionTrigger(description: string): boolean {
 
 /** SOP-5 is triggered by the official type OR either Chinese failure keyword. */
 export function isArticle5Triggered(incident: Incident): boolean {
-  return incident.type === IncidentType.Power_Failure || articleFiveDescriptionTrigger(incident.description);
+  return (
+    incident.type === IncidentType.Power_Failure ||
+    articleFiveDescriptionTrigger(incident.description)
+  );
 }
 
 export function evaluateArticle5(input: Article5Input): Article5Result {

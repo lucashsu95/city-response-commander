@@ -15,7 +15,10 @@
  * without a section suffix, e.g. 忠孝東路四段 -> 忠孝東路) appears in the
  * given location text.
  */
-export function intersectionAppearsInLocation(locationText: string, intersectionName: string): boolean {
+export function intersectionAppearsInLocation(
+  locationText: string,
+  intersectionName: string,
+): boolean {
   if (locationText.includes(intersectionName)) return true;
   const roadAlias = intersectionName.replace(/[一二三四五六七八九十]+段$/u, '');
   return roadAlias !== intersectionName && locationText.includes(roadAlias);

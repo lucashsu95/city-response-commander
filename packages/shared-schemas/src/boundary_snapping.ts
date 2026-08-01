@@ -17,10 +17,7 @@ export type LocationCoverageStatus = 'IN_SCOPE' | 'IN_SCOPE_BY_INTERSECTION' | '
  * it always resolves to one of the two snapped/jurisdiction outcomes.
  */
 export type DataScopeStatus =
-  | 'IN_SCOPE'
-  | 'IN_SCOPE_BY_INTERSECTION'
-  | 'OUT_OF_BOUNDS_SNAPPED'
-  | 'OUT_OF_JURISDICTION';
+  'IN_SCOPE' | 'IN_SCOPE_BY_INTERSECTION' | 'OUT_OF_BOUNDS_SNAPPED' | 'OUT_OF_JURISDICTION';
 
 export interface EntityScopeResult {
   readonly coverage_status: LocationCoverageStatus;
@@ -44,7 +41,10 @@ export interface PerimeterAnchor {
 }
 
 export interface SnapResult {
-  readonly coverage_status: Extract<DataScopeStatus, 'OUT_OF_BOUNDS_SNAPPED' | 'OUT_OF_JURISDICTION'>;
+  readonly coverage_status: Extract<
+    DataScopeStatus,
+    'OUT_OF_BOUNDS_SNAPPED' | 'OUT_OF_JURISDICTION'
+  >;
   /** null when coverage_status === 'OUT_OF_JURISDICTION' (R4 AC5/AC8). */
   readonly anchor: PerimeterAnchor | null;
   /** null when the coordinate path is not enabled/usable (R3 AC6). */
