@@ -164,7 +164,7 @@ Task ID scheme: `TASK-BS-01..TASK-BS-19`, flat and sequential. `CHECKPOINT` line
 
 ## Phase 3 — Containment_Assembler integration (Layer 2, backend)
 
-- [ ] TASK-BS-10 Implement `Containment_Assembler` orchestration skeleton with the STOP-gate short-circuit (Requirement 1, Requirement 12 AC1–AC2)
+- [x] TASK-BS-10 Implement `Containment_Assembler` orchestration skeleton with the STOP-gate short-circuit (Requirement 1, Requirement 12 AC1–AC2)
   - objective: Wire the sequence from design.md §3.1 — check `ingestion.data_status` first, and only then run Entity_Scope_Check — as the single entry point backend handlers call.
   - requirements_covered: R1, R12 (AC1, AC2)
   - design_sections: §3, §6

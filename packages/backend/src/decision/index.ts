@@ -33,3 +33,6 @@ export type {
   DecisionFnResult,
   DecisionCoreBuilderPort,
 } from './decision_fn.js';
+
+export { assembleContainment } from './containment_assembler.js';
+export type { AssembleContainmentInput, ContainmentAssemblerResult } from './containment_assembler.js';
