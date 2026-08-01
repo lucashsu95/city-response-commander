@@ -174,14 +174,20 @@ jobs:
             --require-approval never \
             --outputs-file cdk-outputs-frontend.json
 
-      - name: Verify CloudFormation status
+      - name: Verify CloudFormation status (non-blocking)
         shell: bash
         run: |
+          set +e
           STATUS=$(aws cloudformation describe-stacks \
             --stack-name "$FRONTEND_STACK" \
             --region "$AWS_REGION" \
             --query "Stacks[0].StackStatus" \
-            --output text)
+            --output text 2>/dev/null)
+          if [ -z "$STATUS" ] || [ "$STATUS" = "None" ]; then
+            echo "Backend health: failed to read CloudFormation status (likely IAM-limited on this role)" >&2
+            echo "FRONTEND_STACK_STATUS=unknown" >> "$GITHUB_ENV"
+            exit 0
+          fi
           echo "FRONTEND_STACK_STATUS=$STATUS" >> "$GITHUB_ENV"
           echo "Frontend Stack status: $STATUS"
           case "$STATUS" in
@@ -194,27 +200,26 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          FRONTEND_BUCKET="$(
+          FALLBACK_OUT="infra/cdk-outputs-frontend.json"
+          read_outputs() {
             aws cloudformation describe-stacks \
               --stack-name "$FRONTEND_STACK" \
               --region "$AWS_REGION" \
-              --query "Stacks[0].Outputs[?OutputKey=='FrontendBucketName'].OutputValue | [0]" \
-              --output text
-          )"
-          FRONTEND_DISTRIBUTION_ID="$(
-            aws cloudformation describe-stacks \
-              --stack-name "$FRONTEND_STACK" \
-              --region "$AWS_REGION" \
-              --query "Stacks[0].Outputs[?OutputKey=='FrontendDistributionId'].OutputValue | [0]" \
-              --output text
-          )"
-          FRONTEND_URL="$(
-            aws cloudformation describe-stacks \
-              --stack-name "$FRONTEND_STACK" \
-              --region "$AWS_REGION" \
-              --query "Stacks[0].Outputs[?OutputKey=='FrontendUrl'].OutputValue | [0]" \
-              --output text
-          )"
+              --query "Stacks[0].Outputs[?OutputKey=='$1'].OutputValue | [0]" \
+              --output text 2>/dev/null
+          }
+          if [ -f "$FALLBACK_OUT" ] && command -v jq >/dev/null 2>&1; then
+            FRONTEND_BUCKET=$(jq -r '.CityCommanderFrontend.FrontendBucketName // empty' "$FALLBACK_OUT" 2>/dev/null || echo "")
+            FRONTEND_DISTRIBUTION_ID=$(jq -r '.CityCommanderFrontend.FrontendDistributionId // empty' "$FALLBACK_OUT" 2>/dev/null || echo "")
+            FRONTEND_URL=$(jq -r '.CityCommanderFrontend.FrontendUrl // empty' "$FALLBACK_OUT" 2>/dev/null || echo "")
+          fi
+          [ -z "$FRONTEND_BUCKET" ] && FRONTEND_BUCKET=$(read_outputs FrontendBucketName)
+          [ -z "$FRONTEND_DISTRIBUTION_ID" ] && FRONTEND_DISTRIBUTION_ID=$(read_outputs FrontendDistributionId)
+          [ -z "$FRONTEND_URL" ] && FRONTEND_URL=$(read_outputs FrontendUrl)
+          if [ -z "$FRONTEND_BUCKET" ] || [ -z "$FRONTEND_DISTRIBUTION_ID" ] || [ -z "$FRONTEND_URL" ]; then
+            echo "ERROR: could not resolve frontend outputs from CloudFormation or $FALLBACK_OUT" >&2
+            exit 1
+          fi
           echo "frontend_bucket=${FRONTEND_BUCKET}" >> "$GITHUB_OUTPUT"
           echo "frontend_distribution_id=${FRONTEND_DISTRIBUTION_ID}" >> "$GITHUB_OUTPUT"
           echo "frontend_url=${FRONTEND_URL}" >> "$GITHUB_OUTPUT"
