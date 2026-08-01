@@ -11,6 +11,7 @@ export * from './ingestion/timestamp_normalizer.js';
 export * from './ingestion/data_ingestion_service.js';
 
 export * from './road_network/road_network_model.js';
+export * from './road_network/intersection_text_match.js';
 
 export * from './strategies/time_alignment_strategy.js';
 export * from './strategies/incident_anchor_resolution_strategy.js';

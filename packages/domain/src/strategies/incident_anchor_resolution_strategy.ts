@@ -19,6 +19,7 @@
 
 import type { Incident, IncidentAnchor, RoadSegment } from '@city-commander/shared-schemas';
 import type { RoadNetworkModel } from '../road_network/road_network_model.js';
+import { intersectionAppearsInLocation } from '../road_network/intersection_text_match.js';
 
 // ─── Types ─────────────────────────────────────────────────
 
@@ -226,12 +227,6 @@ export function resolveIncidentAnchorStrategy(
 }
 
 // ─── Helpers ───────────────────────────────────────────────
-
-function intersectionAppearsInLocation(locationText: string, intersectionName: string): boolean {
-  if (locationText.includes(intersectionName)) return true;
-  const roadAlias = intersectionName.replace(/[一二三四五六七八九十]+段$/u, '');
-  return roadAlias !== intersectionName && locationText.includes(roadAlias);
-}
 
 /**
  * Extract a position hint from location text relative to an intersection.
