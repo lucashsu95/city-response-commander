@@ -270,7 +270,7 @@ Task ID scheme: `TASK-BS-01..TASK-BS-19`, flat and sequential. `CHECKPOINT` line
 
 ## Phase 5 — Integration, Golden & Boundary Tests (Requirement 14)
 
-- [ ] TASK-BS-17 Full `Containment_Assembler` integration test matrix (Requirement 14.8)
+- [x] TASK-BS-17 Full `Containment_Assembler` integration test matrix (Requirement 14.8)
   - objective: Prove all four documented response shapes are correct end to end.
   - requirements_covered: R14 (AC8)
   - design_sections: §10

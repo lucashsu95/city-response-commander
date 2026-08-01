@@ -603,6 +603,115 @@ describe('assembleContainment', () => {
     });
   });
 
+  describe('R14 AC8 — full containment response matrix', () => {
+    const outsideIncident = (): Incident =>
+      incident({
+        affected_segment: 'RD_TPE_099',
+        affected_road: undefined,
+        location: '完全不在路網範圍內的地點',
+        type: 'Unknown_Chemical_Leak' as unknown as Incident['type'],
+        description: '未知化學氣體洩漏',
+        timestamp: '2026-05-20 22:30',
+      });
+
+    it('Case A: keeps the existing deterministic facts for an IN_SCOPE incident', async () => {
+      const result = await assembleContainment({
+        ingestion: readyIngestion(),
+        incident: incident(),
+        config,
+      });
+
+      expect(result.data_status).toBe('ready');
+      expect(result.data_scope_status).toBe('IN_SCOPE');
+      expect(result.mapped_anchor_node).toBeNull();
+      expect(result.facts).not.toBeNull();
+      expect(result.facts?.incident_anchor).not.toBeNull();
+    });
+
+    it('Case B: returns a snapped anchor and only whitelisted reroutes without an incident anchor', async () => {
+      const result = await assembleContainment({
+        ingestion: readyIngestion(),
+        incident: outsideIncident(),
+        config,
+        composer: { generate: async () => '建議改道 RD_TPE_004。' },
+      });
+      const allowed = new Set(result.safe_context?.allowed_road_whitelist ?? []);
+
+      expect(result.data_scope_status).toBe('OUT_OF_BOUNDS_SNAPPED');
+      expect(result.mapped_anchor_node).not.toBeNull();
+      expect(result.facts?.incident_anchor).toBeNull();
+      expect(result.decision.reroute_roads).not.toHaveLength(0);
+      expect(result.decision.reroute_roads.every((roadId) => allowed.has(roadId))).toBe(true);
+    });
+
+    it('Case C: skips Bedrock and emits only the static out-of-jurisdiction explanation', async () => {
+      const generate = vi.fn<BedrockComposerClient['generate']>();
+      const closedNetwork = RoadNetworkModel.load([
+        {
+          segment_id: 'RD_TPE_010',
+          name: '封閉測試路段',
+          flow_direction: '南北向',
+          intersections: [],
+          capacity_vph: 1_000,
+          alternatives: [],
+          nearby_stations: [],
+        },
+      ]);
+      const result = await assembleContainment({
+        ingestion: readyIngestion({ roadNetwork: closedNetwork }),
+        incident: outsideIncident(),
+        config,
+        composer: { generate },
+      });
+
+      expect(result.data_scope_status).toBe('OUT_OF_JURISDICTION');
+      expect(result.mapped_anchor_node).toBeNull();
+      expect(result.facts?.incident_anchor).toBeNull();
+      expect(generate).not.toHaveBeenCalled();
+      expect(result.decision).toEqual({
+        reroute_roads: [],
+        perimeter_control: null,
+        ai_reasoning: '事件超出本系統路網轄區，未執行道路吸附或 AI 指揮建議生成。',
+      });
+    });
+
+    it('Case D: preserves the STOP response when insufficient data and an out-of-bounds incident coexist', async () => {
+      const generate = vi.fn<BedrockComposerClient['generate']>();
+      const ingestion: IngestionResult = {
+        data_status: 'insufficient_data',
+        stop_reason: 'Source manifest hash mismatch for road_network_geometry.json.',
+        source_manifest_hash: '',
+      };
+      const result = await assembleContainment({
+        ingestion,
+        incident: outsideIncident(),
+        config,
+        composer: { generate },
+      });
+
+      expect(generate).not.toHaveBeenCalled();
+      expect(result).toEqual({
+        data_status: 'insufficient_data',
+        stop_reason: 'Source manifest hash mismatch for road_network_geometry.json.',
+        source_manifest_hash: '',
+        entity_scope: null,
+        sop_coverage: null,
+        data_scope_status: null,
+        mapped_anchor_node: null,
+        safe_context: null,
+        sop_coverage_status: null,
+        sop_authority: null,
+        decision: {
+          reroute_roads: [],
+          perimeter_control: null,
+          ai_reasoning: null,
+        },
+        whitelist_violations: [],
+        facts: null,
+      });
+    });
+  });
+
   describe('R9 — Bedrock output whitelist audit and fallback', () => {
     const outsideIncident = (): Incident =>
       incident({
