@@ -10,11 +10,16 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@aws-sdk/client-apigatewaymanagementapi": "^3.540.0",
+    "@aws-sdk/client-dynamodb": "^3.540.0",
+    "@aws-sdk/client-sfn": "^3.540.0",
+    "@aws-sdk/lib-dynamodb": "^3.540.0",
     "@city-commander/shared-schemas": "*",
     "@city-commander/domain": "*",
     "@city-commander/config": "*"
   },
   "devDependencies": {
+    "fast-check": "^3.19.0",
     "typescript": "^5.4.0"
   }
 }

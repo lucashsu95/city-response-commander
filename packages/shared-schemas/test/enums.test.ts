@@ -62,16 +62,15 @@ describe('shared-schemas enums', () => {
   });
 
   describe('RecoveryStage', () => {
-    it('has exactly 4 values', () => {
+    it('has exactly 3 values', () => {
       const values = Object.values(RecoveryStage);
-      expect(values).toHaveLength(4);
+      expect(values).toHaveLength(3);
     });
 
-    it('contains detect, gate, reconcile, restart', () => {
-      expect(RecoveryStage.detect).toBe('detect');
-      expect(RecoveryStage.gate).toBe('gate');
-      expect(RecoveryStage.reconcile).toBe('reconcile');
-      expect(RecoveryStage.restart).toBe('restart');
+    it('contains NONE, FULL_WORKFLOW, ENRICHMENT_ONLY (design §10.11e)', () => {
+      expect(RecoveryStage.NONE).toBe('NONE');
+      expect(RecoveryStage.FULL_WORKFLOW).toBe('FULL_WORKFLOW');
+      expect(RecoveryStage.ENRICHMENT_ONLY).toBe('ENRICHMENT_ONLY');
     });
   });
 
@@ -81,10 +80,10 @@ describe('shared-schemas enums', () => {
       expect(values).toHaveLength(3);
     });
 
-    it('contains FIRST_RUN, STALE_RECOVERY, START_FAILED_RETRY', () => {
-      expect(RecoveryMode.FIRST_RUN).toBe('FIRST_RUN');
-      expect(RecoveryMode.STALE_RECOVERY).toBe('STALE_RECOVERY');
-      expect(RecoveryMode.START_FAILED_RETRY).toBe('START_FAILED_RETRY');
+    it('contains NORMAL, FULL_WORKFLOW, ENRICHMENT_ONLY (design §10.11e)', () => {
+      expect(RecoveryMode.NORMAL).toBe('NORMAL');
+      expect(RecoveryMode.FULL_WORKFLOW).toBe('FULL_WORKFLOW');
+      expect(RecoveryMode.ENRICHMENT_ONLY).toBe('ENRICHMENT_ONLY');
     });
   });
 
@@ -94,9 +93,9 @@ describe('shared-schemas enums', () => {
       expect(values).toHaveLength(2);
     });
 
-    it('contains DECISIONFN_COMMITTED and ENRICHMENT_COMMITTED', () => {
+    it('contains DECISIONFN_COMMITTED and RECOVERY_GATE_CORE_EXISTS (design §10.11e)', () => {
       expect(EvidenceSource.DECISIONFN_COMMITTED).toBe('DECISIONFN_COMMITTED');
-      expect(EvidenceSource.ENRICHMENT_COMMITTED).toBe('ENRICHMENT_COMMITTED');
+      expect(EvidenceSource.RECOVERY_GATE_CORE_EXISTS).toBe('RECOVERY_GATE_CORE_EXISTS');
     });
   });
 
@@ -108,7 +107,9 @@ describe('shared-schemas enums', () => {
 
     it('contains COMMITTED, ALREADY_COMMITTED_SAME_DECISION, CORE_IDENTITY_CONFLICT', () => {
       expect(CoreWriteStatus.COMMITTED).toBe('COMMITTED');
-      expect(CoreWriteStatus.ALREADY_COMMITTED_SAME_DECISION).toBe('ALREADY_COMMITTED_SAME_DECISION');
+      expect(CoreWriteStatus.ALREADY_COMMITTED_SAME_DECISION).toBe(
+        'ALREADY_COMMITTED_SAME_DECISION',
+      );
       expect(CoreWriteStatus.CORE_IDENTITY_CONFLICT).toBe('CORE_IDENTITY_CONFLICT');
     });
   });
@@ -222,7 +223,7 @@ describe('shared-schemas enums', () => {
 
   describe('SOPArticle', () => {
     it('has exactly 7 articles', () => {
-      const values = Object.values(SOPArticle).filter(v => typeof v === 'number');
+      const values = Object.values(SOPArticle).filter((v) => typeof v === 'number');
       expect(values).toHaveLength(7);
     });
   });
