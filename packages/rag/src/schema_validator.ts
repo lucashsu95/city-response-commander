@@ -11,13 +11,18 @@
  *   PUBLIC_ALERT → {public_alert_text}
  *   EXPLANATION  → {explanation_text}
  * - 任何 payload key 出現在 LLM_PROHIBITED_FIELDS → 全部拒絕，回傳 use_template
+ * - 任何 payload path 出現在 CONTAINMENT_PROHIBITED_PATHS → 全部拒絕，回傳 use_template
  * - 任何 payload key 不在該 narrative_type 的白名單 → 全部拒絕，回傳 use_template
  * - 通過時只回傳白名單內的欄位（strip 掉多餘 key），且所有值強制為 string
  *
  * @module rag/schema_validator
  */
 
-import { LLM_PROHIBITED_FIELDS, NarrativeType } from '@city-commander/shared-schemas';
+import {
+  CONTAINMENT_PROHIBITED_PATHS,
+  LLM_PROHIBITED_FIELDS,
+  NarrativeType,
+} from '@city-commander/shared-schemas';
 
 // ─── LLM-prohibited core fields ─────────────────────────────────────────────
 //
@@ -139,7 +144,20 @@ export function validateBedrockPayload(
     };
   }
 
-  // 4. 再掃非白名單欄位
+  // 4. 以獨立常數掃 containment disclosure paths（R13 AC4/AC5）。
+  //    不與 DecisionCore 的 LLM_PROHIBITED_FIELDS 合併，因兩者型別與來源不同。
+  const containmentProhibitedHits = collectObjectPaths(rawPayload).filter((path) =>
+    CONTAINMENT_PROHIBITED_PATHS.has(path),
+  );
+  if (containmentProhibitedHits.length > 0) {
+    return {
+      outcome: 'use_template',
+      reason: 'prohibited_field_overwrite',
+      offendingFields: containmentProhibitedHits,
+    };
+  }
+
+  // 5. 再掃非白名單欄位
   const nonWhitelisted = keys.filter((k) => !allowedFields.has(k));
   if (nonWhitelisted.length > 0) {
     return {
@@ -149,14 +167,14 @@ export function validateBedrockPayload(
     };
   }
 
-  // 5. PUBLIC_ALERT 的 public_alert_text 需要專屬的語言 map 驗證
+  // 6. PUBLIC_ALERT 的 public_alert_text 需要專屬的語言 map 驗證
   //    其值為 Partial<Record<Language, string>>（物件，非純字串）。
   //    其他 narrative_type（REPORT / EXPLANATION）的白名單欄位值均須為 string。
   if (narrativeType === NarrativeType.PUBLIC_ALERT) {
     return validatePublicAlertPayload(rawPayload);
   }
 
-  // 5b. REPORT / EXPLANATION：所有白名單欄位的值必須是 string
+  // 6b. REPORT / EXPLANATION：所有白名單欄位的值必須是 string
   const nonStringFields = keys.filter(
     (k) => allowedFields.has(k) && typeof rawPayload[k] !== 'string',
   );
@@ -168,7 +186,7 @@ export function validateBedrockPayload(
     };
   }
 
-  // 6. 通過：只回傳白名單內的欄位，型別已確認為 string
+  // 7. 通過：只回傳白名單內的欄位，型別已確認為 string
   const clean: Record<string, string> = {};
   for (const k of keys) {
     if (allowedFields.has(k)) {
@@ -180,6 +198,32 @@ export function validateBedrockPayload(
 }
 
 // ─── Internal helpers ──────────────────────────────────────────────────────
+
+/**
+ * Enumerate dotted paths in an untrusted JSON-like object so nested
+ * containment fields (for example `decision.reroute_roads`) are checked by
+ * the same validator pass as top-level disclosure fields.
+ */
+function collectObjectPaths(
+  value: Record<string, unknown>,
+  prefix = '',
+  seen: WeakSet<object> = new WeakSet<object>(),
+): readonly string[] {
+  if (seen.has(value)) {
+    return [];
+  }
+  seen.add(value);
+
+  const paths: string[] = [];
+  for (const [key, nestedValue] of Object.entries(value)) {
+    const path = prefix === '' ? key : `${prefix}.${key}`;
+    paths.push(path);
+    if (isPlainObject(nestedValue)) {
+      paths.push(...collectObjectPaths(nestedValue, path, seen));
+    }
+  }
+  return paths;
+}
 
 /**
  * PUBLIC_ALERT 專屬驗證：`public_alert_text` 值為語言 map（物件）。

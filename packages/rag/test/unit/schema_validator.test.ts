@@ -202,31 +202,75 @@ describe('validateBedrockPayload — PUBLIC_ALERT', () => {
   });
 });
 
+// ─── CONTAINMENT DISCLOSURE ───────────────────────────────────────────────
+
+describe('validateBedrockPayload — containment prohibited paths', () => {
+  it('rejects a Bedrock attempt to set data_scope_status', () => {
+    const result = validateBedrockPayload(NarrativeType.REPORT, {
+      report_text: '文字內容仍可由 Bedrock 生成',
+      data_scope_status: 'OUT_OF_BOUNDS_SNAPPED',
+    });
+
+    expect(result).toEqual({
+      outcome: 'use_template',
+      reason: 'prohibited_field_overwrite',
+      offendingFields: ['data_scope_status'],
+    });
+  });
+
+  it('rejects nested decision.reroute_roads and decision.perimeter_control paths', () => {
+    const result = validateBedrockPayload(NarrativeType.EXPLANATION, {
+      explanation_text: '嘗試覆寫決定性結果',
+      decision: {
+        reroute_roads: ['RD_TPE_999'],
+        perimeter_control: { target_gate: 'RD_TPE_999' },
+      },
+    });
+
+    expect(result).toEqual({
+      outcome: 'use_template',
+      reason: 'prohibited_field_overwrite',
+      offendingFields: ['decision.reroute_roads', 'decision.perimeter_control'],
+    });
+  });
+
+  it('keeps the containment check separate from the existing DecisionCore check', () => {
+    const result = validateBedrockPayload(NarrativeType.REPORT, {
+      report_text: 'ok',
+      decision_id: 'injected-core-id',
+      sop_authority: 'UNIVERSAL_ONLY',
+    });
+
+    expect(result).toEqual({
+      outcome: 'use_template',
+      reason: 'prohibited_field_overwrite',
+      offendingFields: ['decision_id'],
+    });
+  });
+});
+
 // ─── P37 property: CMS permission split (TASK-048) ─────────────────────────
 
 describe('validateBedrockPayload — Property 37: renderer may write CMS explanation but never deterministic CMS core', () => {
-  it(
-    'Feature: city-response-commander, Property 37: REPORT payload may set cms_explanation_text but a cms_core_text overwrite is always rejected',
-    () => {
-      fc.assert(
-        fc.property(fc.string(), (text) => {
-          const explanationResult = validateBedrockPayload(NarrativeType.REPORT, {
-            cms_explanation_text: text,
-          });
-          expect(explanationResult.outcome).toBe('accepted');
+  it('Feature: city-response-commander, Property 37: REPORT payload may set cms_explanation_text but a cms_core_text overwrite is always rejected', () => {
+    fc.assert(
+      fc.property(fc.string(), (text) => {
+        const explanationResult = validateBedrockPayload(NarrativeType.REPORT, {
+          cms_explanation_text: text,
+        });
+        expect(explanationResult.outcome).toBe('accepted');
 
-          const coreOverwriteResult = validateBedrockPayload(NarrativeType.REPORT, {
-            report_text: 'ok',
-            cms_core_text: text,
-          });
-          expect(coreOverwriteResult.outcome).toBe('use_template');
-          if (coreOverwriteResult.outcome === 'use_template') {
-            expect(coreOverwriteResult.reason).toBe('prohibited_field_overwrite');
-            expect(coreOverwriteResult.offendingFields).toContain('cms_core_text');
-          }
-        }),
-        { numRuns: 100 },
-      );
-    },
-  );
+        const coreOverwriteResult = validateBedrockPayload(NarrativeType.REPORT, {
+          report_text: 'ok',
+          cms_core_text: text,
+        });
+        expect(coreOverwriteResult.outcome).toBe('use_template');
+        if (coreOverwriteResult.outcome === 'use_template') {
+          expect(coreOverwriteResult.reason).toBe('prohibited_field_overwrite');
+          expect(coreOverwriteResult.offendingFields).toContain('cms_core_text');
+        }
+      }),
+      { numRuns: 100 },
+    );
+  });
 });

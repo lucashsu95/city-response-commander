@@ -240,7 +240,7 @@ Task ID scheme: `TASK-BS-01..TASK-BS-19`, flat and sequential. `CHECKPOINT` line
 
 ## Phase 4 — `LLM_PROHIBITED_FIELDS` parity (Requirement 13)
 
-- [ ] TASK-BS-15 Add `CONTAINMENT_PROHIBITED_PATHS` enforcement to `schema_validator.ts`
+- [x] TASK-BS-15 Add `CONTAINMENT_PROHIBITED_PATHS` enforcement to `schema_validator.ts`
   - objective: Give the new disclosure fields the same mechanical LLM-write protection that `DecisionCore` fields already have, per the design decision in design.md §7 (separate type, not merged into `DecisionCore`).
   - requirements_covered: R13 (AC4, AC5)
   - design_sections: §7
