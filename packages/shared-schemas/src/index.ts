@@ -156,3 +156,5 @@ export type {
   ContainmentDisclosure,
 } from './containment_disclosure.js';
 export { CONTAINMENT_PROHIBITED_KEYS, CONTAINMENT_PROHIBITED_PATHS } from './containment_disclosure.js';
+
+export type { WhitelistPartition } from './whitelist_guard.js';

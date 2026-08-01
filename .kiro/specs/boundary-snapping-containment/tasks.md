@@ -147,7 +147,7 @@ Task ID scheme: `TASK-BS-01..TASK-BS-19`, flat and sequential. `CHECKPOINT` line
   - tests_required: `packages/domain/test/unit/sop_coverage_resolver.test.ts`.
   - done_definition: Table is fully traceable — each entry cites the article number it maps to, checkable against `emergency_traffic_sop.txt`.
 
-- [ ] TASK-BS-09 Implement `Whitelist_Guard` (Requirement 9 AC1, Requirement 12.5 property)
+- [x] TASK-BS-09 Implement `Whitelist_Guard` (Requirement 9 AC1, Requirement 12.5 property)
   - objective: Provide a reusable, pure partitioning function that separates any candidate road-id set into whitelisted vs. non-whitelisted members, used both for Safe_Context construction and for auditing Bedrock's output.
   - requirements_covered: R9 (AC1), R14.5
   - design_sections: §4.4
