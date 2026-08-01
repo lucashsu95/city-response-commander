@@ -23,8 +23,19 @@ function fixture(): { directory: string; manifest: string; filenames: string[] }
   return { directory, manifest, filenames };
 }
 
+function bashCompatiblePath(path: string): string {
+  return process.platform === 'win32' ? path.replace(/\\/g, '/') : path;
+}
+
 function verify(directory: string, manifest: string): string {
-  return execFileSync('bash', [verifier, '--manifest-test-only', manifest, directory], {
+  return execFileSync(
+    'bash',
+    [
+      verifier,
+      '--manifest-test-only',
+      bashCompatiblePath(manifest),
+      bashCompatiblePath(directory),
+    ], {
     cwd: root,
     encoding: 'utf8',
     env: { ...process.env, VERIFY_SOURCES_TEST_MANIFEST: '1' },
