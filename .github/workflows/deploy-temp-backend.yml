@@ -4,6 +4,21 @@ on:
   push:
     branches:
       - temp/restore-cdk-deployment-source
+    paths:
+      - "packages/backend/**"
+      - "packages/domain/**"
+      - "packages/shared-schemas/**"
+      - "packages/config/**"
+      - "packages/ai-generator/**"
+      - "packages/rag/**"
+      - "demo-data-source/**"
+      - "infra/lib/demo_backend_stack.ts"
+      - "infra/lib/constructs/**"
+      - "infra/bin/app.ts"
+      - "infra/package.json"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/deploy-temp-backend.yml"
   workflow_dispatch:
 
 permissions:

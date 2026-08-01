@@ -11,13 +11,12 @@ import react from '@vitejs/plugin-react';
 
 export default defineConfig({
   plugins: [react()],
-  // GitHub Pages is mounted at `/<repo>/` when the project's repository name
-  // drives the user page; the workflow that publishes the demo frontend
-  // uploads `packages/frontend/dist` from this same path. Without `base`,
-  // production-mode URLs (`/assets/…`) 404 once the SPA is served under
-  // `/city-response-commander/`. The router has been switched to
-  // `HashRouter` to keep deep-link refreshes working on Pages.
-  base: '/city-response-commander/',
+  // The frontend is hosted on a CloudFront distribution at the domain root
+  // (no `/<repo>/` prefix), so `base` is `/`. Production-style asset URLs
+  // resolve to `/assets/...` and work under the CloudFront root domain. The
+  // router stays `HashRouter` so deep-link refreshes inside the SPA continue
+  // to work without relying on CloudFront SPA fallback for client routes.
+  base: '/',
   build: {
     outDir: 'dist',
     sourcemap: true,
