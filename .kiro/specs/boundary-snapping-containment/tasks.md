@@ -178,7 +178,7 @@ Task ID scheme: `TASK-BS-01..TASK-BS-19`, flat and sequential. `CHECKPOINT` line
   - tests_required: `packages/backend/test/decision/containment_assembler.test.ts` — STOP-gate short-circuit case.
   - done_definition: The `insufficient_data` path is byte-identical to pre-existing backend behavior (regression-proof via existing `decision_fn.test.ts` fixtures reused here).
 
-- [ ] TASK-BS-11 Wire the `IN_SCOPE` / `IN_SCOPE_BY_INTERSECTION` branch to existing `runDeterministicDecision` unchanged (Requirement 12 AC3, AC7)
+- [x] TASK-BS-11 Wire the `IN_SCOPE` / `IN_SCOPE_BY_INTERSECTION` branch to existing `runDeterministicDecision` unchanged (Requirement 12 AC3, AC7)
   - objective: Prove that in-scope incidents are completely unaffected by this feature — the existing golden tests (ACC_001, EVT_002, EVT_003) must keep producing identical output.
   - requirements_covered: R12 (AC3, AC6, AC7)
   - design_sections: §3.2
