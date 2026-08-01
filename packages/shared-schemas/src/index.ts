@@ -167,3 +167,14 @@ export type {
   PublishStatusChangedEvent,
   ProcessingFailedEvent,
 } from './events.js';
+
+// ─── Demo API Types (non-canonical, demo-only) ──────────────────────────────
+export type {
+  DemoTimeseriesAnomaly,
+  DemoControlCenterRecommendation,
+  DemoTechnicalAction,
+  DemoPublicAlerts,
+  DemoPublishRequest,
+  DemoAlertRequest,
+  DemoAlertResponse,
+} from './demo-types.js';

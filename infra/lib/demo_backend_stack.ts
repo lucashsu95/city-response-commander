@@ -212,6 +212,13 @@ export class DemoBackendStack extends Stack {
       integration: demoIntegration,
     });
 
+    // One-click publish for demo decisions (in-memory store, no DynamoDB)
+    httpApi.addRoutes({
+      path: '/decisions/{id}/publish',
+      methods: [HttpMethod.POST],
+      integration: demoIntegration,
+    });
+
     // Production What-if pipeline (deterministic Rule Engine + Bedrock).
     httpApi.addRoutes({
       path: '/what-if',
