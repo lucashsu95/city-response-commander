@@ -282,9 +282,7 @@ describe('every dashboard response carries the §12 envelope', () => {
     // A STOP-gate failure is a state to render, not a missing resource.
     expect(result.statusCode).toBe(200);
     expect(body(result)).toMatchObject({
-      // TASK-125 moved /roads to the UPPERCASE published vocabulary. The other
-      // three routes still speak the internal lowercase form.
-      data_status: name === 'roads' ? 'INSUFFICIENT_DATA' : 'insufficient_data',
+      data_status: 'insufficient_data',
       stop_reason: 'SHA-256 mismatch: live_incidents.json',
       decision_cutoff_timestamp: null,
     });
@@ -445,18 +443,18 @@ describe('GET /roads', () => {
     });
   });
 
-  it('publishes data_status in the UPPERCASE wire vocabulary', async () => {
+  it('publishes data_status in the canonical lowercase wire vocabulary', async () => {
     const result = await createGetRoadsHandler(createPorts())(event);
 
-    expect(body(result)).toMatchObject({ data_status: 'READY', insufficient_data: false });
-    expect(rows(result, 'segments')[0]?.data_status).toBe('READY');
+    expect(body(result)).toMatchObject({ data_status: 'ready', insufficient_data: false });
+    expect(rows(result, 'segments')[0]?.data_status).toBe('ready');
   });
 
   it('keeps insufficient_data consistent with data_status', async () => {
     const stoppedResult = await createGetRoadsHandler(createPorts(stopped))(event);
 
     expect(body(stoppedResult)).toMatchObject({
-      data_status: 'INSUFFICIENT_DATA',
+      data_status: 'insufficient_data',
       insufficient_data: true,
     });
   });
@@ -477,7 +475,7 @@ describe('GET /roads', () => {
     expect(rows(result, 'segments').map((s) => s.segment_id)).toEqual(['RD_TPE_002', 'RD_TPE_004']);
   });
 
-  it('reports an exact-match row as not stale, with both timestamp spellings', async () => {
+  it('reports a fresh exact-match row as ready and not stale (A)', async () => {
     const result = await createGetRoadsHandler(createPorts())(event);
 
     expect(rows(result, 'segments').find((s) => s.segment_id === 'RD_TPE_002')).toMatchObject({
@@ -486,7 +484,7 @@ describe('GET /roads', () => {
       exact_match: true,
       staleness_minutes: 0,
       is_stale: false,
-      data_status: 'READY',
+      data_status: 'ready',
     });
     // ISO companion for machine consumption, same instant.
     expect(
@@ -495,7 +493,7 @@ describe('GET /roads', () => {
     ).toBe(new Date(2026, 4, 20, 22, 10).toISOString());
   });
 
-  it('marks a latest-prior row stale while keeping data_status READY', async () => {
+  it('marks a latest-prior row stale while keeping data_status ready (B)', async () => {
     // RD_TPE_004 has no row at 22:10 here, so Strategy A falls back to 21:10.
     const traffic = trafficRows().filter(
       (row) => !(row.Segment_ID === 'RD_TPE_004' && row.timestamp_raw === CUTOFF),
@@ -504,7 +502,7 @@ describe('GET /roads', () => {
 
     const result = await createGetRoadsHandler(ports)(event);
 
-    // is_stale=true alongside READY is the whole point: the value is usable AND
+    // is_stale=true alongside ready is the whole point: the value is usable AND
     // old, and the client shows both instead of choosing. The frontend must not
     // derive this — the window is policy.max_staleness_minutes, configuration.
     expect(rows(result, 'segments').find((s) => s.segment_id === 'RD_TPE_004')).toMatchObject({
@@ -512,7 +510,7 @@ describe('GET /roads', () => {
       exact_match: false,
       staleness_minutes: 60,
       is_stale: true,
-      data_status: 'READY',
+      data_status: 'ready',
     });
   });
 
@@ -541,13 +539,13 @@ describe('GET /roads', () => {
     expect(body(result)).toMatchObject({
       staleness_minutes: 60,
       is_stale: true,
-      data_status: 'READY',
+      data_status: 'ready',
       observation_timestamp: CUTOFF,
       provenance: { stale: true, staleness_minutes: 60, exact_match: false },
     });
   });
 
-  it('reports null, never 0, when Strategy A rejects the only candidate', async () => {
+  it('reports null, never 0, when Strategy A rejects the only candidate (C)', async () => {
     const ports: DashboardPorts = {
       ...createPorts(),
       snapshots: {
@@ -570,7 +568,7 @@ describe('GET /roads', () => {
       road_name: null,
       observation_timestamp: null,
       observation_timestamp_iso: null,
-      data_status: 'INSUFFICIENT_DATA',
+      data_status: 'insufficient_data',
       is_stale: false,
     });
     // The healthy segment is unaffected.
@@ -651,6 +649,27 @@ describe('GET /roads', () => {
     const result = await createGetRoadsHandler(createPorts(stopped))(event);
 
     expect(body(result).segments).toEqual([]);
+  });
+
+  it('rejects legacy uppercase and stale data_status values in GetRoadsResponseSchema (D)', async () => {
+    const result = await createGetRoadsHandler(createPorts())(event);
+    const valid = body(result);
+
+    for (const legacyStatus of ['READY', 'STALE', 'INSUFFICIENT_DATA', 'DEGRADED', 'stale']) {
+      const invalid = {
+        ...valid,
+        data_status: legacyStatus,
+        insufficient_data: legacyStatus === 'INSUFFICIENT_DATA',
+      };
+      expect(GetRoadsResponseSchema.safeParse(invalid).success).toBe(false);
+    }
+  });
+
+  it('never publishes PascalCase segment field names on the wire (F)', async () => {
+    const result = await createGetRoadsHandler(createPorts())(event);
+    const payload = JSON.stringify(body(result));
+
+    expect(payload).not.toMatch(/Segment_ID|Road_Name|Saturation_Score|Lane_Status/);
   });
 });
 

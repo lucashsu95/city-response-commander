@@ -66,26 +66,21 @@ export interface GetDecisionResponse {
 /**
  * Wire vocabulary for `data_status` on `GET /roads` (TASK-125).
  *
- * UPPERCASE on the wire, lowercase internally. The domain layer's
- * `IngestionResult.data_status` and Strategy A both speak `'ready' |
- * 'insufficient_data'`; those are NOT changed by this contract. The backend maps
- * at the serialization boundary via `toRoadsDataStatus`, so the internal
- * vocabulary and the published one can evolve independently.
+ * Lowercase on the wire, matching the domain layer's `IngestionResult.data_status`
+ * and Strategy A (`'ready' | 'insufficient_data'`). The backend maps at the
+ * serialization boundary via `toRoadsDataStatus`, preserving a single place to
+ * adjust if the published vocabulary diverges again.
  *
- * `STALE` and `DEGRADED` are declared but have NO producer in the current
- * pipeline. They are part of the published vocabulary so a consumer writes a
- * total switch today rather than a breaking one later. Do not infer staleness
- * from `data_status`: use {@link RoadSegmentDTO.is_stale}, which is the backend's
- * staleness verdict and is `true` alongside `READY` for a usable-but-older row.
+ * Staleness is NOT a `data_status` value. Use {@link RoadSegmentDTO.is_stale},
+ * which is the backend's staleness verdict and is `true` alongside `'ready'` for
+ * a usable-but-older row.
  */
-export type RoadsDataStatus = 'READY' | 'STALE' | 'INSUFFICIENT_DATA' | 'DEGRADED';
+export type RoadsDataStatus = 'ready' | 'insufficient_data';
 
 /** Every legal {@link RoadsDataStatus}, for exhaustiveness checks and validation. */
 export const ROADS_DATA_STATUSES: readonly RoadsDataStatus[] = Object.freeze([
-  'READY',
-  'STALE',
-  'INSUFFICIENT_DATA',
-  'DEGRADED',
+  'ready',
+  'insufficient_data',
 ]);
 
 /**
@@ -132,7 +127,7 @@ export type RoadsPolicyView = PolicyMetadata & {
  * substituted value. This is §21 (no fabrication) and it is deliberate: a
  * `saturation_score` of `0` renders as free-flowing traffic, which is the exact
  * opposite of "unknown", and an operator could route traffic onto a road on that
- * basis. A gap is shown as a gap. `data_status: 'INSUFFICIENT_DATA'` on the row
+ * basis. A gap is shown as a gap. `data_status: 'insufficient_data'` on the row
  * means every value field on it is `null`.
  */
 export interface RoadSegmentDTO {
@@ -158,7 +153,7 @@ export interface RoadSegmentDTO {
   readonly observation_timestamp_iso: string | null;
   /** Minutes between this row and the cutoff. `null` when unmeasurable. */
   readonly staleness_minutes: number | null;
-  /** Backend staleness verdict. May be `true` while `data_status` is `READY`. */
+  /** Backend staleness verdict. May be `true` while `data_status` is `'ready'`. */
   readonly is_stale: boolean;
   /** Whether this row sits exactly on the replay position. */
   readonly exact_match: boolean;
@@ -189,7 +184,7 @@ export interface GetRoadsResponse {
   readonly schema_version: string;
   readonly trace_id: string;
   readonly data_status: RoadsDataStatus;
-  /** `true` exactly when `data_status === 'INSUFFICIENT_DATA'`. */
+  /** `true` exactly when `data_status === 'insufficient_data'`. */
   readonly insufficient_data: boolean;
   /** Present only when the source-hash STOP gate failed (§10.0, §21). */
   readonly stop_reason?: string | null;
@@ -203,7 +198,7 @@ export interface GetRoadsResponse {
   readonly observation_timestamp_iso: string | null;
   /** WORST staleness across usable segments. `null` when none is measurable. */
   readonly staleness_minutes: number | null;
-  /** `true` when ANY usable segment is stale. May be `true` with `READY`. */
+  /** `true` when ANY usable segment is stale. May be `true` with `'ready'`. */
   readonly is_stale: boolean;
   readonly policy: RoadsPolicyView;
   /** `true` while any policy on this response is provisional (§10.6). */
@@ -409,12 +404,12 @@ function validateSegment(input: unknown, basePath: string, fail: Collector): voi
 
   // The no-fabrication invariant, enforced rather than documented: a row with no
   // usable observation must not carry a value that renders as a real reading.
-  if (input.data_status === 'INSUFFICIENT_DATA') {
+  if (input.data_status === 'insufficient_data') {
     for (const field of ['saturation_score', 'road_name', 'lane_status', 'level'] as const) {
       if (input[field] !== null) {
         fail(
           `${basePath}.${field}`,
-          `must be null when data_status is INSUFFICIENT_DATA (§21 no fabrication), got ${JSON.stringify(input[field])}`,
+          `must be null when data_status is insufficient_data (§21 no fabrication), got ${JSON.stringify(input[field])}`,
         );
       }
     }
@@ -460,11 +455,11 @@ function validateRoadsResponse(input: unknown, fail: Collector): void {
   // `insufficient_data` is a derived mirror of `data_status`. Letting the two
   // disagree would give a client two different answers to the same question.
   if (typeof input.insufficient_data === 'boolean' && typeof input.data_status === 'string') {
-    const expected = input.data_status === 'INSUFFICIENT_DATA';
+    const expected = input.data_status === 'insufficient_data';
     if (input.insufficient_data !== expected) {
       fail(
         'insufficient_data',
-        `must equal (data_status === 'INSUFFICIENT_DATA'); got ${String(input.insufficient_data)} with data_status=${String(input.data_status)}`,
+        `must equal (data_status === 'insufficient_data'); got ${String(input.insufficient_data)} with data_status=${String(input.data_status)}`,
       );
     }
   }
@@ -518,12 +513,11 @@ export const GetRoadsResponseSchema: RuntimeSchema<GetRoadsResponse> = {
 };
 
 /**
- * Map the internal lowercase status onto the published vocabulary.
+ * Map the internal status onto the published wire vocabulary.
  *
- * The only mapping the current pipeline can produce. `STALE` is intentionally not
- * returned for a stale-but-usable row: that row is `READY` with `is_stale: true`,
- * which is what lets a client show the value AND its age instead of choosing.
+ * Internal and published values are identical today. Stale-but-usable rows remain
+ * `'ready'` with `is_stale: true`, which lets a client show the value AND its age.
  */
 export function toRoadsDataStatus(internal: 'ready' | 'insufficient_data'): RoadsDataStatus {
-  return internal === 'ready' ? 'READY' : 'INSUFFICIENT_DATA';
+  return internal;
 }

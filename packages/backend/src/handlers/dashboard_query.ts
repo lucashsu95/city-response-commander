@@ -236,7 +236,7 @@ export type RoadSegmentView = RoadSegmentDTO;
  * `GET /roads` — the canonical TASK-125 response.
  *
  * Note this deliberately does NOT extend {@link ResponseEnvelope}: the roads
- * contract publishes UPPERCASE `data_status` and adds `insufficient_data`,
+ * contract publishes lowercase `data_status` and adds `insufficient_data`,
  * `is_stale`, `provenance` and the ISO timestamp companions. `/timeline`,
  * `/crowd` and `/incidents` still use `ResponseEnvelope` and are unchanged by
  * this task.
@@ -622,7 +622,7 @@ function aggregateProvenance(segments: readonly RoadSegmentDTO[]): {
   readonly is_stale: boolean;
   readonly exact_match: boolean;
 } {
-  const usable = segments.filter((segment) => segment.data_status === 'READY');
+  const usable = segments.filter((segment) => segment.data_status === 'ready');
 
   if (usable.length === 0) {
     return {
@@ -693,7 +693,7 @@ function roadsResponseOf(
     schema_version: base.schema_version,
     trace_id: base.trace_id,
     data_status: dataStatus,
-    insufficient_data: dataStatus === 'INSUFFICIENT_DATA',
+    insufficient_data: dataStatus === 'insufficient_data',
     ...(base.stop_reason === undefined ? {} : { stop_reason: base.stop_reason }),
     decision_cutoff_timestamp: base.decision_cutoff_timestamp,
     decision_cutoff_timestamp_iso: cutoff === null ? null : cutoff.toISOString(),
