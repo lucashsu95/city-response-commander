@@ -15,6 +15,8 @@
 
 import { useCallback, useMemo, type ReactNode } from 'react';
 import { createApiClient } from '../api/client.js';
+import { CrowdPanel } from '../crowd/crowd_panel.js';
+import { useCrowdSnapshot } from '../crowd/use_crowd_snapshot.js';
 import { DashboardShell } from '../layout/dashboard_shell.js';
 import { useRealtimeConnection } from '../realtime/use_realtime.js';
 import type { PollingCycleResult } from '../realtime/polling_fallback.js';
@@ -42,6 +44,11 @@ export function DashboardPage(): ReactNode {
   );
 
   const timeline = useTimelinePlayback({ transport });
+
+  // TASK-126: the crowd snapshot re-reads `GET /crowd` whenever the
+  // authoritative replay position advances (§16.1). The timeline's `current` is
+  // the only trigger — the crowd panel never extrapolates a previous snapshot.
+  const crowd = useCrowdSnapshot({ transport, replayPosition: timeline.currentTimestamp });
 
   // FIX 4: `timeline` is a fresh object every render (its state is spread
   // into a new object alongside its stable methods each time), so depending
@@ -100,6 +107,7 @@ export function DashboardPage(): ReactNode {
           onNext={timeline.selectNext}
         />
       }
+      crowdContent={<CrowdPanel snapshot={crowd} onRetry={crowd.refresh} />}
     />
   );
 }

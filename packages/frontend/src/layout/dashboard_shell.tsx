@@ -71,11 +71,21 @@ function RoadTrafficRegion(): ReactNode {
   );
 }
 
+interface CrowdRegionProps {
+  /**
+   * TASK-126 crowd/signaling panel. `undefined` (the default) preserves the
+   * pre-TASK-126 empty state so a `DashboardShell` rendered without a
+   * `crowdContent` prop is unchanged.
+   */
+  readonly content?: ReactNode;
+}
+
 /**
  * Crowd/base-station region - displays user counts and roaming data.
- * Empty state until TASK-126 implementation.
+ * Renders the injected TASK-126 `CrowdPanel` when supplied; otherwise falls
+ * back to the pre-TASK-126 empty state.
  */
-function CrowdRegion(): ReactNode {
+function CrowdRegion({ content }: CrowdRegionProps): ReactNode {
   return (
     <section
       className="dashboard-region dashboard-region--crowd"
@@ -84,8 +94,8 @@ function CrowdRegion(): ReactNode {
       <h2 id="crowd-heading" className="dashboard-region__heading">
         基地台人流
       </h2>
-      <div className="dashboard-region__content">
-        <EmptyState message="尚無可顯示的基地台資料" />
+      <div className="dashboard-region__content dashboard-region__content--stacked">
+        {content ?? <EmptyState message="尚無可顯示的基地台資料" />}
       </div>
     </section>
   );
@@ -154,6 +164,11 @@ export interface DashboardShellProps {
    * controller logic of its own.
    */
   readonly timelineContent?: ReactNode;
+  /**
+   * TASK-126 crowd/signaling panel content. Injected by the Dashboard page for
+   * the same reason as `timelineContent`.
+   */
+  readonly crowdContent?: ReactNode;
 }
 
 /**
@@ -190,6 +205,7 @@ export function DashboardShell({
   pollingErrorMessage = null,
   pollingUpdateCount = 0,
   timelineContent,
+  crowdContent,
 }: DashboardShellProps = {}): ReactNode {
   const operationalStatus = resolveOperationalStatus(selectedSnapshot, connectionMode);
 
@@ -208,7 +224,7 @@ export function DashboardShell({
         <div className="dashboard-grid">
           <TimelineRegion content={timelineContent} />
           <RoadTrafficRegion />
-          <CrowdRegion />
+          <CrowdRegion content={crowdContent} />
           <DecisionRegion
             selectedSnapshot={selectedSnapshot}
             affectedRoadContext={affectedRoadContext}

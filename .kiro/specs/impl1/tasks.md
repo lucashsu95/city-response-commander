@@ -3158,7 +3158,7 @@ CHECKPOINT G (not a task): Ensure enrichment path + §9 boundary hold, and Bedro
   - competition_quality_floor: A=red / B=yellow per backend classification for all 15 segments (client never recomputes level); loading/empty/insufficient-data states shown.
   - demo_or_evidence_output: Road panel showing correct red/yellow for the official events; insufficient-data state rendered.
 
-- [ ] TASK-126 Implement crowd/signaling visualization
+- [x] TASK-126 Implement crowd/signaling visualization
   - objective: Render base-station crowd metrics + multilingual/dispersal flags via `GET /crowd` (§16, R8/R9/R11).
   - requirements_covered: REQ-001, REQ-010, REQ-016, REQ-017, R8, R9, R11
   - design_sections: §16, §12 (/crowd)
