@@ -57,6 +57,14 @@ export function buildDecisionCore(input: DecisionCoreBuildInput): DecisionCore {
     sop_authority: input.sop_authority,
     universal_principles: input.universal_principles,
     grounding_candidates: input.grounding_candidates,
+    // GZAE (spec: .kiro/specs/grey-zone-arbitration-engine/, R5 AC1). Same
+    // hash-exclusion rationale as the UARE fields above: advisory/presentation
+    // annotations derived from already-hashed facts, not new decision-identity
+    // facts.
+    pre_warning_segments: input.pre_warning_segments,
+    signal_conflicts: input.signal_conflicts,
+    cascading_risk: input.cascading_risk,
+    self_blocked_exclusions: input.self_blocked_exclusions,
     provisional: input.provisional,
     schema_version: input.schema_version,
   });

@@ -14,6 +14,8 @@ UARE 是這個縫隙的決定性修補層，遵循全案既有不變量：**決�
 
 UARE 處理「事件**類型**在官方 SOP 查無對應條款」（Type Coverage Gap）。UARE **不**處理「事件**地點**不在路網資料涵蓋範圍內」（Location Coverage Gap，例如 `affected_segment`/`affected_road` 皆不存在於 `road_network_geometry.json` 15 筆路段）——後者是另一個已有草案（`feature/boundary-snapping-containment` 分支、`.kiro/specs/boundary-snapping-containment/`）處理的正交問題。兩者可能同時發生；UARE 假設地點解析（`affected_segment` 或其 `alternatives`）本身是合法、可查表的路網資料，僅類型/規則層面查無依據。若 Location Coverage Gap 的機制先行合併，UARE 應以其輸出的合法路段集合為準（見需求 8）；若尚未合併，UARE 在地點也無法解析時依需求 6 明確回報，不臆測。
 
+UARE 亦與 [[grey-zone-arbitration-engine|GZAE]]（`.kiro/specs/grey-zone-arbitration-engine/`）正交：UARE 處理「`triggered_articles` 為空集合」（條款完全無觸發）；GZAE 處理的是條款**已有**觸發、但觸發判定本身落在數值臨界、跨條款訊號矛盾、多起事件疊加、或候選疏散路段自身亦被封鎖等情境（`triggered_articles` 非空）。兩者互不重疊、互不取代，可能同時作用於同一次決策（例如某次決策 `sop_matched: true` 之餘，仍可能被 GZAE 標註 `pre_warning` 或 `signal_conflict`）。UARE 的 `sop_matched`/`sop_authority` 欄位語意不因 GZAE 存在而改變。
+
 ### 來源標註說明 (Source Tag Legend)
 
 - **[VERIFIED_GAP]** — 經閱讀現行程式碼（`recommendation-generator.ts`、`decision_pipeline.ts`、`article2.ts` 等）核實存在之行為缺口，非假設。

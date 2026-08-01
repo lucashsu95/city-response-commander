@@ -69,6 +69,9 @@ export type {
   SopMatchResult,
 } from './universal_defense.js';
 
+// ─── Grey-Zone Arbitration Engine (GZAE) ────────────────────
+export type { SignalConflict, CascadingRisk } from './grey_zone.js';
+
 // ─── Decision Narrative (§10.11b) ──────────────────────────
 export type {
   DecisionNarrative,
