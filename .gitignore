@@ -68,6 +68,7 @@ coverage/
 *.tmp
 *.bak
 *.orig
+.tmp/
 
 # Python (if boundary exists)
 __pycache__/
@@ -83,3 +84,8 @@ fix_utf8/
 .opencode/
 docs/handoff-notes/
 boulder.json
+
+# Local AWS competition credentials
+.env.aws.local
+.env.aws.*
+!.env.aws.example

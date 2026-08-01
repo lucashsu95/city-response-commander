@@ -9,6 +9,8 @@
   ],
   "scripts": {
     "build": "npm run build --workspaces",
+    "build:frontend": "npm run build --workspace=@city-commander/frontend",
+    "demo": "npm run build:frontend",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:lint-rule": "vitest run eslint-local-rules/test/no-llm-prohibited-field-write.test.ts",
