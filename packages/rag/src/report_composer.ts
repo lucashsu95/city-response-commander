@@ -34,7 +34,8 @@ import {
   type NarrativePutResult,
 } from './narrative_writer.js';
 import type { BedrockInvoker } from './bedrock_adapter.js';
-import { formatCitationLocation, type SopCitationResult } from './sop_retriever.js';
+import { formatCitationLocation } from '@city-commander/shared-schemas';
+import type { SopCitationResult } from './sop_retriever.js';
 
 // ─── Input / Output types ─────────────────────────────────────────────────────
 

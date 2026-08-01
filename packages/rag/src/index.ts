@@ -40,6 +40,9 @@ export {
   type SopRetrieveBothFailed,
 } from './sop_retriever.js';
 
+// Re-export FALLBACK_DISCLOSURE from shared-schemas for consumers
+export { FALLBACK_DISCLOSURE } from '@city-commander/shared-schemas';
+
 // ─── SOP S3 Fallback (TASK-109) ──────────────────────────
 export { SopS3Fallback, type SopArticleFetchResult } from './sop_s3_fallback.js';
 

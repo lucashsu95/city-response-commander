@@ -1,74 +1,152 @@
 /**
- * explainWhatIf — What-if stage 4 unit tests (TASK-140)
+ * explainWhatIf — unit + integration tests (TASK-140)
  *
- * 驗證 Bedrock 失敗 → template fallback 路徑下，s3_fallback citation 的
- * `source_location` 與「（類比引用，非精準比對）」標記（`formatCitationLocation`）
- * 會出現在 `explanation_text` 中（模板 fallback 端到端覆蓋，對應
- * packages/rag/src/explanation_composer.ts 的同等測試）。
+ * 驗證：
+ * - Bedrock success + s3_fallback citation 無揭露 → 附加 FALLBACK_DISCLOSURE
+ * - Bedrock failure + s3_fallback citation → template fallback 含 類比引用 marker
+ * - Bedrock success + kb citation → 不附加 disclosure
  */
 
-import { describe, it, expect } from 'vitest';
-import type { BedrockInvoker, BedrockResult, SopRetriever, SopCitationResult } from '@city-commander/rag';
+import { describe, it, expect, vi } from 'vitest';
 import { explainWhatIf, type WhatIfExplanationInput } from '../../src/whatif/explanation.js';
+import type { BedrockInvoker, BedrockResult, SopRetriever, SopCitationResult, SopRetrieveResult } from '@city-commander/rag';
 import type { RecomputeResult } from '../../src/whatif/whatif_types.js';
 
 // ─── Stub helpers ──────────────────────────────────────────────────────────
 
 function makeRecomputeResult(): RecomputeResult {
   return {
-    triggered_articles: [2],
+    triggered_articles: [1, 2],
     applied_formula_articles: [7],
-    expected_actions: ['維持既有改道路線'],
-    ete_preview: { ete_minutes: 42 },
+    expected_actions: ['SOP-1：封閉事故路段', 'SOP-2：替代路線導引'],
+    ete_preview: { ete_minutes: 45 },
     does_not_mutate_state: true,
   };
 }
 
-const SAMPLE_S3_FALLBACK_CITATIONS: readonly SopCitationResult[] = [
+const S3_FALLBACK_CITATIONS: readonly SopCitationResult[] = [
+  {
+    article_no: 1,
+    content: 'SOP 第 1 條：事故路段封閉原文',
+    source_location: 's3://my-bucket/sop/article-1.json',
+    relevancy_score: null,
+    source: 's3_fallback',
+  },
   {
     article_no: 2,
-    content: 'SOP 第 2 條原文',
-    source_location: 's3://bucket/sop/article-2.json',
+    content: 'SOP 第 2 條：替代路線導引原文',
+    source_location: 's3://my-bucket/sop/article-2.json',
     relevancy_score: null,
     source: 's3_fallback',
   },
 ];
 
-function makeBedrockFailure(): BedrockInvoker {
-  return {
-    async invoke(): Promise<BedrockResult> {
-      return { outcome: 'use_template', reason: 'timeout', message: 'timed out' };
-    },
-  };
-}
+const KB_CITATIONS: readonly SopCitationResult[] = [
+  {
+    article_no: 1,
+    content: 'SOP 第 1 條 KB 原文',
+    source_location: 's3://kb-bucket/chunks/article-1.json',
+    relevancy_score: 0.92,
+    source: 'kb',
+  },
+];
 
-function makeRetrieverReturning(citations: readonly SopCitationResult[]): SopRetriever {
+function makeSopRetriever(citations: readonly SopCitationResult[]): SopRetriever {
   return {
-    async retrieve() {
-      return { outcome: 'success', source: 's3_fallback', citations };
-    },
+    retrieve: vi.fn(async (): Promise<SopRetrieveResult> => ({
+      outcome: 'success',
+      citations,
+      source: citations.some((c) => c.source === 's3_fallback') ? 's3_fallback' : 'kb',
+    })),
   } as unknown as SopRetriever;
 }
 
-function makeInput(overrides: Partial<WhatIfExplanationInput> = {}): WhatIfExplanationInput {
+function makeBedrockSuccess(text: string): BedrockInvoker {
   return {
-    recomputeResult: makeRecomputeResult(),
-    rawQuestion: '若 BL17 人數增至 40000？',
-    sopRetriever: makeRetrieverReturning(SAMPLE_S3_FALLBACK_CITATIONS),
-    bedrockInvoker: makeBedrockFailure(),
-    ...overrides,
+    invoke: vi.fn(async (): Promise<BedrockResult> => ({
+      outcome: 'success',
+      text,
+      usedModelId: 'mock-model',
+    })),
+  };
+}
+
+function makeBedrockFailure(): BedrockInvoker {
+  return {
+    invoke: vi.fn(async (): Promise<BedrockResult> => ({
+      outcome: 'use_template',
+      reason: 'timeout',
+      message: 'timed out',
+    })),
   };
 }
 
 // ─── Tests ─────────────────────────────────────────────────────────────────
 
 describe('explainWhatIf', () => {
-  it('Bedrock failure + s3_fallback citation → template fallback explanation_text includes source_location AND 類比引用 marker', async () => {
-    const result = await explainWhatIf(makeInput());
+  it('Bedrock success + s3_fallback citations WITHOUT disclosure → appends 類比引用 disclosure', async () => {
+    const json = JSON.stringify({ explanation_text: '假設成立時會觸發封閉措施' });
+    const input: WhatIfExplanationInput = {
+      recomputeResult: makeRecomputeResult(),
+      rawQuestion: '如果人潮超過兩萬會怎樣？',
+      sopRetriever: makeSopRetriever(S3_FALLBACK_CITATIONS),
+      bedrockInvoker: makeBedrockSuccess(json),
+    };
+
+    const result = await explainWhatIf(input);
+
+    expect(result.text_source).toBe('bedrock');
+    expect(result.explanation_text).toContain('假設成立時會觸發封閉措施');
+    expect(result.explanation_text).toContain('類比引用');
+    expect(result.does_not_mutate_state).toBe(true);
+  });
+
+  it('Bedrock success + s3_fallback citations WITH disclosure already → no double-append', async () => {
+    const json = JSON.stringify({ explanation_text: '解釋文字，已含類比引用說明' });
+    const input: WhatIfExplanationInput = {
+      recomputeResult: makeRecomputeResult(),
+      rawQuestion: '如果人潮超過兩萬會怎樣？',
+      sopRetriever: makeSopRetriever(S3_FALLBACK_CITATIONS),
+      bedrockInvoker: makeBedrockSuccess(json),
+    };
+
+    const result = await explainWhatIf(input);
+
+    expect(result.text_source).toBe('bedrock');
+    const matches = result.explanation_text.match(/類比引用/g);
+    expect(matches).toHaveLength(1);
+  });
+
+  it('Bedrock success + kb-only citations → no disclosure appended', async () => {
+    const json = JSON.stringify({ explanation_text: '純 KB 解釋' });
+    const input: WhatIfExplanationInput = {
+      recomputeResult: makeRecomputeResult(),
+      rawQuestion: '如果飽和度超標？',
+      sopRetriever: makeSopRetriever(KB_CITATIONS),
+      bedrockInvoker: makeBedrockSuccess(json),
+    };
+
+    const result = await explainWhatIf(input);
+
+    expect(result.text_source).toBe('bedrock');
+    expect(result.explanation_text).toBe('純 KB 解釋');
+    expect(result.explanation_text).not.toContain('類比引用');
+  });
+
+  it('[integration] Bedrock failure + s3_fallback → template contains source_location AND 類比引用 marker', async () => {
+    const input: WhatIfExplanationInput = {
+      recomputeResult: makeRecomputeResult(),
+      rawQuestion: '如果人潮破三萬？',
+      sopRetriever: makeSopRetriever(S3_FALLBACK_CITATIONS),
+      bedrockInvoker: makeBedrockFailure(),
+    };
+
+    const result = await explainWhatIf(input);
 
     expect(result.text_source).toBe('template');
-    expect(result.does_not_mutate_state).toBe(true);
-    expect(result.explanation_text).toContain('s3://bucket/sop/article-2.json');
+    // Template fallback uses formatCitationLocation which appends 類比引用 marker
+    expect(result.explanation_text).toContain('s3://my-bucket/sop/article-1.json');
     expect(result.explanation_text).toContain('類比引用');
+    expect(result.does_not_mutate_state).toBe(true);
   });
 });

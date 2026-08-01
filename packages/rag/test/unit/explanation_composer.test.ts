@@ -251,4 +251,62 @@ describe('composeExplanation', () => {
     expect(payload.explanation_text).toContain('s3://bucket/sop/article-2.json');
     expect(payload.explanation_text).not.toContain('類比引用');
   });
+
+  it('Bedrock success + s3_fallback citation WITHOUT disclosure → appends fallback disclosure', async () => {
+    const json = JSON.stringify({ explanation_text: '這是 Bedrock 產生的解釋文字，不含揭露' });
+    const client = committedClient();
+    const result = await composeExplanation(
+      makeInput({
+        bedrockInvoker: makeBedrockSuccess(json),
+        citations: SAMPLE_S3_FALLBACK_CITATIONS,
+        narrativeClient: client,
+      }),
+    );
+    if (result.outcome !== 'failed') {
+      expect(result.text_source).toBe('bedrock');
+    }
+    const item = (client.conditionalPut as ReturnType<typeof vi.fn>).mock
+      .calls[0]?.[0] as NarrativeItem;
+    const payload = item.payload as { explanation_text: string };
+    expect(payload.explanation_text).toContain('類比引用');
+    expect(payload.explanation_text).toContain('這是 Bedrock 產生的解釋文字');
+  });
+
+  it('Bedrock success + s3_fallback citation WITH disclosure already → does NOT double-append', async () => {
+    const json = JSON.stringify({ explanation_text: '這是解釋，本次含類比引用資料' });
+    const client = committedClient();
+    const result = await composeExplanation(
+      makeInput({
+        bedrockInvoker: makeBedrockSuccess(json),
+        citations: SAMPLE_S3_FALLBACK_CITATIONS,
+        narrativeClient: client,
+      }),
+    );
+    if (result.outcome !== 'failed') {
+      expect(result.text_source).toBe('bedrock');
+    }
+    const item = (client.conditionalPut as ReturnType<typeof vi.fn>).mock
+      .calls[0]?.[0] as NarrativeItem;
+    const payload = item.payload as { explanation_text: string };
+    // Should contain 類比引用 exactly once (already in text, not appended)
+    const matches = payload.explanation_text.match(/類比引用/g);
+    expect(matches).toHaveLength(1);
+  });
+
+  it('Bedrock success + kb-only citation → no fallback disclosure appended', async () => {
+    const json = JSON.stringify({ explanation_text: '純 KB 解釋文字' });
+    const client = committedClient();
+    await composeExplanation(
+      makeInput({
+        bedrockInvoker: makeBedrockSuccess(json),
+        citations: SAMPLE_KB_CITATIONS,
+        narrativeClient: client,
+      }),
+    );
+    const item = (client.conditionalPut as ReturnType<typeof vi.fn>).mock
+      .calls[0]?.[0] as NarrativeItem;
+    const payload = item.payload as { explanation_text: string };
+    expect(payload.explanation_text).not.toContain('類比引用');
+    expect(payload.explanation_text).toBe('純 KB 解釋文字');
+  });
 });

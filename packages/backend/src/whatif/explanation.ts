@@ -22,8 +22,8 @@
  * @module backend/whatif/explanation
  */
 
-import { NarrativeType } from '@city-commander/shared-schemas';
-import { validateBedrockPayload, formatCitationLocation } from '@city-commander/rag';
+import { NarrativeType, formatCitationLocation, FALLBACK_DISCLOSURE } from '@city-commander/shared-schemas';
+import { validateBedrockPayload } from '@city-commander/rag';
 import type { SopRetriever, SopCitationResult } from '@city-commander/rag';
 import type { BedrockInvoker } from '@city-commander/rag';
 import type { RecomputeResult } from './whatif_types.js';
@@ -155,7 +155,13 @@ export async function explainWhatIf(
       const effectiveText = rawText != null && rawText.trim().length > 0 ? rawText : null;
 
       if (effectiveText !== null) {
-        explanationText = effectiveText;
+        // Issue #15: 若 citations 含 s3_fallback 且 Bedrock 文字未揭露，強制附加揭露
+        const hasFallbackCitation = citations.some((c) => c.source === 's3_fallback');
+        const alreadyDiscloses = /類比引用|通用安全建議/.test(effectiveText);
+        explanationText =
+          hasFallbackCitation && !alreadyDiscloses
+            ? effectiveText + FALLBACK_DISCLOSURE
+            : effectiveText;
         textSource = 'bedrock';
       } else {
         // SchemaValidator 通過但 explanation_text 為空 → template fallback

@@ -28,6 +28,7 @@ import type {
   ClassificationReasoning,
   ExcludedRouteReason,
 } from '@city-commander/shared-schemas';
+import { formatCitationLocation, FALLBACK_DISCLOSURE } from '@city-commander/shared-schemas';
 import { validateBedrockPayload } from './schema_validator.js';
 import {
   putNarrative,
@@ -36,7 +37,7 @@ import {
   type NarrativePutResult,
 } from './narrative_writer.js';
 import type { BedrockInvoker } from './bedrock_adapter.js';
-import { formatCitationLocation, type SopCitationResult } from './sop_retriever.js';
+import type { SopCitationResult } from './sop_retriever.js';
 
 // ─── Input / Output types ─────────────────────────────────────────────────────
 
@@ -133,12 +134,27 @@ export async function composeExplanation(
       const rawText = validation.fields['explanation_text'];
       const effectiveText = rawText != null && rawText.trim().length > 0 ? rawText : null;
 
-      explanationPayload = {
-        type: 'EXPLANATION',
-        explanation_text: effectiveText ?? buildFallbackExplanationText(core, citations),
-      };
-      // text_source 只在 Bedrock 實際提供非空文字時才標記為 'bedrock'
-      textSource = effectiveText !== null ? 'bedrock' : 'template';
+      if (effectiveText !== null) {
+        // Issue #15: 若 citations 含 s3_fallback 且 Bedrock 文字未揭露，強制附加揭露
+        const hasFallbackCitation = citations.some((c) => c.source === 's3_fallback');
+        const alreadyDiscloses = /類比引用|通用安全建議/.test(effectiveText);
+        const finalText =
+          hasFallbackCitation && !alreadyDiscloses
+            ? effectiveText + FALLBACK_DISCLOSURE
+            : effectiveText;
+
+        explanationPayload = {
+          type: 'EXPLANATION',
+          explanation_text: finalText,
+        };
+        textSource = 'bedrock';
+      } else {
+        explanationPayload = {
+          type: 'EXPLANATION',
+          explanation_text: buildFallbackExplanationText(core, citations),
+        };
+        textSource = 'template';
+      }
     } else {
       // SchemaValidator 拒絕（含 core field overwrite 嘗試）→ template
       explanationPayload = buildTemplateExplanation(core, citations);
