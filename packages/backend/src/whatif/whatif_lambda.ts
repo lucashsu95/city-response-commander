@@ -23,6 +23,8 @@ import { createProductionWhatIfHandler } from './production_handler.js';
 
 const BUCKET = process.env['DEMO_DATA_BUCKET'] ?? '';
 const REGION = process.env['BEDROCK_REGION'] ?? 'us-west-2';
+const SKIP_HASH_VERIFICATION =
+  process.env['DEMO_SKIP_HASH_VERIFICATION'] === 'true';
 
 let cachedHandler: ((event: APIGatewayProxyEventV2) => Promise<APIGatewayProxyResultV2>) | null =
   null;
@@ -53,7 +55,9 @@ async function buildHandler(): Promise<
     },
   };
 
-  return createProductionWhatIfHandler(provider);
+  return createProductionWhatIfHandler(provider, {
+    skipHashVerification: SKIP_HASH_VERIFICATION,
+  });
 }
 
 export const handler = async (

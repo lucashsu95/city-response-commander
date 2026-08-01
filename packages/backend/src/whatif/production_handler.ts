@@ -29,20 +29,28 @@ import { ProductionBedrockInvoker } from './production_bedrock_invoker.js';
  * @param provider - DataSourceProvider pointing at the 5 official runtime
  *                   sources. Source integrity is verified by the facade
  *                   during loadBaseline().
+ * @param options - Options for the production handler.
  */
 export function createProductionWhatIfHandler(
   provider: DataSourceProvider,
+  options?: { skipHashVerification?: boolean },
 ): (event: APIGatewayProxyEventV2) => Promise<APIGatewayProxyResultV2> {
   // Eager-load ingestion to derive the SOP retriever's view of articles.
   // The facade also runs ingestData internally; we keep one source of truth.
-  const ingestion = ingestData(provider);
+  // Bypass hash verification in demo mode — data is from controlled S3 bucket.
+  const ingestionOptions = options?.skipHashVerification
+    ? { expectedHashes: {} }
+    : undefined;
+  const ingestion = ingestData(provider, ingestionOptions);
   if (ingestion.data_status !== 'ready' || ingestion.sopArticles === undefined) {
     throw new Error(
       `What-if Lambda cannot start: ingestion failed (${ingestion.stop_reason ?? 'unknown'})`,
     );
   }
 
-  const facade = new ProductionRuleEngineWhatIfFacade(provider);
+  const facade = new ProductionRuleEngineWhatIfFacade(provider, undefined, {
+    skipHashVerification: options?.skipHashVerification,
+  });
   const sopRetriever = new LocalSopRetriever(ingestion.sopArticles);
   const bedrockInvoker = new ProductionBedrockInvoker();
 

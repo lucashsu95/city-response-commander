@@ -36,6 +36,9 @@ async function loadFromS3(): Promise<DemoDataSet> {
     buffers[`${field}Timestamps`] = Buffer.alloc(0); // placeholder
   }
 
+  const SKIP_HASH_VERIFICATION =
+    process.env['DEMO_SKIP_HASH_VERIFICATION'] === 'true';
+
   const provider = {
     getBuffer(filename: string): Buffer | null {
       if (filename === files.TRAFFIC) return buffers.traffic;
@@ -47,7 +50,7 @@ async function loadFromS3(): Promise<DemoDataSet> {
     },
   };
 
-  const result = ingestData(provider);
+  const result = ingestData(provider, SKIP_HASH_VERIFICATION ? { expectedHashes: {} } : undefined);
   if (result.data_status !== 'ready') {
     throw new Error(`Data ingestion failed: ${result.stop_reason}`);
   }

@@ -108,6 +108,7 @@ export class DemoBackendStack extends Stack {
         DEMO_DATA_BUCKET: dataBucket.bucketName,
         BEDROCK_REGION: 'us-west-2',
         DEMO_MODE: 'true',
+        DEMO_SKIP_HASH_VERIFICATION: 'true',
         AWS_NODEJS_CONNECTION_REUSE_ENABLED: '1',
       },
     });

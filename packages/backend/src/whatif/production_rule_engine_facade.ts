@@ -103,18 +103,26 @@ interface ProductionBaselineSnapshot {
  * never mutates it; every rerun() deep-clones the snapshot before applying
  * assumptions.
  */
+export interface ProductionFacadeOptions {
+  readonly skipHashVerification?: boolean;
+}
+
 export class ProductionRuleEngineWhatIfFacade implements RuleEngineWhatIfFacade {
   private readonly snapshot: ProductionBaselineSnapshot;
   private readonly configProvider: ConfigProvider;
 
-  constructor(provider: DataSourceProvider, configProvider?: ConfigProvider) {
+  constructor(provider: DataSourceProvider, configProvider?: ConfigProvider, options?: ProductionFacadeOptions) {
     this.configProvider = configProvider ?? defaultConfigProvider();
 
     // Verify + parse all 5 official files at construction time.
     // ingestData runs the manifest gate; on hash mismatch it returns
     // insufficient_data, which we surface as a hard error so the Lambda
     // never silently serves unverified data.
-    const ingestion = ingestData(provider);
+    // In demo mode, hash verification is bypassed via DEMO_SKIP_HASH_VERIFICATION.
+    const ingestionOptions = options?.skipHashVerification
+      ? { expectedHashes: {} }
+      : undefined;
+    const ingestion = ingestData(provider, ingestionOptions);
     if (ingestion.data_status !== 'ready') {
       throw new Error(`What-if baseline ingestion failed: ${ingestion.stop_reason ?? 'unknown'}`);
     }
