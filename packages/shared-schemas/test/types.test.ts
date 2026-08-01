@@ -33,8 +33,24 @@ import type {
   TimelineUpdatedEvent,
   DecisionFastPathReadyEvent,
   ProcessingFailedEvent,
+  EntityScopeResult,
+  PerimeterAnchor,
+  SnapResult,
+  BoundarySnapperConfig,
+  SopCoverageResult,
+  UniversalPrinciple,
+  ContainmentDisclosure,
+  MappedAnchorNode,
 } from '../src/index.js';
-import { NarrativeType, IdempotencyStatus, PublishStatus, SCHEMA_VERSION } from '../src/index.js';
+import {
+  NarrativeType,
+  IdempotencyStatus,
+  PublishStatus,
+  SCHEMA_VERSION,
+  DEFAULT_UNIVERSAL_SOP,
+  CONTAINMENT_PROHIBITED_KEYS,
+  CONTAINMENT_PROHIBITED_PATHS,
+} from '../src/index.js';
 
 /**
  * Compile-time type assertion helper.
@@ -320,6 +336,116 @@ describe('shared-schemas type-level assertions', () => {
       };
       expect(event.retryable).toBe(false);
       expect(event.error_code).toBe('CORE_IDENTITY_CONFLICT');
+    });
+  });
+
+  describe('Boundary Snapping & Containment types (spec: boundary-snapping-containment)', () => {
+    it('EntityScopeResult type exists with all coverage_status branches', () => {
+      const inScope: EntityScopeResult = {
+        coverage_status: 'IN_SCOPE',
+        decision_anchor_segment_id: 'RD_TPE_002',
+        matched_field: 'affected_segment',
+        matched_value: 'RD_TPE_002',
+      };
+      const outOfBounds: EntityScopeResult = {
+        coverage_status: 'OUT_OF_BOUNDS',
+        decision_anchor_segment_id: null,
+        matched_field: null,
+        matched_value: null,
+      };
+      expect(inScope.coverage_status).toBe('IN_SCOPE');
+      expect(outOfBounds.decision_anchor_segment_id).toBeNull();
+    });
+
+    it('PerimeterAnchor and SnapResult types exist', () => {
+      const anchor: PerimeterAnchor = {
+        segment_id: 'RD_TPE_009',
+        gateway_intersection: '環河南路口',
+        capacity_vph: 2500,
+      };
+      const snapped: SnapResult = {
+        coverage_status: 'OUT_OF_BOUNDS_SNAPPED',
+        anchor,
+        distance_meters: null,
+        reason: 'nearest_perimeter_anchor_by_capacity',
+        evidence: ['distance_threshold_not_applicable'],
+      };
+      const outOfJurisdiction: SnapResult = {
+        coverage_status: 'OUT_OF_JURISDICTION',
+        anchor: null,
+        distance_meters: null,
+        reason: 'no_perimeter_anchor_available',
+        evidence: [],
+      };
+      expect(snapped.anchor?.segment_id).toBe('RD_TPE_009');
+      expect(outOfJurisdiction.anchor).toBeNull();
+    });
+
+    it('BoundarySnapperConfig requires max_snap_distance_meters (no provisional default)', () => {
+      const config: BoundarySnapperConfig = {
+        max_snap_distance_meters: 500,
+        coordinate_path_enabled: false,
+      };
+      expect(config.max_snap_distance_meters).toBe(500);
+      expect(config.anchor_gazetteer).toBeUndefined();
+    });
+
+    it('DEFAULT_UNIVERSAL_SOP has exactly the 3 principles from R6 AC4', () => {
+      expect(DEFAULT_UNIVERSAL_SOP).toHaveLength(3);
+      const ids = DEFAULT_UNIVERSAL_SOP.map((p) => p.principle_id);
+      expect(ids).toEqual(['UPSTREAM_REDUCTION', 'PERIMETER_DISPERSAL', 'PERIMETER_CONTROL']);
+    });
+
+    it('SopCoverageResult distinguishes OFFICIAL_SOP_MATCHED from UNKNOWN_TYPE_UNIVERSAL_SOP', () => {
+      const officialMatch: SopCoverageResult = {
+        sop_coverage_status: 'OFFICIAL_SOP_MATCHED',
+        sop_authority: 'OFFICIAL_SOP',
+        matched_article_nos: [5],
+        universal_principles: [],
+      };
+      const universalFallback: SopCoverageResult = {
+        sop_coverage_status: 'UNKNOWN_TYPE_UNIVERSAL_SOP',
+        sop_authority: 'SYSTEM_DEFAULT_PRINCIPLE',
+        matched_article_nos: [],
+        universal_principles: DEFAULT_UNIVERSAL_SOP,
+      };
+      expect(officialMatch.sop_authority).toBe('OFFICIAL_SOP');
+      expect(universalFallback.sop_authority).toBe('SYSTEM_DEFAULT_PRINCIPLE');
+    });
+
+    it('ContainmentDisclosure type exists and mapped_anchor_node carries distance_meters', () => {
+      const mappedAnchor: MappedAnchorNode = {
+        segment_id: 'RD_TPE_009',
+        gateway_intersection: '環河南路口',
+        capacity_vph: 2500,
+        distance_meters: null,
+      };
+      const disclosure: ContainmentDisclosure = {
+        data_scope_status: 'OUT_OF_BOUNDS_SNAPPED',
+        mapped_anchor_node: mappedAnchor,
+        sop_coverage_status: 'UNKNOWN_TYPE_UNIVERSAL_SOP',
+        sop_authority: 'SYSTEM_DEFAULT_PRINCIPLE',
+        decision: {
+          reroute_roads: ['RD_TPE_009'],
+          perimeter_control: {
+            action: 'BLOCK_ENTRY',
+            target_gate: 'RD_TPE_009',
+            reason: '事故點位於轄區地圖外圍，於最接近之周界節點設立防衛封鎖線',
+          },
+          ai_reasoning: null,
+        },
+        whitelist_violations: [],
+      };
+      expect(disclosure.mapped_anchor_node?.distance_meters).toBeNull();
+    });
+
+    it('CONTAINMENT_PROHIBITED_KEYS/PATHS cover the R13 AC1 field set', () => {
+      expect(CONTAINMENT_PROHIBITED_KEYS.has('data_scope_status')).toBe(true);
+      expect(CONTAINMENT_PROHIBITED_KEYS.has('mapped_anchor_node')).toBe(true);
+      expect(CONTAINMENT_PROHIBITED_KEYS.has('sop_coverage_status')).toBe(true);
+      expect(CONTAINMENT_PROHIBITED_KEYS.has('sop_authority')).toBe(true);
+      expect(CONTAINMENT_PROHIBITED_PATHS.has('decision.reroute_roads')).toBe(true);
+      expect(CONTAINMENT_PROHIBITED_PATHS.has('decision.perimeter_control')).toBe(true);
     });
   });
 });

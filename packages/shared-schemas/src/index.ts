@@ -126,3 +126,32 @@ export type {
   PublishStatusChangedEvent,
   ProcessingFailedEvent,
 } from './events.js';
+
+// ─── Boundary Snapping & Containment (spec: boundary-snapping-containment) ──
+export type {
+  LocationCoverageStatus,
+  DataScopeStatus,
+  EntityScopeResult,
+  PerimeterAnchor,
+  SnapResult,
+  AnchorGazetteerEntry,
+  BoundarySnapperConfig,
+} from './boundary_snapping.js';
+
+export type {
+  SopCoverageStatus,
+  SopAuthority,
+  UniversalPrincipleId,
+  UniversalPrinciple,
+  SopCoverageResult,
+} from './sop_coverage.js';
+export { DEFAULT_UNIVERSAL_SOP } from './sop_coverage.js';
+
+export type {
+  MappedAnchorNode,
+  PerimeterControl,
+  WhitelistViolation,
+  ContainmentDecision,
+  ContainmentDisclosure,
+} from './containment_disclosure.js';
+export { CONTAINMENT_PROHIBITED_KEYS, CONTAINMENT_PROHIBITED_PATHS } from './containment_disclosure.js';
