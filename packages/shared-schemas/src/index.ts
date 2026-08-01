@@ -136,6 +136,7 @@ export type {
   SnapResult,
   AnchorGazetteerEntry,
   BoundarySnapperConfig,
+  BoundarySnapperConfigError,
 } from './boundary_snapping.js';
 
 export type {

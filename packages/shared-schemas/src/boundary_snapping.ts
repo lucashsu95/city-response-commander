@@ -62,6 +62,9 @@ export interface AnchorGazetteerEntry {
 /**
  * Config consumed by Boundary_Snapper. Read from ConfigProvider's
  * `boundary_snapping.*` keys — see packages/config/src/config_schema.ts.
+ *
+ * `anchor_gazetteer` is keyed by `PerimeterAnchor.segment_id` (design.md §4.3
+ * decision — the only unique, stable key available on a PerimeterAnchor).
  */
 export interface BoundarySnapperConfig {
   /** Required; no provisional default — missing means explicit failure (R5 AC1/AC2). */
@@ -69,4 +72,15 @@ export interface BoundarySnapperConfig {
   readonly coordinate_path_enabled: boolean;
   /** Present only when coordinate_path_enabled and a source is configured (R3 AC1/AC3). */
   readonly anchor_gazetteer?: ReadonlyMap<string, AnchorGazetteerEntry>;
+}
+
+/**
+ * Returned by `snap()` in place of a `SnapResult` when
+ * `max_snap_distance_meters` is missing at the point of use — a defense-in-
+ * depth runtime check independent of the caller correctly enforcing the
+ * config schema's required-ness (R5 AC1/AC2).
+ */
+export interface BoundarySnapperConfigError {
+  readonly error: 'CONFIG_MISSING';
+  readonly missing_key: 'boundary_snapping.max_snap_distance_meters';
 }

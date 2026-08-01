@@ -97,7 +97,7 @@ Task ID scheme: `TASK-BS-01..TASK-BS-19`, flat and sequential. `CHECKPOINT` line
   - tests_required: `packages/domain/test/unit/perimeter_anchor_derivation.test.ts`.
   - done_definition: Anchor set is stable across repeated calls (no random iteration order dependency) and reviewed against the real fixture data by hand once, then locked as a golden fixture.
 
-- [ ] TASK-BS-06 Implement `snap` selection logic + `Max_Snap_Distance_Meters` gate (Requirement 4 AC3–AC5, AC8; Requirement 5)
+- [x] TASK-BS-06 Implement `snap` selection logic + `Max_Snap_Distance_Meters` gate (Requirement 4 AC3–AC5, AC8; Requirement 5)
   - objective: Given an `OUT_OF_BOUNDS` incident, deterministically pick the correct perimeter anchor (or declare the incident out of jurisdiction) using only config-driven thresholds.
   - requirements_covered: R4, R5
   - design_sections: §4.2, §4.3
@@ -113,7 +113,7 @@ Task ID scheme: `TASK-BS-01..TASK-BS-19`, flat and sequential. `CHECKPOINT` line
   - tests_required: `packages/domain/test/unit/boundary_snapper_boundary.test.ts`; property tests P-B1, P-B3 from design.md §10.
   - done_definition: `snap()` never returns a `segment_id` outside Road_Whitelist across 100+ fast-check iterations (P-B1).
 
-- [ ] TASK-BS-07 Implement haversine coordinate path (Requirement 3)
+- [x] TASK-BS-07 Implement haversine coordinate path (Requirement 3) — 與 TASK-BS-06 一併完成，見其 commit
   - objective: Provide ground-distance calculation for the optional coordinate path so a future `Anchor_Gazetteer` integration is correct on day one, even though it is inert against the current official dataset.
   - requirements_covered: R3
   - design_sections: §4.3
