@@ -1,0 +1,226 @@
+name: Deploy Temp Backend to AWS
+
+on:
+  push:
+    branches:
+      - temp/restore-cdk-deployment-source
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: city-commander-temp-backend-deploy
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: ${{ vars.AWS_REGION }}
+  STACK_NAME: CityCommanderDemoBackend
+
+jobs:
+  deploy-backend:
+    name: Deploy backend
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout pushed commit
+        uses: actions/checkout@v4
+
+      - name: Verify deployment commit
+        shell: bash
+        run: |
+          echo "GitHub SHA: $GITHUB_SHA"
+          echo "Checked-out SHA: $(git rev-parse HEAD)"
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build shared schemas
+        run: npm run build --workspace packages/shared-schemas
+
+      - name: Build domain
+        run: npm run build --workspace packages/domain
+
+      - name: Build backend
+        run: npm run build --workspace packages/backend
+
+      - name: Build infrastructure
+        run: npm run build --workspace infra
+
+      - name: Configure AWS credentials through OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+          role-session-name: city-commander-github-deploy
+
+      - name: Verify AWS identity
+        shell: bash
+        run: |
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          echo "AWS Account: $ACCOUNT_ID"
+          test "$ACCOUNT_ID" = "873354961545"
+
+      - name: CDK synth
+        working-directory: infra
+        run: |
+          npx cdk synth CityCommanderDemoBackend \
+            --context env=COMPETITION_AWS \
+            --context demoBackend=true
+
+      - name: CDK diff
+        working-directory: infra
+        shell: bash
+        run: |
+          set +e
+          npx cdk diff CityCommanderDemoBackend \
+            --context env=COMPETITION_AWS \
+            --context demoBackend=true \
+            2>&1 | tee cdk-diff.txt
+          DIFF_EXIT=${PIPESTATUS[0]}
+          set -e
+
+          if grep -E "city-commander-demo-data-873354961545-us-west-2.*(destroy|replace|delete)" \
+            cdk-diff.txt -i; then
+            echo "Blocked: CDK diff may delete or replace the official data bucket."
+            exit 1
+          fi
+
+          if [ "$DIFF_EXIT" -ne 0 ] && [ "$DIFF_EXIT" -ne 1 ]; then
+            exit "$DIFF_EXIT"
+          fi
+
+      - name: Deploy backend
+        working-directory: infra
+        run: |
+          npx cdk deploy CityCommanderDemoBackend \
+            --context env=COMPETITION_AWS \
+            --context demoBackend=true \
+            --require-approval never \
+            --outputs-file cdk-outputs-github.json
+
+      - name: Verify CloudFormation status
+        shell: bash
+        run: |
+          STATUS=$(aws cloudformation describe-stacks \
+            --stack-name CityCommanderDemoBackend \
+            --region "$AWS_REGION" \
+            --query "Stacks[0].StackStatus" \
+            --output text)
+
+          echo "STACK_STATUS=$STATUS" >> "$GITHUB_ENV"
+          echo "CloudFormation status: $STATUS"
+
+          case "$STATUS" in
+            CREATE_COMPLETE|UPDATE_COMPLETE) ;;
+            *) exit 1 ;;
+          esac
+
+      - name: Resolve API URL
+        shell: bash
+        run: |
+          API_URL=$(node - <<'NODE'
+          const fs = require("fs");
+          const data = JSON.parse(
+            fs.readFileSync("infra/cdk-outputs-github.json", "utf8")
+          );
+          const stack = data.CityCommanderDemoBackend ?? {};
+          const value =
+            stack.DemoApiUrl ??
+            stack.ApiUrl ??
+            Object.entries(stack).find(([key]) =>
+              /api.*url/i.test(key)
+            )?.[1];
+
+          if (!value) {
+            process.exit(1);
+          }
+
+          process.stdout.write(String(value).replace(/\/$/, ""));
+          NODE
+          )
+
+          echo "API_URL=$API_URL" >> "$GITHUB_ENV"
+          echo "API URL: $API_URL"
+
+      - name: Health smoke test
+        shell: bash
+        run: |
+          node <<'NODE'
+          const baseUrl = process.env.API_URL;
+          const url = `${baseUrl}/health`;
+
+          const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+          async function main() {
+            let lastError;
+
+            for (let attempt = 1; attempt <= 12; attempt++) {
+              try {
+                const response = await fetch(url);
+                const text = await response.text();
+
+                if (!response.ok) {
+                  throw new Error(`HTTP ${response.status}: ${text}`);
+                }
+
+                const body = JSON.parse(text);
+
+                if (body.data_loaded !== true) {
+                  throw new Error(`data_loaded is not true: ${text}`);
+                }
+
+                console.log("Health check passed:", body);
+                return;
+              } catch (error) {
+                lastError = error;
+                console.error(`Attempt ${attempt}/12 failed:`, error.message);
+
+                if (attempt < 12) {
+                  await sleep(5000);
+                }
+              }
+            }
+
+            throw lastError;
+          }
+
+          main().catch(error => {
+            console.error(error);
+            process.exit(1);
+          });
+          NODE
+
+      - name: Deployment summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "## City Commander backend deployment"
+            echo ""
+            echo "- Branch: \`${GITHUB_REF_NAME}\`"
+            echo "- Commit: \`${GITHUB_SHA}\`"
+            echo "- AWS account: \`873354961545\`"
+            echo "- Region: \`${AWS_REGION}\`"
+            echo "- Stack: \`${STACK_NAME}\`"
+            echo "- Stack status: \`${STACK_STATUS:-unknown}\`"
+            echo "- API URL: \`${API_URL:-unavailable}\`"
+            echo "- Frontend deployment: intentionally skipped"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload deployment outputs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: city-commander-temp-backend-deployment
+          path: infra/cdk-outputs-github.json
+          if-no-files-found: warn
