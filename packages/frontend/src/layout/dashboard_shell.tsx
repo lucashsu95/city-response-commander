@@ -106,18 +106,26 @@ interface DecisionRegionProps {
   readonly selectedSnapshot: SelectedSnapshot | null;
   /** Canonical backend-provided affected-road context, or null when not supplied. */
   readonly affectedRoadContext: AffectedRoadContext | null;
+  /**
+   * TASK-132 decision panels (report + public alert). `undefined` (the default)
+   * preserves the pre-TASK-132 empty state so a `DashboardShell` rendered
+   * without a `decisionContent` prop is unchanged.
+   */
+  readonly content?: ReactNode;
 }
 
 /**
  * Decision command region - displays decision results and canonical context.
  *
  * Renders the canonical SelectedSnapshot and AffectedRoadContext presentation
- * panels. Both display backend-provided values only; the detailed decision
- * experience belongs to TASK-129/131/132.
+ * panels. Both display backend-provided values only. The TASK-132 report and
+ * public-alert panels are injected as `content`; the remaining decision detail
+ * belongs to TASK-129/130/131.
  */
 function DecisionRegion({
   selectedSnapshot,
   affectedRoadContext,
+  content,
 }: DecisionRegionProps): ReactNode {
   return (
     <section
@@ -128,7 +136,7 @@ function DecisionRegion({
         決策指令
       </h2>
       <div className="dashboard-region__content dashboard-region__content--stacked">
-        <EmptyState message="目前尚無可顯示的決策結果" />
+        {content ?? <EmptyState message="目前尚無可顯示的決策結果" />}
         <SnapshotProvenance snapshot={selectedSnapshot} />
         <AffectedRoadContextView context={affectedRoadContext} />
       </div>
@@ -169,6 +177,11 @@ export interface DashboardShellProps {
    * the same reason as `timelineContent`.
    */
   readonly crowdContent?: ReactNode;
+  /**
+   * TASK-132 decision panel content (report + public alert). Injected by the
+   * Dashboard page for the same reason as `timelineContent`.
+   */
+  readonly decisionContent?: ReactNode;
 }
 
 /**
@@ -206,6 +219,7 @@ export function DashboardShell({
   pollingUpdateCount = 0,
   timelineContent,
   crowdContent,
+  decisionContent,
 }: DashboardShellProps = {}): ReactNode {
   const operationalStatus = resolveOperationalStatus(selectedSnapshot, connectionMode);
 
@@ -228,6 +242,7 @@ export function DashboardShell({
           <DecisionRegion
             selectedSnapshot={selectedSnapshot}
             affectedRoadContext={affectedRoadContext}
+            content={decisionContent}
           />
         </div>
       </main>

@@ -13,13 +13,17 @@
  * @module frontend/pages/dashboard
  */
 
-import { useCallback, useMemo, type ReactNode } from 'react';
+import { useCallback, useMemo, useState, type ReactNode } from 'react';
 import { createApiClient } from '../api/client.js';
 import { CrowdPanel } from '../crowd/crowd_panel.js';
 import { useCrowdSnapshot } from '../crowd/use_crowd_snapshot.js';
+import { AlertPanel } from '../decision/alert_panel.js';
+import { ReportPanel } from '../decision/report_panel.js';
+import { useDecisionReadModel } from '../decision/use_decision_read_model.js';
 import { DashboardShell } from '../layout/dashboard_shell.js';
 import { useRealtimeConnection } from '../realtime/use_realtime.js';
 import type { PollingCycleResult } from '../realtime/polling_fallback.js';
+import type { ReadyEventCommit } from '../realtime/use_realtime.js';
 import type { RealtimeEventEnvelope } from '../realtime/transport_events.js';
 import { useAppConfig } from '../state/app_context.js';
 import { TimelinePanel } from '../timeline/timeline_panel.js';
@@ -50,6 +54,14 @@ export function DashboardPage(): ReactNode {
   // the only trigger — the crowd panel never extrapolates a previous snapshot.
   const crowd = useCrowdSnapshot({ transport, replayPosition: timeline.currentTimestamp });
 
+  // TASK-132: the decision panels read `GET /decisions/{decision_id}`. The id is
+  // only known once a realtime event names one (§13: every decision-scoped event
+  // carries `decision_id`); until then the panels stay in their explicit
+  // "no decision yet" state rather than showing a fabricated report.
+  const [decisionId, setDecisionId] = useState<string | null>(null);
+  const decision = useDecisionReadModel({ transport, decisionId });
+  const { refresh: refreshDecision, ingestDecisionPayload } = decision;
+
   // FIX 4: `timeline` is a fresh object every render (its state is spread
   // into a new object alongside its stable methods each time), so depending
   // on `[timeline]` would recreate these callbacks — and therefore the
@@ -67,9 +79,35 @@ export function DashboardPage(): ReactNode {
         // It never seeds timeline state directly — it requests the
         // authoritative GET /timeline refresh.
         refreshTimeline();
+        return;
       }
+
+      // TASK-132: `publish.status_changed`, `processing.failed` and
+      // `incident.injected` carry no `ready_event_id`, so they arrive here
+      // rather than through the dedup coordinator. They are still only
+      // notifications: they name the decision and request an authoritative
+      // re-read, and never supply decision state themselves.
+      if (envelope.decisionId === null) return;
+      setDecisionId((previous) => (previous === envelope.decisionId ? previous : envelope.decisionId));
+      refreshDecision();
     },
-    [refreshTimeline],
+    [refreshDecision, refreshTimeline],
+  );
+
+  // TASK-132: `decision.fast_path_ready` / `decision.enriched` / `report.ready` /
+  // `public_alert.ready` are deduplicated by the TASK-123 coordinator, which
+  // already fetched the authoritative `GET /decisions/{id}` body during
+  // reconciliation. Consume that body instead of issuing a second request; it is
+  // re-validated by the decision decoder before anything is rendered.
+  const handleReadyEvent = useCallback(
+    (commit: ReadyEventCommit) => {
+      const committedId = commit.envelope.decisionId;
+      if (committedId !== null) {
+        setDecisionId((previous) => (previous === committedId ? previous : committedId));
+      }
+      ingestDecisionPayload(commit.decision);
+    },
+    [ingestDecisionPayload],
   );
 
   const handlePollingCycle = useCallback(
@@ -90,6 +128,7 @@ export function DashboardPage(): ReactNode {
     apiEndpoint: config.apiEndpoint,
     wsEndpoint: config.wsEndpoint,
     onEvent: handleRealtimeEvent,
+    onReadyEvent: handleReadyEvent,
     onPollingCycle: handlePollingCycle,
   });
 
@@ -108,6 +147,12 @@ export function DashboardPage(): ReactNode {
         />
       }
       crowdContent={<CrowdPanel snapshot={crowd} onRetry={crowd.refresh} />}
+      decisionContent={
+        <>
+          <ReportPanel decision={decision} onRetry={decision.refresh} />
+          <AlertPanel decision={decision} onRetry={decision.refresh} />
+        </>
+      }
     />
   );
 }

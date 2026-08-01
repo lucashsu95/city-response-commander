@@ -3309,7 +3309,7 @@ CHECKPOINT G (not a task): Ensure enrichment path + §9 boundary hold, and Bedro
   - competition_quality_floor: ETE value + complete calculation basis; event/cutoff/common-snapshot timing; affected road roles and inputs; full formula substitution; organizer-guidance provenance; explicit insufficient-common-snapshot/lower-bound display; selected policy never presented as the official/host-mandated unique answer.
   - demo_or_evidence_output: ETE panel for ACC_001 showing 78.6 minutes, 22:00 common ETE snapshot, RD_TPE_002/RD_TPE_004/RD_TPE_005 roles and saturation values, full formula substitution, and HG-001 organizer-guidance provenance.
 
-- [ ] TASK-132 Implement report + public-alert panels
+- [x] TASK-132 Implement report + public-alert panels
   - objective: Render the command-center report and multilingual public alert from the read model (Core+Narrative), with template-text indication when narratives are not yet ready (§16, R13/R14).
   - requirements_covered: REQ-021, REQ-022, R13, R14
   - design_sections: §16, §10.11c, §10.12, §10.13
