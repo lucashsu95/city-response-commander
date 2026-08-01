@@ -25,7 +25,7 @@
 import {
   NarrativeType,
   formatCitationLocation,
-  FALLBACK_DISCLOSURE,
+  ensureFallbackDisclosure,
 } from '@city-commander/shared-schemas';
 import { validateBedrockPayload } from '@city-commander/rag';
 import type { SopRetriever, SopCitationResult } from '@city-commander/rag';
@@ -159,13 +159,7 @@ export async function explainWhatIf(
       const effectiveText = rawText != null && rawText.trim().length > 0 ? rawText : null;
 
       if (effectiveText !== null) {
-        // Issue #15: 若 citations 含 s3_fallback 且 Bedrock 文字未揭露，強制附加揭露
-        const hasFallbackCitation = citations.some((c) => c.source === 's3_fallback');
-        const alreadyDiscloses = /類比引用|通用安全建議/.test(effectiveText);
-        explanationText =
-          hasFallbackCitation && !alreadyDiscloses
-            ? effectiveText + FALLBACK_DISCLOSURE
-            : effectiveText;
+        explanationText = effectiveText;
         textSource = 'bedrock';
       } else {
         // SchemaValidator 通過但 explanation_text 為空 → template fallback
@@ -182,6 +176,13 @@ export async function explainWhatIf(
     explanationText = buildTemplateExplanationText(recomputeResult, citations);
     textSource = 'template';
   }
+
+  // The canonical fallback caveat applies to every text source, including
+  // template fallbacks caused by invalid, empty, or unavailable Bedrock output.
+  explanationText = ensureFallbackDisclosure(
+    explanationText,
+    citations.some((c) => c.source === 's3_fallback'),
+  );
 
   return {
     explanation_text: explanationText,

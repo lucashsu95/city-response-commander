@@ -8,8 +8,15 @@
  */
 
 import { describe, it, expect, vi } from 'vitest';
+import { FALLBACK_DISCLOSURE } from '@city-commander/shared-schemas';
 import { explainWhatIf, type WhatIfExplanationInput } from '../../src/whatif/explanation.js';
-import type { BedrockInvoker, BedrockResult, SopRetriever, SopCitationResult, SopRetrieveResult } from '@city-commander/rag';
+import type {
+  BedrockInvoker,
+  BedrockResult,
+  SopRetriever,
+  SopCitationResult,
+  SopRetrieveResult,
+} from '@city-commander/rag';
 import type { RecomputeResult } from '../../src/whatif/whatif_types.js';
 
 // ─── Stub helpers ──────────────────────────────────────────────────────────
@@ -101,8 +108,23 @@ describe('explainWhatIf', () => {
     expect(result.does_not_mutate_state).toBe(true);
   });
 
-  it('Bedrock success + s3_fallback citations WITH disclosure already → no double-append', async () => {
-    const json = JSON.stringify({ explanation_text: '解釋文字，已含類比引用說明' });
+  it('Bedrock success + s3_fallback citations with partial disclosure → appends complete disclosure', async () => {
+    const json = JSON.stringify({ explanation_text: '解釋文字，已提及類比引用' });
+    const input: WhatIfExplanationInput = {
+      recomputeResult: makeRecomputeResult(),
+      rawQuestion: '如果人潮超過兩萬會怎樣？',
+      sopRetriever: makeSopRetriever(S3_FALLBACK_CITATIONS),
+      bedrockInvoker: makeBedrockSuccess(json),
+    };
+
+    const result = await explainWhatIf(input);
+
+    expect(result.explanation_text).toContain('解釋文字，已提及類比引用');
+    expect(result.explanation_text).toContain(FALLBACK_DISCLOSURE.trim());
+  });
+
+  it('Bedrock success + s3_fallback citations with complete disclosure → no double-append', async () => {
+    const json = JSON.stringify({ explanation_text: `解釋文字${FALLBACK_DISCLOSURE}` });
     const input: WhatIfExplanationInput = {
       recomputeResult: makeRecomputeResult(),
       rawQuestion: '如果人潮超過兩萬會怎樣？',
@@ -113,8 +135,7 @@ describe('explainWhatIf', () => {
     const result = await explainWhatIf(input);
 
     expect(result.text_source).toBe('bedrock');
-    const matches = result.explanation_text.match(/類比引用/g);
-    expect(matches).toHaveLength(1);
+    expect(result.explanation_text.split(FALLBACK_DISCLOSURE.trim())).toHaveLength(2);
   });
 
   it('Bedrock success + kb-only citations → no disclosure appended', async () => {
@@ -133,7 +154,7 @@ describe('explainWhatIf', () => {
     expect(result.explanation_text).not.toContain('類比引用');
   });
 
-  it('[integration] Bedrock failure + s3_fallback → template contains source_location AND 類比引用 marker', async () => {
+  it('Bedrock failure + s3_fallback → template contains source_location and complete disclosure', async () => {
     const input: WhatIfExplanationInput = {
       recomputeResult: makeRecomputeResult(),
       rawQuestion: '如果人潮破三萬？',
@@ -144,9 +165,10 @@ describe('explainWhatIf', () => {
     const result = await explainWhatIf(input);
 
     expect(result.text_source).toBe('template');
-    // Template fallback uses formatCitationLocation which appends 類比引用 marker
+    // Template fallback uses formatCitationLocation and must carry the full caveat.
     expect(result.explanation_text).toContain('s3://my-bucket/sop/article-1.json');
     expect(result.explanation_text).toContain('類比引用');
+    expect(result.explanation_text).toContain(FALLBACK_DISCLOSURE.trim());
     expect(result.does_not_mutate_state).toBe(true);
   });
 });

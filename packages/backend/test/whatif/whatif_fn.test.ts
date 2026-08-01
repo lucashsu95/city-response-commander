@@ -12,7 +12,12 @@
 
 import { describe, it, expect, vi } from 'vitest';
 import type { APIGatewayProxyEventV2 } from 'aws-lambda';
-import type { BedrockInvoker, BedrockResult, SopRetriever } from '@city-commander/rag';
+import type {
+  BedrockInvoker,
+  BedrockResult,
+  SopRetriever,
+  SopCitationResult,
+} from '@city-commander/rag';
 import {
   createWhatIfHandler as createRawWhatIfHandler,
   type WhatIfFnDependencies,
@@ -70,14 +75,33 @@ function bedrockCapturing(texts: string[], response: string): BedrockInvoker {
   };
 }
 
-function retrieverStub(onCall?: () => void): SopRetriever {
+function retrieverStub(
+  onCall?: () => void,
+  citations: readonly SopCitationResult[] = [],
+): SopRetriever {
   return {
     async retrieve() {
       onCall?.();
-      return { outcome: 'success', citations: [], source: 'kb' };
+      return {
+        outcome: 'success',
+        citations,
+        source: citations.some((citation) => citation.source === 's3_fallback')
+          ? 's3_fallback'
+          : 'kb',
+      };
     },
   } as unknown as SopRetriever;
 }
+
+const S3_FALLBACK_CITATIONS: readonly SopCitationResult[] = [
+  {
+    article_no: 3,
+    content: 'SOP 第 3 條：啟動分流原文',
+    source_location: 's3://bucket/sop/article-3.json',
+    relevancy_score: null,
+    source: 's3_fallback',
+  },
+];
 
 const PARSED_BL17 = JSON.stringify({
   status: 'parsed',
@@ -138,7 +162,10 @@ describe('WhatIfFn — Cognito operator 授權', () => {
       sopRetriever: retrieverStub(),
     });
     const result = await handler(
-      makeEvent({ body: '{"query":"x"}', claims: { sub: OPERATOR, 'cognito:groups': ['viewers'] } }),
+      makeEvent({
+        body: '{"query":"x"}',
+        claims: { sub: OPERATOR, 'cognito:groups': ['viewers'] },
+      }),
     );
     expect(statusOf(result)).toBe(401);
   });
@@ -202,9 +229,7 @@ describe('WhatIfFn — request body 解析', () => {
       bedrockInvoker: bedrockReturning(PARSED_BL17),
       sopRetriever: retrieverStub(),
     });
-    const result = await handler(
-      makeEvent({ body: JSON.stringify({ query: 'a'.repeat(2001) }) }),
-    );
+    const result = await handler(makeEvent({ body: JSON.stringify({ query: 'a'.repeat(2001) }) }));
     expect(statusOf(result)).toBe(400);
   });
 
@@ -275,6 +300,35 @@ describe('WhatIfFn — clarification 短路（§14.5）', () => {
     expect(body.status).toBe('answered');
     expect(body.triggered_articles).toEqual([3]);
     expect(Array.isArray(body.expected_actions)).toBe(true);
+  });
+
+  it('answered 回應保留 citation 的來源位置與 fallback 類型', async () => {
+    let invocationCount = 0;
+    const handler = createWhatIfHandler({
+      bedrockInvoker: {
+        async invoke(): Promise<BedrockResult> {
+          const text =
+            invocationCount++ === 0
+              ? PARSED_BL17
+              : JSON.stringify({ explanation_text: 'What-if 解釋文字' });
+          return { outcome: 'success', text, usedModelId: 'stub-model' };
+        },
+      },
+      sopRetriever: retrieverStub(undefined, S3_FALLBACK_CITATIONS),
+    });
+
+    const body = parseBody(
+      await handler(makeEvent({ body: JSON.stringify({ query: '若 BL17 人數增至 40000' }) })),
+    );
+
+    expect(body.sop_citations).toEqual([
+      {
+        article_no: 3,
+        content: 'SOP 第 3 條：啟動分流原文',
+        source_location: 's3://bucket/sop/article-3.json',
+        source: 's3_fallback',
+      },
+    ]);
   });
 });
 

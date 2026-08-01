@@ -28,7 +28,7 @@ import type {
   ClassificationReasoning,
   ExcludedRouteReason,
 } from '@city-commander/shared-schemas';
-import { formatCitationLocation, FALLBACK_DISCLOSURE } from '@city-commander/shared-schemas';
+import { formatCitationLocation, ensureFallbackDisclosure } from '@city-commander/shared-schemas';
 import { validateBedrockPayload } from './schema_validator.js';
 import {
   putNarrative,
@@ -135,17 +135,9 @@ export async function composeExplanation(
       const effectiveText = rawText != null && rawText.trim().length > 0 ? rawText : null;
 
       if (effectiveText !== null) {
-        // Issue #15: 若 citations 含 s3_fallback 且 Bedrock 文字未揭露，強制附加揭露
-        const hasFallbackCitation = citations.some((c) => c.source === 's3_fallback');
-        const alreadyDiscloses = /類比引用|通用安全建議/.test(effectiveText);
-        const finalText =
-          hasFallbackCitation && !alreadyDiscloses
-            ? effectiveText + FALLBACK_DISCLOSURE
-            : effectiveText;
-
         explanationPayload = {
           type: 'EXPLANATION',
-          explanation_text: finalText,
+          explanation_text: effectiveText,
         };
         textSource = 'bedrock';
       } else {
@@ -165,6 +157,16 @@ export async function composeExplanation(
     explanationPayload = buildTemplateExplanation(core, citations);
     textSource = 'template';
   }
+
+  // The canonical fallback caveat applies to every text source, including
+  // template fallbacks caused by invalid, empty, or unavailable Bedrock output.
+  explanationPayload = {
+    ...explanationPayload,
+    explanation_text: ensureFallbackDisclosure(
+      explanationPayload.explanation_text,
+      citations.some((c) => c.source === 's3_fallback'),
+    ),
+  };
 
   // ── 4. putNarrative → EXPLANATION item conditional Put ──────────────────
   let putResult: NarrativePutResult;

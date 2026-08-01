@@ -118,6 +118,7 @@ export type { EnvironmentProfile, ConfigSchema, StrategyConfig } from './config.
 export {
   formatCitationLocation,
   FALLBACK_DISCLOSURE,
+  ensureFallbackDisclosure,
   type CitationLocationInput,
 } from './citation_formatting.js';
 

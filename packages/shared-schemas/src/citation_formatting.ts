@@ -34,7 +34,19 @@ export function formatCitationLocation(c: CitationLocationInput): string {
 }
 
 /**
- * Disclosure text appended to Bedrock-generated explanations when
- * any citation uses s3_fallback source.
+ * Disclosure text required when an explanation uses an S3 fallback citation.
  */
 export const FALLBACK_DISCLOSURE = '\n\n（本次引用含類比引用，非精準比對，僅供參考）';
+
+/**
+ * Deterministically ensure that Bedrock output carries the complete fallback
+ * disclosure. A partial phrase such as 「類比引用」 is insufficient because it
+ * omits the required non-exact-match and reference-only caveats.
+ */
+export function ensureFallbackDisclosure(text: string, hasFallbackCitation: boolean): string {
+  if (!hasFallbackCitation || text.includes(FALLBACK_DISCLOSURE.trim())) {
+    return text;
+  }
+
+  return text + FALLBACK_DISCLOSURE;
+}
