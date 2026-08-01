@@ -21,7 +21,7 @@ Task ID scheme: `TASK-BS-01..TASK-BS-19`, flat and sequential. `CHECKPOINT` line
 
 ## Phase 0 — Shared Types & Config
 
-- [ ] TASK-BS-01 Add `EntityScopeResult`, `PerimeterAnchor`, `SnapResult`, `SopCoverageResult`, `UniversalPrinciple`, `ContainmentResult`, `ContainmentDisclosure` types to `packages/shared-schemas`
+- [x] TASK-BS-01 Add `EntityScopeResult`, `PerimeterAnchor`, `SnapResult`, `SopCoverageResult`, `UniversalPrinciple`, `ContainmentResult`, `ContainmentDisclosure` types to `packages/shared-schemas`
   - objective: Establish the shared type vocabulary so domain and backend packages compile against the same contracts from the start.
   - requirements_covered: R2, R4, R6, R10, R13
   - design_sections: §4, §5, §6, §7, §8
@@ -36,7 +36,7 @@ Task ID scheme: `TASK-BS-01..TASK-BS-19`, flat and sequential. `CHECKPOINT` line
   - tests_required: `packages/shared-schemas/test/types.test.ts` — type-level smoke test that all new exports are importable.
   - done_definition: Package builds; nothing outside this task's file list is touched.
 
-- [ ] TASK-BS-02 Add `boundary_snapping.*` and `containment.*` keys to `CONFIG_SCHEMA`
+- [x] TASK-BS-02 Add `boundary_snapping.*` and `containment.*` keys to `CONFIG_SCHEMA`
   - objective: Make the snapping/containment thresholds configurable per deployment without code changes, matching the existing policy-knob pattern.
   - requirements_covered: R11
   - design_sections: §9
@@ -55,7 +55,7 @@ Task ID scheme: `TASK-BS-01..TASK-BS-19`, flat and sequential. `CHECKPOINT` line
 
 ## Phase 1 — Boundary_Snapper (Layer 1, pure domain)
 
-- [ ] TASK-BS-03 Extract `intersectionAppearsInLocation` into a shared helper
+- [x] TASK-BS-03 Extract `intersectionAppearsInLocation` into a shared helper
   - objective: Boundary_Snapper's Entity_Scope_Check (R2) and the existing `IncidentAnchorResolutionStrategy` (Strategy D) must agree on "does this intersection name appear in the location text" — sharing one implementation prevents behavior drift between the two.
   - requirements_covered: R2 (implicitly, via design.md §4.5)
   - design_sections: §4.5
