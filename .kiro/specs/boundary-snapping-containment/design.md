@@ -349,6 +349,13 @@ export const CONTAINMENT_PROHIBITED_PATHS: readonly string[] = [
 
 ## 8. API 回應範例（Requirement 10）
 
+以下範例已對齊 §4.2 對官方 15 筆 `road_network_geometry.json` 手算並鎖定為
+golden fixture 的實際推導結果（`packages/domain/test/unit/perimeter_anchor_derivation.test.ts`）：
+官方資料集上唯一的 Perimeter_Anchor 是 `RD_TPE_009`（基隆路地下道）／
+「正氣橋」（此路口名稱只出現在 `RD_TPE_009.intersections`，不對應任何
+路段 `name`）。`RD_TPE_009.alternatives` 僅有 `["RD_TPE_003"]`，故 §6.1
+的 `allowed_road_whitelist` 在此例為 `{RD_TPE_009, RD_TPE_003}`。
+
 ```json
 {
   "incident_id": "INC_OUT_OF_BOUNDS_001",
@@ -357,18 +364,18 @@ export const CONTAINMENT_PROHIBITED_PATHS: readonly string[] = [
   "data_scope_status": "OUT_OF_BOUNDS_SNAPPED",
   "mapped_anchor_node": {
     "segment_id": "RD_TPE_009",
-    "gateway_intersection": "環河南路口",
+    "gateway_intersection": "正氣橋",
     "distance_meters": null
   },
   "sop_coverage_status": "UNKNOWN_TYPE_UNIVERSAL_SOP",
   "sop_authority": "SYSTEM_DEFAULT_PRINCIPLE",
   "incident_anchor": null,
   "decision": {
-    "reroute_roads": ["RD_TPE_009", "RD_TPE_004"],
+    "reroute_roads": ["RD_TPE_009", "RD_TPE_003"],
     "perimeter_control": {
       "action": "BLOCK_ENTRY",
       "target_gate": "RD_TPE_009",
-      "reason": "事故點位於轄區地圖外圍，於最接近之周界節點設立防衛封鎖線"
+      "reason": "事故點位於轄區地圖外圍，於周界節點 RD_TPE_009（正氣橋）設立防衛封鎖線"
     },
     "ai_reasoning": "（Bedrock 生成文字，經 Whitelist_Guard 稽核）"
   },
