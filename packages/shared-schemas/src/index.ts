@@ -167,6 +167,12 @@ export type {
   EteCalculationVariable,
 } from './ete_calculation.js';
 
+// ─── Route Reasoning Trace ───────────────────────────────────────
+export type {
+  RouteReasoningTrace,
+  RouteReasoningEntry,
+} from './route_reasoning_trace.js';
+
 // ─── Discriminated union for API/event payloads (§12/§13) ──
 export type {
   WebSocketEvent,

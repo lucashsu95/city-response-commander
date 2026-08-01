@@ -24,6 +24,9 @@ import type {
   DemoPublicAlerts,
   DemoAlertResponse,
   PublishRecord,
+  RagTrace,
+  EteCalculationTrace,
+  RouteReasoningTrace,
 } from '@city-commander/shared-schemas';
 import type { RoadNetworkModel, SOPLoadResult } from '@city-commander/domain';
 import type { NormalizedTimestamp } from '@city-commander/domain';
@@ -45,6 +48,12 @@ import {
   SnapshotSelector,
   type SnapshotSelectorConfigProvider,
 } from '@city-commander/domain';
+import {
+  buildRagTrace,
+  computeEte,
+  buildRetrievalContext,
+  buildRouteReasoningTrace,
+} from '../reasoning/index.js';
 
 // ─── SOP thresholds (from emergency_traffic_sop.txt) ───────────────────────────
 
@@ -1176,6 +1185,72 @@ function handleIncident(body: string | null | undefined): APIGatewayProxyResult 
     eteMinutes: ete?.ete_minutes ?? undefined,
   });
 
+  // ── Wire 1: retrieveSopEvidence() → rag_trace ─────────────────────────────────
+  // Build SOP citations from the already-loaded sopArticles (LocalSopRetriever pattern)
+  const citationSet = [...new Set([...articles.triggered_articles, ...articles.applied_formula_articles])].sort(
+    (a, b) => a - b,
+  );
+  const sopCitations = citationSet
+    .map((articleNo) => {
+      const chunk = data.sopArticles.getByArticleNo(articleNo);
+      if (!chunk) return null;
+      return {
+        article_no: articleNo,
+        content: chunk.text,
+        source_location: `emergency_traffic_sop.txt#article-${articleNo}`,
+        relevancy_score: null as number | null,
+        source: 'kb' as const,
+      };
+    })
+    .filter((c): c is NonNullable<typeof c> => c !== null);
+
+  const retrievalContext = buildRetrievalContext(
+    articles.triggered_articles,
+    articles.applied_formula_articles,
+    ete?.ete_minutes ?? undefined,
+    articles.invoked_procedures.slice(0, 3),
+  );
+  const ragTrace: RagTrace = buildRagTrace(
+    sopCitations,
+    retrievalContext,
+    'local_sop_knowledge_base',
+    'emergency_traffic_sop.txt',
+  );
+
+  // ── Wire 2: route_reasoning_trace ──────────────────────────────────────────
+  // Build route segment evidence from road network + traffic data
+  const routeCandidateSegments = allSegments
+    .filter((seg) => seg.segment_id !== incident.affected_segment)
+    .map((seg) => {
+      const rec = data.traffic.find((r) => r.Segment_ID === seg.segment_id);
+      return {
+        segment_id: seg.segment_id,
+        capacity_vph: seg.capacity_vph,
+        saturation_score: rec?.Saturation_Score ?? 0.5,
+        intersections: seg.intersections,
+        flow_direction: seg.flow_direction,
+        incident_segment: incident.affected_segment,
+      };
+    });
+
+  const routeReasoningTrace: RouteReasoningTrace = buildRouteReasoningTrace(
+    incident.affected_segment,
+    evacuation.primary_evacuation,
+    routeCandidateSegments,
+    satScore,
+  );
+
+  // ── Wire 3: ete_calculation (SOP-7 formula trace) ───────────────────────────
+  const eteCalculationTrace: EteCalculationTrace | null = (() => {
+    if (!articles.applied_formula_articles.includes(7)) return null;
+    return computeEte({
+      severity: incident.severity ?? null,
+      avgSaturation: satScore,
+      baseTimestamp: baseTime,
+      timezone: 'Asia/Taipei',
+    });
+  })();
+
   return jsonResponse(200, {
     decision_id: core.decision_id,
     event_id: incident.event_id,
@@ -1191,6 +1266,9 @@ function handleIncident(body: string | null | undefined): APIGatewayProxyResult 
     cms_core_text: core.cms_core_text,
     control_center_recommendation: recommendation,
     public_alerts: publicAlerts,
+    rag_trace: ragTrace,
+    route_reasoning_trace: routeReasoningTrace,
+    ...(eteCalculationTrace !== null && { ete_calculation: eteCalculationTrace }),
     data_status: 'ready',
     text_source: 'deterministic',
   });
