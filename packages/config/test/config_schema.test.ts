@@ -390,3 +390,93 @@ describe('Policy Knob Keys', () => {
     }
   });
 });
+
+// ─── Boundary Snapping & Containment keys (spec: boundary-snapping-containment, R11) ──
+
+describe('Boundary Snapping & Containment Config Keys (R11)', () => {
+  const NEW_KEYS = [
+    'boundary_snapping.max_snap_distance_meters',
+    'boundary_snapping.coordinate_path_enabled',
+    'boundary_snapping.anchor_gazetteer_source',
+    'containment.universal_sop_enabled',
+  ];
+
+  it('ALL_CONFIG_KEYS includes all 4 new keys (R11 AC1-AC4)', () => {
+    for (const key of NEW_KEYS) {
+      expect(ALL_CONFIG_KEYS).toContain(key);
+    }
+  });
+
+  it('max_snap_distance_meters is optional with no provisionalDefault, mirroring orchestration.state_machine_arn (R5 AC1/AC2)', () => {
+    const def = getKeyDefinition('boundary_snapping.max_snap_distance_meters');
+    expect(def).toBeDefined();
+    expect(def!.type).toBe('number');
+    expect(def!.required).toBe(false);
+    expect(def!.provisionalDefault).toBeUndefined();
+  });
+
+  it('validateConfig does NOT reject a config missing max_snap_distance_meters (it is optional at the schema level; Boundary_Snapper enforces its own missing-value failure per R5 AC2)', () => {
+    const defaults = getProvisionalDefaults() as Record<string, unknown>;
+    const result = validateConfig(defaults);
+    expect(result.errors.some((e) => e.key === 'boundary_snapping.max_snap_distance_meters')).toBe(
+      false,
+    );
+  });
+
+  it('coordinate_path_enabled defaults to false and is required', () => {
+    const def = getKeyDefinition('boundary_snapping.coordinate_path_enabled');
+    expect(def).toBeDefined();
+    expect(def!.type).toBe('boolean');
+    expect(def!.required).toBe(true);
+    expect(def!.provisionalDefault).toBe(false);
+  });
+
+  it('anchor_gazetteer_source is optional (required only when coordinate_path_enabled=true, R11 AC3)', () => {
+    const def = getKeyDefinition('boundary_snapping.anchor_gazetteer_source');
+    expect(def).toBeDefined();
+    expect(def!.required).toBe(false);
+  });
+
+  it('universal_sop_enabled defaults to true and is required', () => {
+    const def = getKeyDefinition('containment.universal_sop_enabled');
+    expect(def).toBeDefined();
+    expect(def!.type).toBe('boolean');
+    expect(def!.required).toBe(true);
+    expect(def!.provisionalDefault).toBe(true);
+  });
+
+  it('should reject a config missing the required coordinate_path_enabled key', () => {
+    const defaults = getProvisionalDefaults() as Record<string, unknown>;
+    const { 'boundary_snapping.coordinate_path_enabled': _removed, ...rest } = defaults;
+    const result = validateConfig(rest);
+    expect(result.valid).toBe(false);
+    expect(
+      result.errors.some((e) => e.key === 'boundary_snapping.coordinate_path_enabled'),
+    ).toBe(true);
+  });
+
+  it('should reject a config missing the required containment.universal_sop_enabled key', () => {
+    const defaults = getProvisionalDefaults() as Record<string, unknown>;
+    const { 'containment.universal_sop_enabled': _removed, ...rest } = defaults;
+    const result = validateConfig(rest);
+    expect(result.valid).toBe(false);
+    expect(result.errors.some((e) => e.key === 'containment.universal_sop_enabled')).toBe(true);
+  });
+
+  it('should reject a string where boolean expected for coordinate_path_enabled', () => {
+    const defaults = getProvisionalDefaults() as Record<string, unknown>;
+    const config = { ...defaults, 'boundary_snapping.coordinate_path_enabled': 'true' };
+    const result = validateConfig(config);
+    expect(result.valid).toBe(false);
+    expect(
+      result.errors.some((e) => e.key === 'boundary_snapping.coordinate_path_enabled'),
+    ).toBe(true);
+  });
+
+  it('provisional defaults (which omit max_snap_distance_meters) still pass validation', () => {
+    const defaults = getProvisionalDefaults() as Record<string, unknown>;
+    expect(defaults['boundary_snapping.max_snap_distance_meters']).toBeUndefined();
+    const result = validateConfig(defaults);
+    expect(result.valid).toBe(true);
+  });
+});

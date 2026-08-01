@@ -412,6 +412,56 @@ export const CONFIG_SCHEMA: readonly ConfigKeyDefinition[] = [
       'Strategy F: station set and time snapshot for SOP6 roaming check (OQ-005, PROVISIONAL)',
     isProvisionalPolicy: true,
   },
+
+  // ══════════════════════════════════════════════════════════════════
+  // Boundary Snapping & Containment (spec: boundary-snapping-containment, R11)
+  // ══════════════════════════════════════════════════════════════════
+
+  {
+    key: 'boundary_snapping.max_snap_distance_meters',
+    type: 'number',
+    // Optional by design, same pattern as `orchestration.state_machine_arn` above:
+    // Boundary_Snapper itself fails fast and explicitly when this key is absent
+    // (R5 AC1/AC2) rather than snapping against a guessed distance. Marking it
+    // required:true here would force a fabricated provisionalDefault just to
+    // satisfy getProvisionalDefaults(), which is exactly what R5 forbids.
+    required: false,
+    // Deliberately NO provisionalDefault — see above.
+    description:
+      'Max ground distance (meters) a Coverage_Gap incident may be snapped to a ' +
+      'Perimeter_Anchor before being reported OUT_OF_JURISDICTION instead (R5).',
+    isProvisionalPolicy: false,
+  },
+  {
+    key: 'boundary_snapping.coordinate_path_enabled',
+    type: 'boolean',
+    required: true,
+    provisionalDefault: false,
+    description:
+      'Enables the coordinate/haversine snapping path (R3). Inert against the ' +
+      'current official dataset, which carries no coordinate fields.',
+    isProvisionalPolicy: false,
+  },
+  {
+    key: 'boundary_snapping.anchor_gazetteer_source',
+    type: 'string',
+    // Required only when boundary_snapping.coordinate_path_enabled=true (R3 AC1, R11 AC3).
+    required: false,
+    description:
+      'External WGS84 coordinate lookup source for Perimeter_Anchor/intersection ' +
+      'names. Not supplied by the official dataset.',
+    isProvisionalPolicy: false,
+  },
+  {
+    key: 'containment.universal_sop_enabled',
+    type: 'boolean',
+    required: true,
+    provisionalDefault: true,
+    description:
+      'When false, an unknown incident type is reported as uncovered instead of ' +
+      'falling back to DEFAULT_UNIVERSAL_SOP (R6, R11 AC5).',
+    isProvisionalPolicy: false,
+  },
 ] as const;
 
 // ─── Derived Helpers ─────────────────────────────────────────────────────────
