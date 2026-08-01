@@ -39,7 +39,7 @@ export function createProductionWhatIfHandler(
   // The facade also runs ingestData internally; we keep one source of truth.
   // Bypass hash verification in demo mode — data is from controlled S3 bucket.
   const ingestionOptions = options?.skipHashVerification
-    ? { expectedHashes: {} }
+    ? { skipVerification: true }
     : undefined;
   const ingestion = ingestData(provider, ingestionOptions);
   if (ingestion.data_status !== 'ready' || ingestion.sopArticles === undefined) {

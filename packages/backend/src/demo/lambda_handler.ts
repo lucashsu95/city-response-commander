@@ -50,7 +50,7 @@ async function loadFromS3(): Promise<DemoDataSet> {
     },
   };
 
-  const result = ingestData(provider, SKIP_HASH_VERIFICATION ? { expectedHashes: {} } : undefined);
+  const result = ingestData(provider, SKIP_HASH_VERIFICATION ? { skipVerification: true } : undefined);
   if (result.data_status !== 'ready') {
     throw new Error(`Data ingestion failed: ${result.stop_reason}`);
   }

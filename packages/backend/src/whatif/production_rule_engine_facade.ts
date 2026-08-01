@@ -120,7 +120,7 @@ export class ProductionRuleEngineWhatIfFacade implements RuleEngineWhatIfFacade 
     // never silently serves unverified data.
     // In demo mode, hash verification is bypassed via DEMO_SKIP_HASH_VERIFICATION.
     const ingestionOptions = options?.skipHashVerification
-      ? { expectedHashes: {} }
+      ? { skipVerification: true }
       : undefined;
     const ingestion = ingestData(provider, ingestionOptions);
     if (ingestion.data_status !== 'ready') {
