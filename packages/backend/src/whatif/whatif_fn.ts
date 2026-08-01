@@ -61,8 +61,8 @@ export interface WhatIfFnDependencies {
 
 // ─── HTTP helpers ─────────────────────────────────────────────────────────────
 
-/** HTTP 回應的 Content-Type header */
-const JSON_CONTENT_TYPE = 'application/json';
+/** HTTP 回應的 Content-Type header（含 UTF-8 charset，符合 AWS HTTP API Lambda proxy 慣例） */
+const JSON_CONTENT_TYPE = 'application/json; charset=utf-8';
 
 /** schema_version 常數（所有回應均包含） */
 const SCHEMA_VER = SCHEMA_VERSION;
@@ -160,6 +160,15 @@ const OPERATOR_GROUP = 'operators';
  * 此處 Cognito group check 是應用層防線。
  */
 function isAuthorizedOperator(event: APIGatewayProxyEventV2): boolean {
+  // The competition Demo Lambda intentionally opts into a public mode for
+  // /what-if. The env var is set by the DynamoBackendStack at deploy time;
+  // production deployments omit it. This is the only application-layer
+  // bypass allowed in main; the IAM Deny on WhatIfFnRole is the final
+  // production-side defence.
+  if (process.env['DEMO_PUBLIC_WHATIF'] === 'true') {
+    return true;
+  }
+
   // HTTP API Gateway JWT authorizer 型別用 unknown 轉型後嚴格提取
   const ctx = event.requestContext as unknown as {
     authorizer?: { jwt?: { claims?: Record<string, unknown> } };
