@@ -4,6 +4,7 @@ export default defineConfig({
   test: {
     include: [
       "scripts/test/**/*.test.ts",
+      "scripts/*.test.ts",
       "packages/*/test/**/*.test.ts",
       "eslint-local-rules/test/**/*.test.ts",
     ],

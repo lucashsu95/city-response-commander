@@ -1,0 +1,63 @@
+{
+  "fixture": true,
+  "scenario": "EVT_003",
+  "_citation": "design.md §9.5 EVT_003 walkthrough; HG-001 golden ETE=41.0 (tasks.md). affected_intersection_scope.mode reflects the documented OQ-010 unresolved status (design.md §9.5 note: 'affected-intersection count and total police remain unresolved').",
+  "incident": {
+    "event_id": "TPE_2026_EVT_003",
+    "type": "Power_Failure",
+    "location": "信義威秀/ATT4FUN周邊路燈號誌故障",
+    "affected_segment": "RD_TPE_007",
+    "status": "Caution",
+    "severity": "Medium",
+    "description": "2026-05-20 22:30 信義區部分路段號誌失效，需改由人工交通指揮",
+    "timestamp": "2026-05-20 22:30"
+  },
+  "decision_response": {
+    "schema_version": "1.0",
+    "trace_id": "fixture-tr-evt003",
+    "decision_id": "fixture-dec-evt003",
+    "idempotency_key": "TPE_2026_EVT_003|2026-05-20 22:30|prov-2026a-fixture",
+    "event_id": "TPE_2026_EVT_003",
+    "triggered_articles": [5],
+    "applied_formula_articles": [7],
+    "ete": {
+      "severity": "Medium",
+      "base_clearance": 20,
+      "affected_set": [
+        { "segment_id": "RD_TPE_007", "role": "INCIDENT" },
+        { "segment_id": "RD_TPE_011", "role": "PRIMARY" }
+      ],
+      "ete_snapshot_timestamp": "2026-05-20 22:30",
+      "saturation_inputs": [0.85, 0.85],
+      "avg_saturation": 0.85,
+      "congestion_penalty": 21.0,
+      "ete_minutes": 41.0,
+      "calculation_status": "CALCULATED",
+      "guidance_id": "HG-001"
+    },
+    "affected_intersection_scope": {
+      "mode": "unresolved_manual_confirmation"
+    },
+    "provisional": true,
+    "policy": {
+      "classification": "ORGANIZER_GUIDED_TEAM_POLICY"
+    },
+    "execution": { "status": "completed", "last_error": null, "retryable": false, "attempt_count": 1 }
+  },
+  "report_response": {
+    "report": {
+      "decision_id": "fixture-dec-evt003",
+      "report_text_present": true,
+      "cited_articles": [5, 7]
+    },
+    "alert": {
+      "decision_id": "fixture-dec-evt003",
+      "languages": ["zh", "en"],
+      "alert_text_present": true
+    }
+  },
+  "latency": {
+    "FastPathLatencyMs": 1100,
+    "EndToEndLatencyMs": 3900
+  }
+}

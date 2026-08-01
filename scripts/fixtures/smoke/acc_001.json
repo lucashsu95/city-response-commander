@@ -1,0 +1,67 @@
+{
+  "fixture": true,
+  "scenario": "ACC_001",
+  "_citation": "design.md §9.5 ACC_001 walkthrough + §12 GET /decisions/{id} example (dec-acc001); HG-001 golden ETE=78.6 (tasks.md)",
+  "incident": {
+    "event_id": "TPE_2026_ACC_001",
+    "type": "Road_Collapse_Accident",
+    "location": "光復南路與忠孝東路口南側",
+    "affected_segment": "RD_TPE_002",
+    "status": "Closed",
+    "severity": "Critical",
+    "description": "2026-05-20 22:10 發生地下管線爆裂導致路面塌陷並引發三車連環追撞，光復南路南下全線封鎖",
+    "timestamp": "2026-05-20 22:10"
+  },
+  "decision_response": {
+    "schema_version": "1.0",
+    "trace_id": "fixture-tr-acc001",
+    "decision_id": "fixture-dec-acc001",
+    "idempotency_key": "TPE_2026_ACC_001|2026-05-20 22:10|prov-2026a-fixture",
+    "event_id": "TPE_2026_ACC_001",
+    "triggered_articles": [1, 2],
+    "invoked_procedures": ["article2_alternative_route_guidance"],
+    "applied_formula_articles": [7],
+    "primary_evacuation": { "segment_id": "RD_TPE_004", "example_classification": "PROVISIONAL_DERIVED_EXAMPLE" },
+    "secondary_evacuation": [{ "segment_id": "RD_TPE_005", "example_classification": "PROVISIONAL_DERIVED_EXAMPLE" }],
+    "ete": {
+      "severity": "Critical",
+      "base_clearance": 60,
+      "affected_set": [
+        { "segment_id": "RD_TPE_002", "role": "INCIDENT" },
+        { "segment_id": "RD_TPE_004", "role": "PRIMARY" },
+        { "segment_id": "RD_TPE_005", "role": "SECONDARY" }
+      ],
+      "ete_snapshot_timestamp": "2026-05-20 22:00",
+      "saturation_inputs": [1.0, 0.78, 0.65],
+      "saturation_sum": 2.43,
+      "road_count": 3,
+      "avg_saturation": 0.81,
+      "congestion_penalty": 18.6,
+      "ete_minutes": 78.6,
+      "calculation_status": "CALCULATED",
+      "guidance_id": "HG-001"
+    },
+    "provisional": true,
+    "policy": {
+      "classification": "ORGANIZER_GUIDED_TEAM_POLICY",
+      "affected_road": { "role": "DISPLAY_AND_CONTEXT_ONLY" }
+    },
+    "execution": { "status": "completed", "last_error": null, "retryable": false, "attempt_count": 1 }
+  },
+  "report_response": {
+    "report": {
+      "decision_id": "fixture-dec-acc001",
+      "report_text_present": true,
+      "cited_articles": [1, 2, 7]
+    },
+    "alert": {
+      "decision_id": "fixture-dec-acc001",
+      "languages": ["zh", "en"],
+      "alert_text_present": true
+    }
+  },
+  "latency": {
+    "FastPathLatencyMs": 1200,
+    "EndToEndLatencyMs": 4300
+  }
+}
