@@ -285,7 +285,7 @@ Task ID scheme: `TASK-BS-01..TASK-BS-19`, flat and sequential. `CHECKPOINT` line
   - tests_required: (this task IS the test task)
   - done_definition: 4/4 cases green.
 
-- [ ] TASK-BS-18 Property test suite for Boundary_Snapper and Whitelist_Guard (Requirement 14.1–14.5, 14.7)
+- [x] TASK-BS-18 Property test suite for Boundary_Snapper and Whitelist_Guard (Requirement 14.1–14.5, 14.7)
   - objective: Consolidate and run the fast-check property suite referenced piecemeal in Phase 1/2 tasks, at ≥100 iterations each, as a single reviewable suite.
   - requirements_covered: R14 (AC1–AC5, AC7)
   - design_sections: §10
