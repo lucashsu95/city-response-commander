@@ -47,8 +47,17 @@ jobs:
       - name: Build shared schemas
         run: npm run build --workspace packages/shared-schemas
 
+      - name: Build config
+        run: npm run build --workspace packages/config
+
       - name: Build domain
         run: npm run build --workspace packages/domain
+
+      - name: Build ai-generator
+        run: npm run build --workspace packages/ai-generator
+
+      - name: Build rag
+        run: npm run build --workspace packages/rag
 
       - name: Build backend
         run: npm run build --workspace packages/backend
