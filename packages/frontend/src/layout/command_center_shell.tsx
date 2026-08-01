@@ -784,6 +784,10 @@ export interface CommandCenterShellProps {
   readonly whatifContent: ReactNode;
   /** Injection modal content */
   readonly injectionContent: ReactNode;
+  /** Control Center Recommendation panel (optional, shown after injection) */
+  readonly recommendationContent?: ReactNode;
+  /** Anomaly demo popup overlay (optional) */
+  readonly overlayContent?: ReactNode;
 }
 
 // ─── Command Center Shell ─────────────────────────────────
@@ -810,6 +814,8 @@ export function CommandCenterShell({
   multilingualContent,
   whatifContent,
   injectionContent,
+  recommendationContent,
+  overlayContent,
 }: CommandCenterShellProps): ReactNode {
   const [activeNav, setActiveNav] = useState('dashboard');
   const [injectionOpen, setInjectionOpen] = useState(false);
@@ -885,6 +891,11 @@ export function CommandCenterShell({
             <div className="cmd-ai-column__section">
               {routeAdviceContent}
             </div>
+            {recommendationContent && (
+              <div className="cmd-ai-column__section">
+                {recommendationContent}
+              </div>
+            )}
             <div className="cmd-ai-column__section">
               {multilingualContent}
             </div>
@@ -894,6 +905,9 @@ export function CommandCenterShell({
           </div>
         </aside>
       </div>
+
+      {/* Overlay Content (e.g. Anomaly Demo Popup) */}
+      {overlayContent}
 
       {/* Injection Modal */}
       <InjectionModal
