@@ -31,7 +31,11 @@
  * @module backend/realtime/decision_enriched
  */
 
-import { NarrativeType, SCHEMA_VERSION, type DecisionEnrichedEvent } from '@city-commander/shared-schemas';
+import {
+  NarrativeType,
+  SCHEMA_VERSION,
+  type DecisionEnrichedEvent,
+} from '@city-commander/shared-schemas';
 import { buildReadyEventId } from '@city-commander/rag';
 import { REQUIRED_NARRATIVE_TYPES } from '../repository/decision_narrative_reader.js';
 import { LatencyTrace } from '../metrics/latency_trace.js';
@@ -51,7 +55,9 @@ export function isNarrativeSetComplete(existingTypes: readonly NarrativeType[]):
 }
 
 /** The narrative types still missing from the required set, in stable order. */
-export function missingNarrativeTypes(existingTypes: readonly NarrativeType[]): readonly NarrativeType[] {
+export function missingNarrativeTypes(
+  existingTypes: readonly NarrativeType[],
+): readonly NarrativeType[] {
   const present = new Set(existingTypes);
   return REQUIRED_NARRATIVE_TYPES.filter((type) => !present.has(type));
 }
@@ -98,7 +104,11 @@ export function buildDecisionEnrichedEvent(input: DecisionEnrichedInput): Decisi
     provisional: input.provisional,
     policy_version: input.policyVersion,
     decision_id: input.decisionId,
-    ready_event_id: buildReadyEventId(input.decisionId, NarrativeType.EXPLANATION, input.coreVersionRef),
+    ready_event_id: buildReadyEventId(
+      input.decisionId,
+      NarrativeType.EXPLANATION,
+      input.coreVersionRef,
+    ),
   };
 }
 

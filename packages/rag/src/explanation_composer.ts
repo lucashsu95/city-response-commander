@@ -23,7 +23,11 @@ import {
   type DecisionCore,
   type ExplanationPayload,
 } from '@city-commander/shared-schemas';
-import type { EvidenceTrace, ClassificationReasoning, ExcludedRouteReason } from '@city-commander/shared-schemas';
+import type {
+  EvidenceTrace,
+  ClassificationReasoning,
+  ExcludedRouteReason,
+} from '@city-commander/shared-schemas';
 import { validateBedrockPayload } from './schema_validator.js';
 import {
   putNarrative,
@@ -127,10 +131,7 @@ export async function composeExplanation(
     if (validation.outcome === 'accepted') {
       // 空字串視同缺漏（SchemaValidator 只確認 string 型別，不排除空字串）
       const rawText = validation.fields['explanation_text'];
-      const effectiveText =
-        rawText != null && rawText.trim().length > 0
-          ? rawText
-          : null;
+      const effectiveText = rawText != null && rawText.trim().length > 0 ? rawText : null;
 
       explanationPayload = {
         type: 'EXPLANATION',
@@ -243,16 +244,13 @@ function buildExplanationPrompt(
 
   const citationLines = citations
     .map(
-      (c) =>
-        `  - 第 ${c.article_no} 條（來源：${c.source_location}）：${c.content.slice(0, 120)}`,
+      (c) => `  - 第 ${c.article_no} 條（來源：${c.source_location}）：${c.content.slice(0, 120)}`,
     )
     .join('\n');
 
   const primaryRoute = core.primary_evacuation ?? '（無合規替代路段）';
   const secondaryRoutes =
-    core.secondary_evacuation.length > 0
-      ? core.secondary_evacuation.join('、')
-      : '（無）';
+    core.secondary_evacuation.length > 0 ? core.secondary_evacuation.join('、') : '（無）';
   const triggeredArticles = core.triggered_articles.join('、');
   const eteSection = formatEteForPrompt(core);
 
@@ -321,9 +319,7 @@ function buildFallbackExplanationText(
   const evidence: EvidenceTrace = core.evidence;
   const primaryRoute = core.primary_evacuation ?? '查無合規替代路段';
   const secondaryRoutes =
-    core.secondary_evacuation.length > 0
-      ? core.secondary_evacuation.join('、')
-      : '無';
+    core.secondary_evacuation.length > 0 ? core.secondary_evacuation.join('、') : '無';
   const triggeredArticles = core.triggered_articles.join('、');
 
   const classificationLines = evidence.classification_reasoning

@@ -15,10 +15,7 @@
  */
 
 import type { BedrockInvoker } from '@city-commander/rag';
-import type {
-  ParseScenarioResult,
-  WhatIfAssumption,
-} from './whatif_types.js';
+import type { ParseScenarioResult, WhatIfAssumption } from './whatif_types.js';
 import {
   wrapUntrustedQuestion,
   sanitizeEchoedText,
@@ -186,9 +183,10 @@ export async function parseScenario(
   const status = obj['status'];
 
   if (status === 'clarification_required') {
-    const reason = typeof obj['reason'] === 'string' && obj['reason'].trim().length > 0
-      ? sanitizeReason(obj['reason'])
-      : PARSE_FAILED_PROMPT;
+    const reason =
+      typeof obj['reason'] === 'string' && obj['reason'].trim().length > 0
+        ? sanitizeReason(obj['reason'])
+        : PARSE_FAILED_PROMPT;
     return { parse_status: 'clarification_required', clarification_prompt: reason };
   }
 

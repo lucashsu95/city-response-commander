@@ -49,10 +49,7 @@ export const PUBLISH_TRANSITIONS: ReadonlyMap<
  * @param to - 目標狀態
  * @returns true 表示合法轉移
  */
-export function isLegalPublishTransition(
-  from: PublishStatus | null,
-  to: PublishStatus,
-): boolean {
+export function isLegalPublishTransition(from: PublishStatus | null, to: PublishStatus): boolean {
   return PUBLISH_TRANSITIONS.get(from)?.has(to) ?? false;
 }
 
@@ -72,9 +69,7 @@ export function isLegalPublishTransition(
  *
  * @returns PublishStatus 或 null（需明確指定 target_state）
  */
-export function inferNextPublishState(
-  currentState: PublishStatus | null,
-): PublishStatus | null {
+export function inferNextPublishState(currentState: PublishStatus | null): PublishStatus | null {
   // 失敗復原必須明確指定，不自動推斷
   if (currentState === PublishStatus.publish_failed) return null;
 
@@ -92,8 +87,6 @@ export function inferNextPublishState(
  *
  * @returns 合法後繼狀態陣列（空陣列表示終端狀態）
  */
-export function allowedNextStates(
-  currentState: PublishStatus | null,
-): readonly PublishStatus[] {
+export function allowedNextStates(currentState: PublishStatus | null): readonly PublishStatus[] {
   return [...(PUBLISH_TRANSITIONS.get(currentState) ?? [])];
 }

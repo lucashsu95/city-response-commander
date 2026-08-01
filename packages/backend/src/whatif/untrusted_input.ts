@@ -35,10 +35,7 @@ export const USER_QUESTION_TAG = 'user_question';
  * 跳脫的作用是降低 Bedrock 被誤導、產生錯誤措辭或錯誤 assumptions 的機率。
  */
 export function escapeXmlEntities(text: string): string {
-  return text
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
+  return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
 /**
@@ -92,10 +89,7 @@ export function sanitizeEchoedText(
   value: string,
   maxLength: number = MAX_ECHOED_FRAGMENT_LENGTH,
 ): string {
-  const stripped = value
-    .replace(CONTROL_CHARS, '')
-    .replace(/\s+/g, ' ')
-    .trim();
+  const stripped = value.replace(CONTROL_CHARS, '').replace(/\s+/g, ' ').trim();
 
   if (stripped.length <= maxLength) return stripped;
   return `${stripped.slice(0, maxLength)}…`;

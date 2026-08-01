@@ -79,7 +79,7 @@ interface FieldSpec {
   readonly acceptsPercentScale?: boolean;
   /** 值超出範圍時附加的量綱提示（幫使用者用對單位） */
   readonly scaleHint?: string;
-};
+}
 
 const FIELD_SPECS: Record<string, FieldSpec> = {
   Saturation_Score: {
@@ -176,8 +176,7 @@ function validateEntityExists(
   const entityType = classifyEntity(assumption.entity_id);
   if (entityType === null) return null;
 
-  const loaded =
-    entityType === 'road_segment' ? catalog.roadSegmentIds : catalog.baseStationIds;
+  const loaded = entityType === 'road_segment' ? catalog.roadSegmentIds : catalog.baseStationIds;
   if (!loaded.has(assumption.entity_id)) {
     return `實體「${echo(assumption.entity_id)}」不存在於目前載入的官方資料中，請確認 ID。`;
   }
@@ -202,9 +201,13 @@ function validateEntityFieldMatch(assumption: WhatIfAssumption): string | null {
   if (spec === undefined) return null; // 已由 validateFieldWhitelist 處理
 
   if (!spec.allowedEntities.includes(entityType)) {
-    const allowed = spec.allowedEntities.map((t) =>
-      t === 'road_segment' ? `路段（${ROAD_SEGMENT_PREFIX}*）` : `基地台（${BASE_STATION_PREFIX}*）`,
-    ).join('或');
+    const allowed = spec.allowedEntities
+      .map((t) =>
+        t === 'road_segment'
+          ? `路段（${ROAD_SEGMENT_PREFIX}*）`
+          : `基地台（${BASE_STATION_PREFIX}*）`,
+      )
+      .join('或');
     return `欄位「${echo(assumption.field)}」只適用於 ${allowed}，無法用於「${echo(assumption.entity_id)}」。`;
   }
   return null;

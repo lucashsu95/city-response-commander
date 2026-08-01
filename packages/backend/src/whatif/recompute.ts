@@ -32,9 +32,7 @@ export interface RuleEngineWhatIfFacts {
  * the full Rule Engine. Production AWS/config wiring remains outside this task.
  */
 export interface RuleEngineWhatIfFacade {
-  readonly loadBaseline: (
-    event: APIGatewayProxyEventV2,
-  ) => Promise<RuleEngineWhatIfBaseline>;
+  readonly loadBaseline: (event: APIGatewayProxyEventV2) => Promise<RuleEngineWhatIfBaseline>;
   readonly rerun: (input: {
     readonly baseline: RuleEngineWhatIfBaseline;
     readonly assumptions: readonly WhatIfAssumption[];

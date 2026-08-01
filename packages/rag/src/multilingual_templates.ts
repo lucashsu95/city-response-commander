@@ -200,9 +200,7 @@ export interface MultilingualTemplateInput {
  * // payload.public_alert_text.zh !== ''
  * // payload.public_alert_text.en !== ''
  */
-export function renderMultilingualTemplates(
-  input: MultilingualTemplateInput,
-): PublicAlertPayload {
+export function renderMultilingualTemplates(input: MultilingualTemplateInput): PublicAlertPayload {
   const { core, languages } = input;
   const occurred = core.occurred_at;
 

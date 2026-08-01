@@ -145,9 +145,9 @@ export function appendAuditEntry(input: AppendAuditEntryInput): PublishRecord {
  *
  * @returns `{ valid: true }` 或 `{ valid: false; reason: string }`
  */
-export function validateAuditTrailIntegrity(record: PublishRecord):
-  | { readonly valid: true }
-  | { readonly valid: false; readonly reason: string } {
+export function validateAuditTrailIntegrity(
+  record: PublishRecord,
+): { readonly valid: true } | { readonly valid: false; readonly reason: string } {
   const trail = record.audit_trail;
 
   if (trail.length === 0) {
@@ -169,8 +169,7 @@ export function validateAuditTrailIntegrity(record: PublishRecord):
     if (next.from_state !== curr.to_state) {
       return {
         valid: false,
-        reason:
-          `audit_trail 鏈斷裂：entry[${i}].to_state=${curr.to_state} ≠ entry[${i + 1}].from_state=${next.from_state}。`,
+        reason: `audit_trail 鏈斷裂：entry[${i}].to_state=${curr.to_state} ≠ entry[${i + 1}].from_state=${next.from_state}。`,
       };
     }
   }

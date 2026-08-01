@@ -25,10 +25,7 @@ export {
   type BedrockInvokeOptions,
 } from './bedrock_adapter.js';
 
-export {
-  MockBedrockAdapter,
-  createBedrockAdapter,
-} from './mock_bedrock_adapter.js';
+export { MockBedrockAdapter, createBedrockAdapter } from './mock_bedrock_adapter.js';
 
 // ─── SOP Retriever (TASK-108) ────────────────────────────
 export {
@@ -43,10 +40,7 @@ export {
 } from './sop_retriever.js';
 
 // ─── SOP S3 Fallback (TASK-109) ──────────────────────────
-export {
-  SopS3Fallback,
-  type SopArticleFetchResult,
-} from './sop_s3_fallback.js';
+export { SopS3Fallback, type SopArticleFetchResult } from './sop_s3_fallback.js';
 
 // ─── Report Composer (TASK-113) ──────────────────────────
 export {

@@ -114,7 +114,11 @@ export interface PublishFnDependencies {
 /** writePublishRecord 的回傳結果 */
 export type WritePublishRecordResult =
   | { readonly success: true; readonly record: PublishRecord }
-  | { readonly success: false; readonly reason: 'VERSION_CONFLICT' | 'ILLEGAL_TRANSITION' | 'INTERNAL_ERROR'; readonly message: string };
+  | {
+      readonly success: false;
+      readonly reason: 'VERSION_CONFLICT' | 'ILLEGAL_TRANSITION' | 'INTERNAL_ERROR';
+      readonly message: string;
+    };
 
 // ─── HTTP helpers ─────────────────────────────────────────────────────────────
 
@@ -139,8 +143,9 @@ function errorResponse(
 function hasPublicAlertText(
   value: PublicAlertPayload['public_alert_text'] | null,
 ): value is PublicAlertPayload['public_alert_text'] {
-  return value !== null && Object.values(value).some(
-    (text) => typeof text === 'string' && text.trim().length > 0,
+  return (
+    value !== null &&
+    Object.values(value).some((text) => typeof text === 'string' && text.trim().length > 0)
   );
 }
 
@@ -162,9 +167,9 @@ const COMMANDER_GROUP = 'commanders';
  *
  * @returns `{ authorized: true; actor: string }` 或 `{ authorized: false }`
  */
-function authorizeCommander(event: APIGatewayProxyEventV2):
-  | { readonly authorized: true; readonly actor: string }
-  | { readonly authorized: false } {
+function authorizeCommander(
+  event: APIGatewayProxyEventV2,
+): { readonly authorized: true; readonly actor: string } | { readonly authorized: false } {
   // HTTP API Gateway JWT authorizer 在 requestContext.authorizer.jwt.claims 下
   // 型別套件 @types/aws-lambda 尚未包含 HTTP API JWT authorizer 型別，
   // 以 unknown 轉型後再嚴格提取（不假設結構）
@@ -256,8 +261,7 @@ function parsePublishBody(body: string | null | undefined): ParsedPublishBody {
   const obj = parsed as Record<string, unknown>;
 
   const ts = obj['target_state'];
-  const target_state =
-    typeof ts === 'string' && ts in PublishStatus ? (ts as PublishStatus) : null;
+  const target_state = typeof ts === 'string' && ts in PublishStatus ? (ts as PublishStatus) : null;
 
   const fr = obj['failure_reason'];
   const failure_reason = typeof fr === 'string' && fr.trim().length > 0 ? fr.trim() : null;
@@ -343,22 +347,14 @@ export function createPublishHandler(
     // ── 0. Cognito commander 身份驗證 ──────────────────────────────────────
     const authResult = authorizeCommander(event);
     if (!authResult.authorized) {
-      return errorResponse(
-        403,
-        'FORBIDDEN',
-        '需要 commander 身份才能執行發布操作。',
-      );
+      return errorResponse(403, 'FORBIDDEN', '需要 commander 身份才能執行發布操作。');
     }
     const actor = authResult.actor;
 
     // ── 1. 取得 decision_id（path parameter）──────────────────────────────
     const decisionId = extractDecisionId(event);
     if (decisionId === null) {
-      return errorResponse(
-        400,
-        'INVALID_REQUEST',
-        '缺少路徑參數 id（decision_id）。',
-      );
+      return errorResponse(400, 'INVALID_REQUEST', '缺少路徑參數 id（decision_id）。');
     }
 
     try {
@@ -470,7 +466,7 @@ export function createPublishHandler(
 
       if (shouldDispatchChannels) {
         // Read-only payload preparation may fail safely before taking the claim.
-        const cmsCoreText = await readCmsCoreText(decisionId) ?? '';
+        const cmsCoreText = (await readCmsCoreText(decisionId)) ?? '';
         const publicAlertText = await readPublicAlertText(decisionId);
         if (!hasPublicAlertText(publicAlertText)) {
           return errorResponse(
@@ -511,7 +507,7 @@ export function createPublishHandler(
           const failedRecord: PublishRecord = appendAuditEntry({
             decisionId,
             actor,
-            existing,                     // ← 實際持久化的 record（approved）
+            existing, // ← 實際持久化的 record（approved）
             targetState: PublishStatus.publish_failed,
             failureReason: outcome.reason,
           });
@@ -560,17 +556,9 @@ export function createPublishHandler(
           );
         }
         if (writeResult.reason === 'ILLEGAL_TRANSITION') {
-          return errorResponse(
-            409,
-            'ILLEGAL_TRANSITION',
-            writeResult.message,
-          );
+          return errorResponse(409, 'ILLEGAL_TRANSITION', writeResult.message);
         }
-        return errorResponse(
-          500,
-          'INTERNAL_ERROR',
-          '寫入發布記錄時發生內部錯誤。',
-        );
+        return errorResponse(500, 'INTERNAL_ERROR', '寫入發布記錄時發生內部錯誤。');
       }
 
       // ── 10. 回傳成功結果 ─────────────────────────────────────────────────

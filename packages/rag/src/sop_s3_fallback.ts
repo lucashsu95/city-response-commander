@@ -94,9 +94,7 @@ export class SopS3Fallback {
     try {
       parsed = JSON.parse(body);
     } catch {
-      throw new Error(
-        `Failed to parse SOP article ${articleNo} from S3 (${s3_uri}): invalid JSON`,
-      );
+      throw new Error(`Failed to parse SOP article ${articleNo} from S3 (${s3_uri}): invalid JSON`);
     }
 
     const chunk = validateSOPArticleChunk(parsed, articleNo, s3_uri);
@@ -132,7 +130,9 @@ function validateSOPArticleChunk(
   const obj = raw as Record<string, unknown>;
 
   if (typeof obj['article_no'] !== 'number' || !Number.isInteger(obj['article_no'])) {
-    throw new Error(`SOP article ${expectedArticleNo} from S3 (${s3Uri}): article_no must be an integer`);
+    throw new Error(
+      `SOP article ${expectedArticleNo} from S3 (${s3Uri}): article_no must be an integer`,
+    );
   }
 
   // 物件鍵由 article_no 推導，但內容是否對得上必須驗證：

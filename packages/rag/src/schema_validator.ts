@@ -21,7 +21,7 @@ import { NarrativeType } from '@city-commander/shared-schemas';
 
 // ─── LLM-prohibited core fields（與 eslint-local-rules.cjs 同步）─────────────
 //
- // ⚠️  MAINTENANCE NOTE — Divergent Change risk:
+// ⚠️  MAINTENANCE NOTE — Divergent Change risk:
 //     這份清單必須與 eslint-local-rules.cjs 的 LLM_PROHIBITED_FIELDS 保持一致。
 //     當 DecisionCore 新增或移除欄位時，兩處都需同步更新。
 //     長期修復方向：由 @city-commander/shared-schemas 匯出 canonical list，
@@ -75,12 +75,8 @@ const ALLOWED_FIELDS: Record<NarrativeType, ReadonlySet<string>> = {
     'cms_explanation_text',
     'citations_presentation',
   ]),
-  [NarrativeType.PUBLIC_ALERT]: new Set([
-    'public_alert_text',
-  ]),
-  [NarrativeType.EXPLANATION]: new Set([
-    'explanation_text',
-  ]),
+  [NarrativeType.PUBLIC_ALERT]: new Set(['public_alert_text']),
+  [NarrativeType.EXPLANATION]: new Set(['explanation_text']),
 };
 
 // ─── Result types ──────────────────────────────────────────────────────────
@@ -113,12 +109,12 @@ export interface RejectedPayload {
 
 /** 拒絕原因 */
 export type RejectionReason =
-  | 'prohibited_field_overwrite'      // payload 含 LLM-prohibited core field
-  | 'non_whitelisted_field'           // payload 含該 narrative_type 白名單外的欄位
-  | 'non_string_value'                // 白名單內欄位的值不是 string（REPORT / EXPLANATION）
-  | 'public_alert_text_map_invalid'   // PUBLIC_ALERT 的 public_alert_text 不是合法語言 map
-  | 'invalid_narrative_type'          // 傳入未知的 narrative_type
-  | 'not_a_plain_object';             // payload 不是純物件（無法安全遍歷）
+  | 'prohibited_field_overwrite' // payload 含 LLM-prohibited core field
+  | 'non_whitelisted_field' // payload 含該 narrative_type 白名單外的欄位
+  | 'non_string_value' // 白名單內欄位的值不是 string（REPORT / EXPLANATION）
+  | 'public_alert_text_map_invalid' // PUBLIC_ALERT 的 public_alert_text 不是合法語言 map
+  | 'invalid_narrative_type' // 傳入未知的 narrative_type
+  | 'not_a_plain_object'; // payload 不是純物件（無法安全遍歷）
 
 export type ValidationResult = ValidatedPayload | RejectedPayload;
 
@@ -233,9 +229,7 @@ export function validateBedrockPayload(
  * - 物件的每個 value 都是非空 string
  * - 通過時回傳 `alertTextMap`（不放入通用 `fields`，避免型別混淆）
  */
-function validatePublicAlertPayload(
-  rawPayload: Record<string, unknown>,
-): ValidationResult {
+function validatePublicAlertPayload(rawPayload: Record<string, unknown>): ValidationResult {
   const alertText = rawPayload['public_alert_text'];
 
   if (!isPlainObject(alertText)) {

@@ -35,7 +35,10 @@ import {
   type SopCitationResult,
 } from '@city-commander/rag';
 import type { RecoveryGateResult } from './recovery_gate.js';
-import { splitNarrativeTypes, type DecisionNarrativeReadPort } from '../repository/decision_narrative_reader.js';
+import {
+  splitNarrativeTypes,
+  type DecisionNarrativeReadPort,
+} from '../repository/decision_narrative_reader.js';
 import {
   publishDecisionEnriched,
   isNarrativeSetComplete,

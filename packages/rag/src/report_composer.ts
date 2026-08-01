@@ -187,13 +187,11 @@ export async function composeReport(input: ReportComposerInput): Promise<ReportC
  */
 function buildReportPrompt(core: DecisionCore, citations: readonly SopCitationResult[]): string {
   const primaryRoute = core.primary_evacuation ?? '（無合規替代路段）';
-  const secondaryRoutes = core.secondary_evacuation.length > 0
-    ? core.secondary_evacuation.join('、')
-    : '（無）';
+  const secondaryRoutes =
+    core.secondary_evacuation.length > 0 ? core.secondary_evacuation.join('、') : '（無）';
   const triggeredArticles = core.triggered_articles.join('、');
-  const invokedProcedures = core.invoked_procedures.length > 0
-    ? core.invoked_procedures.join('、')
-    : '（無）';
+  const invokedProcedures =
+    core.invoked_procedures.length > 0 ? core.invoked_procedures.join('、') : '（無）';
 
   const eteSection = formatEteForPrompt(core);
   const signalTimingLine = buildSignalTimingLine(core);
@@ -201,7 +199,9 @@ function buildReportPrompt(core: DecisionCore, citations: readonly SopCitationRe
   const classificationLine = buildClassificationLine(core);
 
   const citationLines = citations
-    .map((c) => `  - 第 ${c.article_no} 條（來源：${c.source_location}）：${c.content.slice(0, 120)}`)
+    .map(
+      (c) => `  - 第 ${c.article_no} 條（來源：${c.source_location}）：${c.content.slice(0, 120)}`,
+    )
     .join('\n');
 
   const excludedRoutes = buildExclusionLines(core).join('\n');
@@ -277,9 +277,8 @@ function buildFallbackReportText(
   citations: readonly SopCitationResult[],
 ): string {
   const primaryRoute = core.primary_evacuation ?? '查無合規替代路段';
-  const secondaryRoutes = core.secondary_evacuation.length > 0
-    ? core.secondary_evacuation.join('、')
-    : '無';
+  const secondaryRoutes =
+    core.secondary_evacuation.length > 0 ? core.secondary_evacuation.join('、') : '無';
   const triggeredArticles = core.triggered_articles.join('、');
   const eteText = formatEteForReport(core);
   const signalTimingLine = buildSignalTimingLine(core);
@@ -287,9 +286,10 @@ function buildFallbackReportText(
   const classificationLine = buildClassificationLine(core);
   const exclusionLines = buildExclusionLines(core);
 
-  const articleList = citations.length > 0
-    ? citations.map((c) => `第 ${c.article_no} 條`).join('、')
-    : `第 ${triggeredArticles} 條`;
+  const articleList =
+    citations.length > 0
+      ? citations.map((c) => `第 ${c.article_no} 條`).join('、')
+      : `第 ${triggeredArticles} 條`;
 
   return [
     `【交控中心建議書】`,
@@ -322,7 +322,9 @@ function buildSignalTimingLine(core: DecisionCore): string | null {
   const measures = core.art1_measures;
   if (!measures) return null;
 
-  const parts = [`號誌調整：${measures.trigger_segment} 替代路口綠燈時間 +${measures.alternatives_green_plus_pct}%`];
+  const parts = [
+    `號誌調整：${measures.trigger_segment} 替代路口綠燈時間 +${measures.alternatives_green_plus_pct}%`,
+  ];
   if (measures.long_green_timing) parts.push('啟動長綠燈時制');
   if (measures.police_clear_intersections) parts.push('派遣警力協助路口疏導');
   return parts.join('，');

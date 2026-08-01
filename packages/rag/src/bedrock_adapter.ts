@@ -43,10 +43,10 @@ export interface BedrockFailure {
 }
 
 export type BedrockFailureReason =
-  | 'timeout'               // 逾時（該 model 可重試下一個 fallback）
-  | 'model_not_supported'   // 所有 model ID 在此 region 均不支援
-  | 'throttled'             // 被 throttle（該 model 可重試下一個 fallback）
-  | 'unexpected_error';     // 其他非預期錯誤
+  | 'timeout' // 逾時（該 model 可重試下一個 fallback）
+  | 'model_not_supported' // 所有 model ID 在此 region 均不支援
+  | 'throttled' // 被 throttle（該 model 可重試下一個 fallback）
+  | 'unexpected_error'; // 其他非預期錯誤
 
 export type BedrockResult = BedrockSuccess | BedrockFailure;
 

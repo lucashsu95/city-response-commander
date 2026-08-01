@@ -131,11 +131,7 @@ export class SopRetriever {
   private readonly kbClient: KbRetrieveClient;
   private readonly s3Fallback: SopS3Fallback;
 
-  constructor(
-    knowledgeBaseId: string,
-    kbClient: KbRetrieveClient,
-    s3Fallback: SopS3Fallback,
-  ) {
+  constructor(knowledgeBaseId: string, kbClient: KbRetrieveClient, s3Fallback: SopS3Fallback) {
     this.knowledgeBaseId = knowledgeBaseId;
     this.kbClient = kbClient;
     this.s3Fallback = s3Fallback;

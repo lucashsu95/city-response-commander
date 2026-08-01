@@ -26,10 +26,7 @@ import {
   type DecisionCore,
   type PublicAlertPayload,
 } from '@city-commander/shared-schemas';
-import {
-  requiredAlertLanguages,
-  type SupportedLanguage,
-} from '@city-commander/domain';
+import { requiredAlertLanguages, type SupportedLanguage } from '@city-commander/domain';
 import { validateBedrockPayload } from './schema_validator.js';
 import {
   putNarrative,
@@ -38,10 +35,7 @@ import {
   type NarrativePutResult,
 } from './narrative_writer.js';
 import type { BedrockInvoker } from './bedrock_adapter.js';
-import {
-  renderMultilingualTemplates,
-  formatEteForAlert,
-} from './multilingual_templates.js';
+import { renderMultilingualTemplates, formatEteForAlert } from './multilingual_templates.js';
 
 // ─── Language floor logic ─────────────────────────────────────────────────────
 

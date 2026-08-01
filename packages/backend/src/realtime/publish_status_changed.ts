@@ -19,10 +19,7 @@
  * @module backend/realtime/publish_status_changed
  */
 
-import type {
-  PublishRecord,
-  PublishStatusChangedEvent,
-} from '@city-commander/shared-schemas';
+import type { PublishRecord, PublishStatusChangedEvent } from '@city-commander/shared-schemas';
 import { PublishStatus, SCHEMA_VERSION } from '@city-commander/shared-schemas';
 
 // ─── Event constant ───────────────────────────────────────────────────────────
@@ -181,8 +178,7 @@ export function isStalePublishConnection(error: unknown): boolean {
   if (typeof error !== 'object' || error === null) return false;
   const name = (error as { name?: unknown }).name;
   if (name === 'GoneException') return true;
-  const status = (error as { $metadata?: { httpStatusCode?: unknown } }).$metadata
-    ?.httpStatusCode;
+  const status = (error as { $metadata?: { httpStatusCode?: unknown } }).$metadata?.httpStatusCode;
   return status === 410;
 }
 
@@ -239,9 +235,9 @@ export async function emitPublishStatusChanged(
   // 清理失敗靜默忽略（不阻斷廣播結果回傳）
   if (publisher.deleteConnection !== undefined && staleConnectionIds.length > 0) {
     const deleteConnection = publisher.deleteConnection.bind(publisher);
-    Promise.all(
-      staleConnectionIds.map((id) => deleteConnection(id).catch(() => undefined)),
-    ).catch(() => undefined);
+    Promise.all(staleConnectionIds.map((id) => deleteConnection(id).catch(() => undefined))).catch(
+      () => undefined,
+    );
   }
 
   return {

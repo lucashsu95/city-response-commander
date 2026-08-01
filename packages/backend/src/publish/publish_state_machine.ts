@@ -56,7 +56,11 @@ export interface PublishRecordStore {
    */
   readonly conditionalPut: (record: PublishRecord) => Promise<
     | { readonly success: true }
-    | { readonly success: false; readonly reason: 'ALREADY_EXISTS' | 'INTERNAL_ERROR'; readonly message: string }
+    | {
+        readonly success: false;
+        readonly reason: 'ALREADY_EXISTS' | 'INTERNAL_ERROR';
+        readonly message: string;
+      }
   >;
 
   /**
@@ -67,9 +71,16 @@ export interface PublishRecordStore {
    * @param record - 完整的 updated PublishRecord（含新 version）
    * @param expectedVersion - 預期的當前 version（樂觀鎖條件）
    */
-  readonly conditionalUpdate: (record: PublishRecord, expectedVersion: number) => Promise<
+  readonly conditionalUpdate: (
+    record: PublishRecord,
+    expectedVersion: number,
+  ) => Promise<
     | { readonly success: true }
-    | { readonly success: false; readonly reason: 'VERSION_CONFLICT' | 'INTERNAL_ERROR'; readonly message: string }
+    | {
+        readonly success: false;
+        readonly reason: 'VERSION_CONFLICT' | 'INTERNAL_ERROR';
+        readonly message: string;
+      }
   >;
 }
 

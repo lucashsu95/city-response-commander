@@ -208,8 +208,9 @@ function simulateSmsChannel(
 ): ChannelResult {
   try {
     const messages = Object.entries(payload.public_alert_text)
-      .filter((entry): entry is [string, string] =>
-        typeof entry[1] === 'string' && entry[1].trim().length > 0,
+      .filter(
+        (entry): entry is [string, string] =>
+          typeof entry[1] === 'string' && entry[1].trim().length > 0,
       )
       .sort(([left], [right]) => left.localeCompare(right));
 

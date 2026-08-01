@@ -194,9 +194,7 @@ function isAuthorizedOperator(event: APIGatewayProxyEventV2): boolean {
  */
 function extractTraceId(event: APIGatewayProxyEventV2): string {
   return (
-    event.headers?.['x-amzn-trace-id'] ??
-    event.requestContext.requestId ??
-    `whatif-${Date.now()}`
+    event.headers?.['x-amzn-trace-id'] ?? event.requestContext.requestId ?? `whatif-${Date.now()}`
   );
 }
 
@@ -283,10 +281,7 @@ export function createWhatIfHandler(
       const baseline = await ruleEngineFacade.loadBaseline(event);
 
       // ── Stage 2: SchemaValidator + DomainValidator ────────────────────────
-      const validateResult = validateScenario(
-        parseResult.assumptions,
-        baseline.loadedEntities,
-      );
+      const validateResult = validateScenario(parseResult.assumptions, baseline.loadedEntities);
 
       if (validateResult.validation_status === 'clarification_required') {
         // stage 2 驗證失敗 → 立即回應，不進入 stage 3/4

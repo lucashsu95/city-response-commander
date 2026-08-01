@@ -103,13 +103,16 @@ export async function explainWhatIf(
     // KB + S3 雙重失敗：記錄診斷資訊，使用部分 citations（可能為空）繼續執行。
     // stage 4 的解釋降級為 template fallback（若 Bedrock 也失敗），
     // 但不拋出例外；完全沒有 citation 時會 fail closed，避免無 grounding 的 LLM 解釋。
-    console.warn('[WhatIfExplanation] SopRetriever both KB and S3 failed; using partial citations.', {
-      failed_articles: retrieveResult.failed_articles,
-      error_code: 'SOP_CITATION_RETRIEVAL_FAILED',
-      kb_failed: true,
-      s3_failed: true,
-      partial_count: retrieveResult.partial_citations.length,
-    });
+    console.warn(
+      '[WhatIfExplanation] SopRetriever both KB and S3 failed; using partial citations.',
+      {
+        failed_articles: retrieveResult.failed_articles,
+        error_code: 'SOP_CITATION_RETRIEVAL_FAILED',
+        kb_failed: true,
+        s3_failed: true,
+        partial_count: retrieveResult.partial_citations.length,
+      },
+    );
     citations = retrieveResult.partial_citations;
 
     if (citations.length === 0) {
@@ -149,8 +152,7 @@ export async function explainWhatIf(
 
     if (validation.outcome === 'accepted') {
       const rawText = validation.fields['explanation_text'];
-      const effectiveText =
-        rawText != null && rawText.trim().length > 0 ? rawText : null;
+      const effectiveText = rawText != null && rawText.trim().length > 0 ? rawText : null;
 
       if (effectiveText !== null) {
         explanationText = effectiveText;
