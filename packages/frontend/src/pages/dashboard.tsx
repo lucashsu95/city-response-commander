@@ -15,6 +15,8 @@
 
 import { useCallback, useMemo, useState, type ReactNode } from 'react';
 import { createApiClient } from '../api/client.js';
+import { AdminSessionControl } from '../auth/admin_session_control.js';
+import type { AdminToken } from '../auth/admin_session.js';
 import { CrowdPanel } from '../crowd/crowd_panel.js';
 import { useCrowdSnapshot } from '../crowd/use_crowd_snapshot.js';
 import { AlertPanel } from '../decision/alert_panel.js';
@@ -26,6 +28,7 @@ import { ExplanationChain } from '../decision/explanation_chain.js';
 import { ReportPanel } from '../decision/report_panel.js';
 import { RoutePanel } from '../decision/route_panel.js';
 import { useDecisionReadModel } from '../decision/use_decision_read_model.js';
+import { InjectionPanel } from '../inject/injection_panel.js';
 import { WhatIfDialog } from '../whatif/whatif_dialog.js';
 import { useEteView } from '../decision/use_ete_view.js';
 import { useEvidenceView } from '../decision/use_evidence_view.js';
@@ -49,6 +52,13 @@ import { useTimelinePlayback } from '../timeline/use_timeline_playback.js';
  */
 export function DashboardPage(): ReactNode {
   const config = useAppConfig();
+
+  // TASK-128 repair: the admin JWT lives only in this page's React state. No
+  // frontend module persists it (no localStorage/sessionStorage/cookie/URL/env),
+  // and no frontend module inspects or trusts its payload — the Backend/Cognito
+  // authorizer remains the sole source of authorization truth. A page refresh
+  // clears this state naturally.
+  const [adminToken, setAdminToken] = useState<AdminToken>(null);
 
   // Same-lifetime API client shared by the timeline controller's direct
   // `GET /timeline` fetches. Realtime's own transport (used for the §13
@@ -211,6 +221,12 @@ export function DashboardPage(): ReactNode {
             execution={executionStatus}
             onRetry={decision.refresh}
           />
+        </>
+      }
+      injectionContent={
+        <>
+          <AdminSessionControl adminToken={adminToken} onAdminTokenChange={setAdminToken} />
+          <InjectionPanel client={transport} adminToken={adminToken} />
         </>
       }
     />

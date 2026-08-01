@@ -122,6 +122,15 @@ interface WhatIfRegionProps {
   readonly content?: ReactNode;
 }
 
+interface InjectionRegionProps {
+  /**
+   * TASK-128 admin session control + incident injection panel. `undefined`
+   * (the default) preserves an empty state so a `DashboardShell` rendered
+   * without an `injectionContent` prop is unchanged.
+   */
+  readonly content?: ReactNode;
+}
+
 /**
  * Decision command region - displays decision results and canonical context.
  *
@@ -175,6 +184,31 @@ function WhatIfRegion({ content }: WhatIfRegionProps): ReactNode {
   );
 }
 
+/**
+ * Incident injection region (§12, §17, TASK-128).
+ *
+ * Renders the injected admin-session control + `InjectionPanel` content when
+ * supplied; otherwise falls back to the shared empty state. This region is
+ * layout-only: no API, auth, or classification logic lives here — that stays
+ * in the Dashboard page and inside `InjectionPanel`/`AdminSessionControl`
+ * themselves.
+ */
+function InjectionRegion({ content }: InjectionRegionProps): ReactNode {
+  return (
+    <section
+      className="dashboard-region dashboard-region--injection"
+      aria-labelledby="injection-heading"
+    >
+      <h2 id="injection-heading" className="dashboard-region__heading">
+        事件注入
+      </h2>
+      <div className="dashboard-region__content dashboard-region__content--stacked">
+        {content ?? <EmptyState message="尚無事件注入內容" />}
+      </div>
+    </section>
+  );
+}
+
 // ─── Dashboard Shell ───────────────────────────────────────
 
 export interface DashboardShellProps {
@@ -217,6 +251,13 @@ export interface DashboardShellProps {
    * TASK-141 What-if dialog content. Injected by the Dashboard page.
    */
   readonly whatifContent?: ReactNode;
+  /**
+   * TASK-128 admin session control + incident injection panel content.
+   * Injected by the Dashboard page for the same reason as `timelineContent`:
+   * the shell stays a layout-only component with no fetch, auth, or
+   * classification logic of its own.
+   */
+  readonly injectionContent?: ReactNode;
 }
 
 /**
@@ -256,6 +297,7 @@ export function DashboardShell({
   crowdContent,
   decisionContent,
   whatifContent,
+  injectionContent,
 }: DashboardShellProps = {}): ReactNode {
   const operationalStatus = resolveOperationalStatus(selectedSnapshot, connectionMode);
 
@@ -281,6 +323,7 @@ export function DashboardShell({
             content={decisionContent}
           />
           <WhatIfRegion content={whatifContent} />
+          <InjectionRegion content={injectionContent} />
         </div>
       </main>
 
