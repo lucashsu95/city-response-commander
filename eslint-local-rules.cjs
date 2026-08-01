@@ -5,6 +5,13 @@
  *
  * Custom rule: no-llm-prohibited-field-write
  * Flags writes to LLM-prohibited DecisionCore fields from renderer/rag modules (§9 boundary).
+ *
+ * LLM_PROHIBITED_FIELDS below is a manual copy of the canonical list in
+ * packages/shared-schemas/src/llm_boundary.ts. This file is a repo-root,
+ * lint-time CJS module outside any package's build output, so it can't
+ * import that ESM package without a build step; instead,
+ * eslint-local-rules/test/prohibited-fields-sync.test.ts asserts the two
+ * lists stay identical. Update both when DecisionCore's fields change.
  */
 
 const LLM_PROHIBITED_FIELDS = new Set([
@@ -96,3 +103,13 @@ module.exports = {
     },
   },
 };
+
+// NOTE: eslint-plugin-local-rules treats every key of `module.exports` above
+// as a rule name (Object.keys(rules) → `local-rules/<key>`), so this constant
+// must not be attached to that same object. It's exposed as a non-enumerable
+// property instead, purely for eslint-local-rules/test/prohibited-fields-sync.test.ts
+// to read at test time.
+Object.defineProperty(module.exports, 'LLM_PROHIBITED_FIELDS', {
+  value: LLM_PROHIBITED_FIELDS,
+  enumerable: false,
+});
