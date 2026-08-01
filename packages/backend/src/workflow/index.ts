@@ -49,6 +49,7 @@ export {
   AslState,
   AslPayloadError,
   ASL_GAP_INSUFFICIENT_DATA_BRANCH,
+  ASL_GAP_PASS_STATE_DROPS_TRACE_ID,
   ASL_DIVERGENCE_PROCESSING_FAILED_RETRYABLE,
   jsonPathToField,
   nextStateForRecoveryMode,

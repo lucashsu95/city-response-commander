@@ -42,6 +42,25 @@ export { FAST_PATH_TARGET_MS, OFFICIAL_DEADLINE_MS };
 export const DEFAULT_TARGET_PERCENTILE = 95;
 
 /**
+ * Samples required per budget before a PASS is believable (review item D5).
+ *
+ * Three, because the competition is graded on three official events (ACC_001,
+ * EVT_002, EVT_003) and a release gate that passes on fewer has not actually
+ * observed the system it is clearing.
+ *
+ * The previous default of `1` made the gate technically satisfiable by a single
+ * lucky measurement: one 4 800 ms Fast Path sample and one 41 s end-to-end sample
+ * returned `PASS` with `exit_code: 0`, and the 60 s official deadline would have
+ * been reported as demonstrated on a population of one. Under-sampling is
+ * indistinguishable from compliance in the output, so the floor has to be in the
+ * default rather than in whoever remembers to pass `--min-samples`.
+ *
+ * Shortfall degrades to `INSUFFICIENT_DATA`, never to `PASS`. A confirmed breach
+ * still outranks it — see `decideVerdict`.
+ */
+export const DEFAULT_MIN_SAMPLES = 3;
+
+/**
  * Verdict of an SLA evaluation.
  *
  * The two budgets get separate verdicts because they carry different authority.
@@ -120,8 +139,18 @@ export interface LatencySlaReport {
     /** Percentile value compared against the target; `null` with no samples. */
     readonly evaluated_ms: number | null;
     readonly compliant: boolean | null;
-    /** Whether this budget had enough samples to be judged at all. */
+    /**
+     * At least one measurement exists, so a BREACH can be judged. Independent of
+     * `min_samples`: one 9 000 ms sample proves the target was missed.
+     */
     readonly assessable: boolean;
+    /**
+     * Population reached `thresholds.min_samples`, so a PASS is believable
+     * (review item D5). `assessable && !sufficient` means "no breach found, but we
+     * have not measured enough to claim compliance" — which reports as
+     * `INSUFFICIENT_DATA`, never `PASS`.
+     */
+    readonly sufficient: boolean;
   };
   readonly end_to_end: {
     readonly metric: string;
@@ -131,6 +160,8 @@ export interface LatencySlaReport {
     readonly compliant: boolean | null;
     /** Judged independently of the Fast Path population. */
     readonly assessable: boolean;
+    /** Reached `thresholds.min_samples`. Judged independently of the Fast Path. */
+    readonly sufficient: boolean;
   };
   readonly violations: readonly SlaViolation[];
   /**
@@ -148,7 +179,8 @@ export interface LatencySlaOptions {
   readonly targetPercentile?: number;
   /**
    * Minimum samples required per budget before a PASS is believable. Applied to
-   * each population independently.
+   * each population independently. Defaults to {@link DEFAULT_MIN_SAMPLES} (3,
+   * one per official event); a shortfall yields `INSUFFICIENT_DATA`, never `PASS`.
    */
   readonly minSamples?: number;
   /** Make a missed 5 s team target fatal. Off by default: it is not official. */
@@ -309,7 +341,7 @@ export function evaluateLatencySla(
   const fastPathTargetMs = options.fastPathTargetMs ?? FAST_PATH_TARGET_MS;
   const officialDeadlineMs = options.officialDeadlineMs ?? OFFICIAL_DEADLINE_MS;
   const targetPercentile = options.targetPercentile ?? DEFAULT_TARGET_PERCENTILE;
-  const minSamples = options.minSamples ?? 1;
+  const minSamples = options.minSamples ?? DEFAULT_MIN_SAMPLES;
   const evaluatedAt = options.evaluatedAt ?? new Date().toISOString();
 
   const fastPathValues = samples
@@ -364,23 +396,41 @@ export function evaluateLatencySla(
   // Each budget is assessed against its OWN population. Coupling them meant a run
   // with no Fast Path samples returned INSUFFICIENT_DATA and buried a confirmed
   // 60 s breach that was sitting right there in the data.
-  const fastPathAssessable = fastPathValues.length > 0 && fastPathValues.length >= minSamples;
-  const officialAssessable = endToEndValues.length > 0 && endToEndValues.length >= minSamples;
+  //
+  // `assessable` and `sufficient` are two different questions, and conflating them
+  // was the bug that review item D5 nearly re-introduced:
+  //
+  //   assessable — is there at least ONE measurement? A breach is a breach at n=1.
+  //                A 61 s decision is proof of failure whether it is the only
+  //                sample or the thousandth, so this must NOT depend on minSamples.
+  //   sufficient — are there enough measurements for a PASS to mean anything?
+  //                This is where minSamples belongs: absence of evidence is not
+  //                evidence of compliance.
+  //
+  // Gating `assessable` on minSamples would have turned a single measured 61 s
+  // breach into INSUFFICIENT_DATA and buried the violation — the same failure the
+  // independent-population fix above exists to prevent.
+  const fastPathAssessable = fastPathValues.length > 0;
+  const officialAssessable = endToEndValues.length > 0;
+  const fastPathSufficient = fastPathValues.length >= minSamples;
+  const officialSufficient = endToEndValues.length >= minSamples;
 
   const insufficientDataReason = describeInsufficientData({
     sampleCount: samples.length,
     fastPathCount: fastPathValues.length,
     endToEndCount: endToEndValues.length,
     minSamples,
-    fastPathAssessable,
-    officialAssessable,
+    fastPathSufficient,
+    officialSufficient,
   });
 
   const verdict = decideVerdict({
     officialAssessable,
     officialCompliant,
+    officialSufficient,
     fastPathAssessable,
     fastPathCompliant,
+    fastPathSufficient,
   });
 
   return {
@@ -399,6 +449,7 @@ export function evaluateLatencySla(
       evaluated_ms: fastPathEvaluated,
       compliant: fastPathCompliant,
       assessable: fastPathAssessable,
+      sufficient: fastPathSufficient,
     },
     end_to_end: {
       metric: LATENCY_METRIC_NAMES.END_TO_END_LATENCY_MS,
@@ -406,6 +457,7 @@ export function evaluateLatencySla(
       evaluated_ms: endToEndEvaluated,
       compliant: officialCompliant,
       assessable: officialAssessable,
+      sufficient: officialSufficient,
     },
     violations,
     insufficient_data_reason: insufficientDataReason,
@@ -425,8 +477,10 @@ export function evaluateLatencySla(
 function decideVerdict(input: {
   readonly officialAssessable: boolean;
   readonly officialCompliant: boolean | null;
+  readonly officialSufficient: boolean;
   readonly fastPathAssessable: boolean;
   readonly fastPathCompliant: boolean | null;
+  readonly fastPathSufficient: boolean;
 }): SlaVerdict {
   if (input.officialAssessable && input.officialCompliant === false) {
     return 'OFFICIAL_SLA_VIOLATION';
@@ -436,7 +490,13 @@ function decideVerdict(input: {
   if (input.fastPathAssessable && input.fastPathCompliant === false) {
     return 'TEAM_TARGET_MISSED';
   }
+  // No breach found. PASS now has to clear the higher bar (review item D5): every
+  // budget needs a measurement AND enough of them. A clean run on one sample is
+  // an unfinished measurement, not a demonstrated SLA.
   if (!input.officialAssessable || !input.fastPathAssessable) {
+    return 'INSUFFICIENT_DATA';
+  }
+  if (!input.officialSufficient || !input.fastPathSufficient) {
     return 'INSUFFICIENT_DATA';
   }
   return 'PASS';
@@ -449,27 +509,33 @@ function exitCodeFor(verdict: SlaVerdict, failOnTeamTarget: boolean): number {
   return EXIT_CODES[verdict];
 }
 
-/** Name every budget that could not be judged, independently of the verdict. */
+/**
+ * Name every budget whose population is too thin to support a PASS, independently
+ * of the verdict.
+ *
+ * Populated even when the verdict is a confirmed violation: "we found a breach AND
+ * we were under-sampled" is two separate facts and the operator needs both.
+ */
 function describeInsufficientData(input: {
   readonly sampleCount: number;
   readonly fastPathCount: number;
   readonly endToEndCount: number;
   readonly minSamples: number;
-  readonly fastPathAssessable: boolean;
-  readonly officialAssessable: boolean;
+  readonly fastPathSufficient: boolean;
+  readonly officialSufficient: boolean;
 }): string | null {
   if (input.sampleCount === 0) {
     return 'No latency samples were found. An empty result set cannot demonstrate compliance.';
   }
 
   const missing: string[] = [];
-  if (!input.fastPathAssessable) {
+  if (!input.fastPathSufficient) {
     missing.push(
       `${LATENCY_METRIC_NAMES.FAST_PATH_LATENCY_MS}: ${String(input.fastPathCount)} sample(s), ` +
         `minSamples=${String(input.minSamples)}`,
     );
   }
-  if (!input.officialAssessable) {
+  if (!input.officialSufficient) {
     missing.push(
       `${LATENCY_METRIC_NAMES.END_TO_END_LATENCY_MS}: ${String(input.endToEndCount)} sample(s), ` +
         `minSamples=${String(input.minSamples)}`,

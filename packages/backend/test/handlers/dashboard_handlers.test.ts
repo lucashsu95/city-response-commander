@@ -604,6 +604,49 @@ describe('GET /roads', () => {
     expect(rows(result, 'segments').length).toBeGreaterThan(0);
   });
 
+  it('warns when rows are dropped, so truncation is not silent (C3)', async () => {
+    const warnings: { message: string; context: Record<string, unknown> }[] = [];
+    const traffic = trafficRows();
+    const ports: DashboardPorts = {
+      ...createPorts({
+        traffic,
+        trafficTimestamps: instantsFor(traffic).slice(0, 3),
+        crowd: [],
+        crowdTimestamps: [],
+      }),
+      logger: {
+        warn: (message, context) => warnings.push({ message, context }),
+      },
+    };
+
+    await createGetRoadsHandler(ports)(event);
+
+    // Discarding the surplus is correct; doing it invisibly is not. A truncated
+    // dataset used to be indistinguishable from a complete one — same 200, same
+    // `data_status: 'ready'`, fewer segments, no signal anywhere.
+    const truncation = warnings.find((entry) => entry.message.includes('truncated'));
+    expect(truncation).toBeDefined();
+    expect(truncation?.context).toMatchObject({
+      dataset: 'traffic',
+      usable: 3,
+      total: traffic.length,
+      dropped: traffic.length - 3,
+    });
+  });
+
+  it('stays quiet when the arrays line up', async () => {
+    const warnings: string[] = [];
+    const ports: DashboardPorts = {
+      ...createPorts(),
+      logger: { warn: (message) => warnings.push(message) },
+    };
+
+    await createGetRoadsHandler(ports)(event);
+
+    // A warning that fires on every healthy request is a warning nobody reads.
+    expect(warnings).toEqual([]);
+  });
+
   it('returns no segments when the STOP gate failed', async () => {
     const result = await createGetRoadsHandler(createPorts(stopped))(event);
 

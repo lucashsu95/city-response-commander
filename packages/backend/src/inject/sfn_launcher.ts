@@ -225,8 +225,34 @@ export function deriveExecutionName(idempotencyKey: string, attemptCount: number
  * `WORKFLOW_INPUT_JSONPATHS` (TASK-097) enumerates those paths and a test asserts
  * this function covers all of them — a missing field is a runtime failure in
  * Step Functions, not a type error, so the coverage has to be pinned by a test.
+ *
+ * ## Why `traceId` is guarded at runtime and the others are not
+ *
+ * The type system already requires `traceId: string`, so this check looks
+ * redundant — and it is not, for two reasons. `''` satisfies `string`, and an
+ * `unknown` payload crossing the Lambda boundary reaches here after a cast. Eight
+ * ASL states read `$.trace_id`; an absent or blank value fails `RUN_DECISION`
+ * with a NON-RETRYABLE `States.Runtime`, which means 100% of injections die
+ * before `DecisionFn` and the Dashboard shows nothing. That is the single
+ * highest-blast-radius input in the whole payload, so it fails loudly here —
+ * at the caller, with the field named — rather than 200 ms later inside AWS with
+ * a JSONPath error nobody can map back to a line of code.
+ *
+ * The remaining fields are guarded structurally instead: `idempotency_key`,
+ * `attempt_count` and `lease_owner` are all part of `MARK_RUNNING`'s conditional
+ * guard, so a blank one fails the conditional update and surfaces as a normal
+ * fenced outcome rather than a runtime crash.
+ *
+ * @throws SfnLauncherUsageError when `traceId` is absent or blank
  */
 export function buildExecutionPayload(input: WorkflowLaunchInput): WorkflowExecutionPayload {
+  if (!input.traceId || input.traceId.trim() === '') {
+    throw new SfnLauncherUsageError(
+      'WorkflowLaunchInput.traceId is required and cannot be empty; ' +
+        'eight ASL states read $.trace_id and a blank value is a non-retryable States.Runtime.',
+    );
+  }
+
   return {
     idempotency_key: input.idempotencyKey,
     decision_id: input.decisionId,

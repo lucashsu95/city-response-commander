@@ -37,7 +37,11 @@
 import { createIdempotencyReader } from '../repository/idempotency_repository.js';
 import { DecisionCoreReader } from '../repository/decision_core_reader.js';
 import { DecisionNarrativeReader } from '../repository/decision_narrative_reader.js';
-import type { RecoveryGateInput, RecoveryGatePorts, RecoveryGateResult } from '../recovery/recovery_gate.js';
+import type {
+  RecoveryGateInput,
+  RecoveryGatePorts,
+  RecoveryGateResult,
+} from '../recovery/recovery_gate.js';
 import { evaluateRecoveryGate } from '../recovery/recovery_gate.js';
 import { resolveTableName } from '../config/env_keys.js';
 

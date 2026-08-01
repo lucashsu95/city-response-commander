@@ -258,28 +258,59 @@ describe('an empty or unusable population never passes', () => {
     expect(report.verdict).toBe('PASS');
   });
 
-  it('still lists violations found in an under-sized population', () => {
+  it('names the breach found in an under-sized population instead of hiding it', () => {
     const report = evaluate([sample({ fastPathMs: 9_000 })], { minSamples: 5 });
 
-    // The verdict is INSUFFICIENT_DATA, but the evidence is not discarded.
-    expect(report.verdict).toBe('INSUFFICIENT_DATA');
+    // Review item D5: raising minSamples must NOT mask positive evidence. One
+    // 9 000 ms sample proves the 5 s target was missed, so the verdict names the
+    // breach and the under-sizing is reported alongside it, not instead of it.
+    expect(report.verdict).toBe('TEAM_TARGET_MISSED');
     expect(report.violations).toHaveLength(1);
+    expect(report.fast_path.assessable).toBe(true);
+    expect(report.fast_path.sufficient).toBe(false);
+    expect(report.insufficient_data_reason).toContain('minSamples=5');
+  });
+
+  it('never reports PASS on a clean run that is below minSamples', () => {
+    // The D5 case that matters: nothing is wrong in the data, and that is exactly
+    // why a single lucky measurement must not clear the gate.
+    const report = evaluate([sample({ fastPathMs: 3_000, endToEndMs: 30_000 })], {
+      minSamples: 3,
+    });
+
+    expect(report.verdict).toBe('INSUFFICIENT_DATA');
+    expect(report.violations).toEqual([]);
+    expect(report.fast_path.assessable).toBe(true);
+    expect(report.fast_path.sufficient).toBe(false);
+    expect(report.end_to_end.sufficient).toBe(false);
   });
 });
 
 // ─── Compliance ────────────────────────────────────────────
 
 describe('compliant runs', () => {
+  // Three samples throughout: DEFAULT_MIN_SAMPLES is 3, one per official event
+  // (ACC_001 / EVT_002 / EVT_003), so a PASS fixture has to clear that bar.
   it('passes when both budgets are met', () => {
-    const report = evaluate([sample({ fastPathMs: 3_000, endToEndMs: 30_000 })]);
+    const report = evaluate([
+      sample({ fastPathMs: 3_000, endToEndMs: 30_000 }),
+      sample({ fastPathMs: 3_100, endToEndMs: 31_000 }),
+      sample({ fastPathMs: 3_200, endToEndMs: 32_000 }),
+    ]);
 
     expect(report.verdict).toBe('PASS');
     expect(report.exit_code).toBe(0);
     expect(report.violations).toEqual([]);
+    expect(report.fast_path.sufficient).toBe(true);
+    expect(report.end_to_end.sufficient).toBe(true);
   });
 
   it('passes at exactly 5000ms and 60000ms (inclusive budgets)', () => {
-    const report = evaluate([sample({ fastPathMs: 5_000, endToEndMs: 60_000 })]);
+    const report = evaluate([
+      sample({ fastPathMs: 5_000, endToEndMs: 60_000 }),
+      sample({ fastPathMs: 5_000, endToEndMs: 60_000 }),
+      sample({ fastPathMs: 5_000, endToEndMs: 60_000 }),
+    ]);
 
     expect(report.verdict).toBe('PASS');
     expect(report.fast_path.compliant).toBe(true);
@@ -302,7 +333,9 @@ describe('compliant runs', () => {
       fast_path_target_ms: 5_000,
       official_deadline_ms: 60_000,
       target_percentile: 95,
-      min_samples: 1,
+      // DEFAULT_MIN_SAMPLES, raised from 1 to 3 for review item D5. Pinned here so
+      // a silent change back to 1 cannot re-open a PASS on a single sample.
+      min_samples: 3,
     });
   });
 
@@ -405,9 +438,17 @@ describe('the two budgets are assessed independently (audit fix 2)', () => {
       { minSamples: 2 },
     );
 
+    // Fast Path cleared minSamples=2, the official budget only has one
+    // measurement. Both are measurable (so a breach in either would still be
+    // named), but only one population is large enough to support a PASS — so the
+    // run as a whole cannot pass.
     expect(report.fast_path.assessable).toBe(true);
-    expect(report.end_to_end.assessable).toBe(false);
+    expect(report.fast_path.sufficient).toBe(true);
+    expect(report.end_to_end.assessable).toBe(true);
+    expect(report.end_to_end.sufficient).toBe(false);
     expect(report.verdict).toBe('INSUFFICIENT_DATA');
+    expect(report.insufficient_data_reason).toContain('EndToEndLatencyMs');
+    expect(report.insufficient_data_reason).not.toContain('FastPathLatencyMs');
   });
 
   it('returns INSUFFICIENT_DATA when the official budget alone is unmeasurable', () => {
@@ -510,12 +551,29 @@ describe('the official 60s deadline is judged on the worst case', () => {
 // ─── CLI ───────────────────────────────────────────────────
 
 describe('CLI', () => {
+  // A PASS fixture needs DEFAULT_MIN_SAMPLES (3) measurements — one per official
+  // event — since review item D5 raised the floor. Fixtures that assert a BREACH
+  // deliberately stay at one sample: a breach is provable at n=1.
+  const passingRun = JSON.stringify([
+    emfLine(3_000, 30_000),
+    emfLine(3_100, 31_000),
+    emfLine(3_200, 32_000),
+  ]);
+
   it('exits 0 and prints the JSON report on a pass', async () => {
-    const result = await cli(['--input', 'latency.json'], JSON.stringify([emfLine(3_000, 30_000)]));
+    const result = await cli(['--input', 'latency.json'], passingRun);
 
     expect(result.exitCode).toBe(0);
     expect((JSON.parse(result.stdout) as LatencySlaReport).verdict).toBe('PASS');
     expect(result.stderr).toBe('');
+  });
+
+  it('exits 2 on a clean run that is below the default minSamples', async () => {
+    const result = await cli(['--input', 'latency.json'], JSON.stringify([emfLine(3_000, 30_000)]));
+
+    // Nothing breached, but one decision is not a verified SLA (D5).
+    expect(result.exitCode).toBe(2);
+    expect((JSON.parse(result.stdout) as LatencySlaReport).verdict).toBe('INSUFFICIENT_DATA');
   });
 
   it('exits 1 on an official SLA violation', async () => {
@@ -558,7 +616,7 @@ describe('CLI', () => {
   });
 
   it('reads from stdin when no --input is given', async () => {
-    const result = await cli([], JSON.stringify([emfLine(3_000, 30_000)]));
+    const result = await cli([], passingRun);
 
     expect(result.exitCode).toBe(0);
   });
@@ -581,11 +639,9 @@ describe('CLI', () => {
   });
 
   it('lets a flag win over the environment', async () => {
-    const result = await cli(
-      ['--fast-path-target-ms', '9000'],
-      JSON.stringify([emfLine(3_000, 30_000)]),
-      { FASTPATH_TARGET_MS: '1000' },
-    );
+    const result = await cli(['--fast-path-target-ms', '9000'], passingRun, {
+      FASTPATH_TARGET_MS: '1000',
+    });
 
     expect(result.exitCode).toBe(0);
   });

@@ -343,9 +343,14 @@ export async function dispatchWorkflowStatusAction(
         nowDisplay: context.nowDisplay,
         lastError: payload.last_error,
         // `markProcessingFailed` derives `recovery_stage` from this rather than
-        // trusting the ASL's own value, so the two must agree. See
-        // ASL_DIVERGENCE_PROCESSING_FAILED_RETRYABLE.
+        // trusting the ASL's own value, so the two must agree.
         effectiveCoreCommitted: payload.recovery_stage === 'ENRICHMENT_ONLY',
+        // D3 resolved: the ASL's assertion is now authoritative in the narrowing
+        // direction only. `PREPARE_INVALID_RECOVERY_MODE` and
+        // `PREPARE_UNKNOWN_CORE_WRITE_STATUS` send `retryable: false` and the record
+        // is written terminal; an explicit `true` still cannot widen
+        // CORE_IDENTITY_CONFLICT (FIX 1).
+        ...(payload.retryable === undefined ? {} : { retryableOverride: payload.retryable }),
       });
 
     case 'RECONCILE_STALE_RUNNING':
@@ -362,26 +367,87 @@ export async function dispatchWorkflowStatusAction(
 }
 
 /**
- * A second ASL/code disagreement, recorded rather than silently absorbed.
+ * The `retryable` dual-source problem, and how it was closed (review item D3).
  *
- * The `PREPARE_*` states assert `retryable` explicitly, but
- * `markProcessingFailed` derives it: only `CORE_IDENTITY_CONFLICT` is terminal,
- * everything else is retryable. For `INVALID_RECOVERY_MODE` and
- * `UNKNOWN_CORE_WRITE_STATUS` the ASL asserts `retryable: false` while the Lambda
- * will write `true`.
+ * The `PREPARE_*` states assert `retryable` explicitly, but `markProcessingFailed`
+ * ALSO derived it from `lastError` — so for `INVALID_RECOVERY_MODE` and
+ * `UNKNOWN_CORE_WRITE_STATUS` the ASL said `false` and the Lambda wrote `true`,
+ * and the record ended up claiming a malformed INPUT was worth retrying.
  *
- * Left as-is deliberately: `markProcessingFailed` is committed, tested logic, and
- * whether a malformed INPUT should be retryable is a design decision for the team,
- * not something to settle inside a mapping function.
+ * Resolved by making the ASL authoritative in the NARROWING direction only:
+ * {@link dispatchWorkflowStatusAction} forwards `payload.retryable` as
+ * `retryableOverride`, an explicit `false` writes a terminal record, and an
+ * explicit `true` is ignored so no caller can make `CORE_IDENTITY_CONFLICT`
+ * retryable. Kept as an exported record so the reasoning survives the diff.
  */
 export const ASL_DIVERGENCE_PROCESSING_FAILED_RETRYABLE = {
+  reviewItem: 'D3',
+  status: 'RESOLVED',
   affectedStates: [
     AslState.PREPARE_INVALID_RECOVERY_MODE,
     AslState.PREPARE_UNKNOWN_CORE_WRITE_STATUS,
   ],
   aslAsserts: { retryable: false },
-  lambdaWrites: { retryable: true },
+  lambdaWrites: { retryable: false },
   resolution:
-    'Either drop retryable/recovery_stage from the ASL payload (single source of truth = the ' +
-    'Lambda), or extend markProcessingFailed with an explicit terminal override.',
+    'dispatchWorkflowStatusAction forwards payload.retryable as retryableOverride; ' +
+    'markProcessingFailed treats an explicit false as terminal (recovery_stage=NONE) and ' +
+    'ignores an explicit true, so the override can only narrow, never widen (FIX 1 preserved).',
+} as const;
+
+// ─── Open ASL gaps (review items D1, D2) ───────────────────
+//
+// Both live in `infra/statemachine/workflow.asl.json`, which Matrix 8 assigns to
+// TASK-068 (member 3) as owner with TASK-097 as integration task — an ownership
+// overlap that has to be settled before either is edited. Recorded as exported
+// constants rather than TODO comments so a test can pin them and the fix deletes
+// the constant instead of hoping someone greps for it.
+//
+//   D1 → ASL_GAP_INSUFFICIENT_DATA_BRANCH   (declared above, near the Choice map)
+//   D2 → ASL_GAP_PASS_STATE_DROPS_TRACE_ID  (below)
+//
+// Neither is reachable in the demo path: ADR-015 locks the official CSV bytes, so
+// ingestion cannot report `insufficient_data` (D1's trigger) and DecisionFn cannot
+// hit an identity conflict against a freshly-provisioned table (D2's trigger).
+// They are correctness gaps for the recovery paths, not demo blockers.
+
+/**
+ * D2 — the `PREPARE_*` Pass states silently drop `trace_id` from the state data.
+ *
+ * A `Pass` state with `Parameters` and no `ResultPath` REPLACES its input with the
+ * `Parameters` object. None of the three `PREPARE_*` states lists `trace_id.$`, so
+ * from that point on `$.trace_id` no longer exists in the execution data.
+ *
+ * `MARK_PROCESSING_FAILED` does not read it, so the status write is unaffected and
+ * the IdempotencyTable still records the terminal state correctly — which is why
+ * async 409 semantics (FIX 1) keep working. But `PUBLISH_PROCESSING_FAILED` DOES
+ * read `$.trace_id`, and it has `Retry` without `Catch`, so on the
+ * CORE_IDENTITY_CONFLICT path the execution ends with an unmapped
+ * `States.Runtime` and the `processing.failed` WebSocket event is never pushed.
+ * Degraded observability, not data loss.
+ *
+ * Fix is one line per state: add `"trace_id.$": "$.trace_id"` to the `Parameters`
+ * of `PREPARE_CORE_IDENTITY_CONFLICT`, `PREPARE_INVALID_RECOVERY_MODE` and
+ * `PREPARE_UNKNOWN_CORE_WRITE_STATUS`. Nothing in this package can work around it:
+ * the field is gone before the Lambda is invoked.
+ */
+export const ASL_GAP_PASS_STATE_DROPS_TRACE_ID = {
+  reviewItem: 'D2',
+  status: 'OPEN',
+  file: 'infra/statemachine/workflow.asl.json',
+  affectedStates: [
+    AslState.PREPARE_CORE_IDENTITY_CONFLICT,
+    AslState.PREPARE_INVALID_RECOVERY_MODE,
+    AslState.PREPARE_UNKNOWN_CORE_WRITE_STATUS,
+  ],
+  cause:
+    'A Pass state with Parameters and no ResultPath replaces the state input; none of the ' +
+    'PREPARE_* states re-emits trace_id.$, so $.trace_id is absent downstream.',
+  firstFailingConsumer: AslState.PUBLISH_PROCESSING_FAILED,
+  consequence:
+    'PUBLISH_PROCESSING_FAILED reads $.trace_id and has Retry but no Catch, so the ' +
+    'CORE_IDENTITY_CONFLICT path terminates on States.Runtime and processing.failed is never ' +
+    'pushed. The IdempotencyTable write already happened, so async 409 (FIX 1) still holds.',
+  fix: 'Add "trace_id.$": "$.trace_id" to the Parameters of all three PREPARE_* states.',
+  workaroundInThisPackage: null,
 } as const;

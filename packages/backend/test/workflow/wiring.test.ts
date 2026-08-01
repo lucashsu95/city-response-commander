@@ -26,6 +26,7 @@ import type { IdempotencyRecord } from '@city-commander/shared-schemas';
 import {
   ASL_DIVERGENCE_PROCESSING_FAILED_RETRYABLE,
   ASL_GAP_INSUFFICIENT_DATA_BRANCH,
+  ASL_GAP_PASS_STATE_DROPS_TRACE_ID,
   AslPayloadError,
   AslState,
   IdempotencyConditionFailedError,
@@ -143,6 +144,23 @@ describe('buildExecutionPayload covers every ASL INPUT JSONPath', () => {
     expect(buildExecutionPayload(launchInput()).trace_id).toBe(TRACE);
   });
 
+  it('refuses a blank trace_id instead of shipping it to Step Functions (C1)', () => {
+    // `''` satisfies `traceId: string`, and an unknown payload crossing the Lambda
+    // boundary reaches here after a cast. RUN_DECISION reading an absent
+    // $.trace_id is a NON-RETRYABLE States.Runtime, i.e. 100% of injections die
+    // before DecisionFn. Failing at the caller names the field; failing inside AWS
+    // gives a JSONPath error nobody can trace back.
+    for (const traceId of ['', '   ', '\t\n']) {
+      expect(() => buildExecutionPayload(launchInput({ traceId }))).toThrow(/traceId is required/);
+    }
+  });
+
+  it('accepts a trace_id that only looks marginal', () => {
+    // Guard rejects blank, not short. Trimming the value would silently rewrite a
+    // correlation id, so a padded id is refused as blank only when it IS blank.
+    expect(buildExecutionPayload(launchInput({ traceId: 't' })).trace_id).toBe('t');
+  });
+
   it('defaults missing_narrative_types to an empty array', () => {
     // RECOVERY_GATE reads $.missing_narrative_types unconditionally, and the gate
     // computes the real value itself, so [] is the honest advisory default.
@@ -219,6 +237,25 @@ describe('DECISION_CORE_WRITE_GATE translation', () => {
 
     // §12: a conflict must not reach enrichment or MARK_COMPLETED.
     expect(next).not.toBe(AslState.MARK_CORE_COMMITTED_DECISION);
+  });
+
+  it('records that the PREPARE_* Pass states drop trace_id (D2)', () => {
+    // Documents a KNOWN GAP in workflow.asl.json that nothing in this package can
+    // work around: the field is gone before the Lambda is invoked. When member 3
+    // adds `trace_id.$` to the three Parameters blocks, flip status and delete the
+    // constant — this assertion is what stops it being forgotten.
+    expect(ASL_GAP_PASS_STATE_DROPS_TRACE_ID.status).toBe('OPEN');
+    expect(ASL_GAP_PASS_STATE_DROPS_TRACE_ID.affectedStates).toEqual([
+      AslState.PREPARE_CORE_IDENTITY_CONFLICT,
+      AslState.PREPARE_INVALID_RECOVERY_MODE,
+      AslState.PREPARE_UNKNOWN_CORE_WRITE_STATUS,
+    ]);
+    expect(ASL_GAP_PASS_STATE_DROPS_TRACE_ID.firstFailingConsumer).toBe(
+      AslState.PUBLISH_PROCESSING_FAILED,
+    );
+    // No local mitigation exists; recording `null` keeps that explicit rather than
+    // implying the backend has already handled it.
+    expect(ASL_GAP_PASS_STATE_DROPS_TRACE_ID.workaroundInThisPackage).toBeNull();
   });
 
   it('records that the ASL still lacks a SKIPPED_INSUFFICIENT_DATA branch', () => {
@@ -522,14 +559,94 @@ describe('dispatchWorkflowStatusAction', () => {
     expect(actions).toHaveLength(5);
   });
 
-  it('records the retryable divergence rather than absorbing it silently', () => {
-    // The PREPARE_* states assert retryable:false for a malformed INPUT, but
-    // markProcessingFailed derives retryable:true. Left for the team to settle.
+  it('agrees with the ASL on retryable now that the override exists (D3)', () => {
+    // Was a recorded divergence: the ASL asserted retryable:false for a malformed
+    // INPUT while markProcessingFailed derived true. Both now write false.
     expect(ASL_DIVERGENCE_PROCESSING_FAILED_RETRYABLE.affectedStates).toContain(
       AslState.PREPARE_INVALID_RECOVERY_MODE,
     );
-    expect(ASL_DIVERGENCE_PROCESSING_FAILED_RETRYABLE.aslAsserts.retryable).toBe(false);
-    expect(ASL_DIVERGENCE_PROCESSING_FAILED_RETRYABLE.lambdaWrites.retryable).toBe(true);
+    expect(ASL_DIVERGENCE_PROCESSING_FAILED_RETRYABLE.status).toBe('RESOLVED');
+    expect(ASL_DIVERGENCE_PROCESSING_FAILED_RETRYABLE.aslAsserts.retryable).toBe(
+      ASL_DIVERGENCE_PROCESSING_FAILED_RETRYABLE.lambdaWrites.retryable,
+    );
+  });
+
+  it('honours an explicit retryable:false from a PREPARE_* state (D3)', async () => {
+    const { store, updates } = fakeStore();
+
+    await dispatchWorkflowStatusAction(
+      store,
+      {
+        action: 'MARK_PROCESSING_FAILED',
+        idempotency_key: KEY,
+        decision_id: DECISION,
+        attempt_count: 1,
+        execution_id: EXEC,
+        // What PREPARE_INVALID_RECOVERY_MODE actually sends. `lastError` alone
+        // would have derived retryable:true and left a malformed INPUT looking
+        // recoverable.
+        last_error: 'INVALID_RECOVERY_MODE',
+        retryable: false,
+        recovery_stage: 'NONE',
+      },
+      context,
+    );
+
+    expect(updates[0]?.mutation).toMatchObject({
+      set: expect.objectContaining({
+        retryable: false,
+        // Forced terminal, so no recovery stage may remain live — otherwise a
+        // recovery request could pick up a record nothing is allowed to retry.
+        recovery_stage: 'NONE',
+      }),
+    });
+  });
+
+  it('ignores an explicit retryable:true, so a conflict can never be widened (D3)', async () => {
+    const { store, updates } = fakeStore();
+
+    await dispatchWorkflowStatusAction(
+      store,
+      {
+        action: 'MARK_PROCESSING_FAILED',
+        idempotency_key: KEY,
+        decision_id: DECISION,
+        attempt_count: 1,
+        execution_id: EXEC,
+        last_error: 'CORE_IDENTITY_CONFLICT',
+        // A caller must not be able to make an identity conflict retryable: FIX 1
+        // requires it to stay terminal. The override narrows only.
+        retryable: true,
+        recovery_stage: 'FULL_WORKFLOW',
+      },
+      context,
+    );
+
+    expect(updates[0]?.mutation).toMatchObject({
+      set: expect.objectContaining({ retryable: false, recovery_stage: 'NONE' }),
+    });
+  });
+
+  it('leaves the derivation alone when the ASL asserts nothing (D3)', async () => {
+    const { store, updates } = fakeStore();
+
+    await dispatchWorkflowStatusAction(
+      store,
+      {
+        action: 'MARK_PROCESSING_FAILED',
+        idempotency_key: KEY,
+        decision_id: DECISION,
+        attempt_count: 1,
+        execution_id: EXEC,
+        last_error: 'TASK_FAILED',
+        recovery_stage: 'ENRICHMENT_ONLY',
+      },
+      context,
+    );
+
+    expect(updates[0]?.mutation).toMatchObject({
+      set: expect.objectContaining({ retryable: true, recovery_stage: 'ENRICHMENT_ONLY' }),
+    });
   });
 
   it('propagates a fenced outcome as a result, not as an error', async () => {

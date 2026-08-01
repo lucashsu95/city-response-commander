@@ -92,9 +92,7 @@ export function resetRuntimeForTesting(): void {
  * @throws AslPayloadError for a payload the state machine should never produce
  * @throws IdempotencyRepositoryError on a DynamoDB failure
  */
-export async function handler(
-  event: AslWorkflowStatusPayload,
-): Promise<ApplyOrConfirmOutcome> {
+export async function handler(event: AslWorkflowStatusPayload): Promise<ApplyOrConfirmOutcome> {
   const { store, executionDeadlineMs } = getRuntime();
 
   // One clock read per invocation, passed down. Everything below this line is

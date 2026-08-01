@@ -104,11 +104,29 @@ export interface DashboardPolicyPort {
   stationsInMultilingualScope(current: readonly CurrentStationSnapshot[]): MultilingualScopeResult;
 }
 
+/**
+ * Warning sink for silent data loss (review item C3).
+ *
+ * Deliberately narrower than `StructuredLogger`: that class requires a `trace_id`
+ * at construction, and threading one down into the alignment helpers would couple
+ * these pure functions to a request context they otherwise never touch. This port
+ * is the minimum that lets truncation be observable, and it is optional so no
+ * existing caller or test has to change.
+ *
+ * Wire it to `StructuredLogger.warn('diagnostic', …)` at the Lambda entry, where a
+ * `trace_id` genuinely exists.
+ */
+export interface DashboardWarnPort {
+  warn(message: string, context: Record<string, unknown>): void;
+}
+
 /** Ports the dashboard queries need. */
 export interface DashboardPorts {
   readonly ingestion: DashboardIngestionPort;
   readonly snapshots: DashboardSnapshotPort;
   readonly policy: DashboardPolicyPort;
+  /** Optional. Absent means truncation stays silent, which is the old behaviour. */
+  readonly logger?: DashboardWarnPort;
 }
 
 /**
@@ -137,12 +155,15 @@ export interface DashboardPorts {
 export function createDashboardPortsFromConfig(input: {
   readonly ingestion: DashboardIngestionPort;
   readonly config: PolicyStrategyConfigProvider;
+  /** Optional warn sink for truncated alignments (C3). Supplied at the Lambda entry. */
+  readonly logger?: DashboardWarnPort;
 }): DashboardPorts {
   const bundle = createPolicyStrategyBundle(input.config);
   const mode: MultilingualScopeMode = bundle.metadata.multilingual_scope.mode;
 
   return {
     ingestion: input.ingestion,
+    ...(input.logger === undefined ? {} : { logger: input.logger }),
     snapshots: {
       select: (entityId, cutoff, records) => bundle.timeAlignment.select(entityId, cutoff, records),
     },
@@ -358,17 +379,57 @@ function envelope(
 }
 
 /**
+ * Report a parallel-array length mismatch (review item C3).
+ *
+ * Dropping the surplus is the correct behaviour — pairing by index across a
+ * mismatch would misalign every subsequent row and put a wrong `Saturation_Score`
+ * next to a segment id, which an operator might act on. But doing it silently
+ * meant a truncated dataset was indistinguishable from a complete one: `/roads`
+ * would return 12 of 15 segments with a clean `data_status: 'ready'` and nothing
+ * anywhere said three had been discarded.
+ *
+ * Fires only when truncation actually happened. An unconditional line would emit a
+ * WARN on every healthy request, and a warning that is always present is a warning
+ * nobody reads.
+ */
+function warnIfTruncated(
+  logger: DashboardWarnPort | undefined,
+  dataset: 'traffic' | 'crowd',
+  rowCount: number,
+  instantCount: number,
+  usable: number,
+): void {
+  if (logger === undefined) return;
+  const total = Math.max(rowCount, instantCount);
+  if (usable >= total) return;
+
+  logger.warn('Data alignment truncated excess rows', {
+    dataset,
+    usable,
+    total,
+    dropped: total - usable,
+    row_count: rowCount,
+    instant_count: instantCount,
+  });
+}
+
+/**
  * Pair rows with their normalized instants.
  *
  * The normalized timestamps are a PARALLEL array. A length mismatch means a row
  * cannot be tied to its instant, and pairing by index anyway would silently
  * misalign every subsequent row — so the shorter length wins and the surplus is
- * dropped rather than guessed.
+ * dropped rather than guessed. The drop is reported via
+ * {@link warnIfTruncated} so it is not invisible.
  */
-function alignTraffic(ingested: IngestionResult): readonly AlignedTraffic[] {
+function alignTraffic(
+  ingested: IngestionResult,
+  logger?: DashboardWarnPort,
+): readonly AlignedTraffic[] {
   const rows = ingested.traffic ?? [];
   const instants = ingested.trafficTimestamps ?? [];
   const usable = Math.min(rows.length, instants.length);
+  warnIfTruncated(logger, 'traffic', rows.length, instants.length, usable);
 
   const aligned: AlignedTraffic[] = [];
   for (let index = 0; index < usable; index += 1) {
@@ -387,10 +448,14 @@ function alignTraffic(ingested: IngestionResult): readonly AlignedTraffic[] {
   return aligned;
 }
 
-function alignCrowd(ingested: IngestionResult): readonly AlignedCrowd[] {
+function alignCrowd(
+  ingested: IngestionResult,
+  logger?: DashboardWarnPort,
+): readonly AlignedCrowd[] {
   const rows = ingested.crowd ?? [];
   const instants = ingested.crowdTimestamps ?? [];
   const usable = Math.min(rows.length, instants.length);
+  warnIfTruncated(logger, 'crowd', rows.length, instants.length, usable);
 
   const aligned: AlignedCrowd[] = [];
   for (let index = 0; index < usable; index += 1) {
@@ -441,8 +506,8 @@ function load(ports: DashboardPorts): {
     return { ingested, traffic: [], crowd: [], cutoff: null, cutoffRaw: null };
   }
 
-  const traffic = alignTraffic(ingested);
-  const crowd = alignCrowd(ingested);
+  const traffic = alignTraffic(ingested, ports.logger);
+  const crowd = alignCrowd(ingested, ports.logger);
   const { cutoff, raw } = resolveCutoff(traffic, crowd);
   return { ingested, traffic, crowd, cutoff, cutoffRaw: raw };
 }

@@ -17,6 +17,11 @@
  *    under this key, so retrying could only attempt to overwrite an immutable
  *    core. This state is what a later same-key POST reads to return `409`
  *    (never `500`), while the original request's `202` stands (FIX 1).
+ *  - **Caller-asserted terminal** — `retryableOverride === false`. The ASL's
+ *    `PREPARE_*` states know some inputs are unrecoverable for reasons that
+ *    cannot be read off `lastError` (a malformed INPUT does not become
+ *    well-formed on retry). See {@link MarkProcessingFailedContext.retryableOverride};
+ *    the override only narrows, never widens.
  *
  * @module backend/workflow/mark_processing_failed
  */
@@ -45,6 +50,29 @@ export interface MarkProcessingFailedContext extends StatusActionContext {
    * Ignored for the terminal conflict variant, which is always `NONE`.
    */
   readonly effectiveCoreCommitted: boolean;
+  /**
+   * The ASL's own `retryable` assertion, when a `PREPARE_*` state made one.
+   *
+   * Resolves the dual-source problem this action used to have: the ASL asserted
+   * `retryable: false` for `INVALID_RECOVERY_MODE` and
+   * `UNKNOWN_CORE_WRITE_STATUS`, while this function derived `true` from
+   * `lastError`, and whichever ran last won. The record could therefore say
+   * "retryable" for an input the state machine had already judged terminal.
+   *
+   * The override is deliberately ONE-WAY — it can only narrow:
+   *
+   *  - `false` → terminal wins. The caller knows something this function cannot
+   *    infer from `lastError` alone (a malformed INPUT is not going to become
+   *    well-formed on retry).
+   *  - `true` / `undefined` → the derivation stands. An explicit `true` can NEVER
+   *    make `CORE_IDENTITY_CONFLICT` retryable; that invariant is FIX 1 and a
+   *    caller must not be able to widen it.
+   *
+   * Forcing `false` also forces `recovery_stage = NONE`, because
+   * `retryable=false` with a live `recovery_stage` is a contradiction that would
+   * let a recovery request pick up a record nothing is allowed to retry.
+   */
+  readonly retryableOverride?: boolean;
 }
 
 /**
@@ -60,8 +88,13 @@ export function markProcessingFailed(
   const { executionArn, nowEpochMs, nowDisplay, lastError, effectiveCoreCommitted } = context;
 
   const isTerminalConflict = lastError === ProcessingFailure.CORE_IDENTITY_CONFLICT;
-  const retryable = !isTerminalConflict;
-  const recoveryStage = isTerminalConflict
+  // One-way narrowing: an explicit `false` from the ASL makes the record terminal,
+  // an explicit `true` can never un-terminalise a conflict (FIX 1).
+  const forcedTerminal = context.retryableOverride === false;
+  const terminal = isTerminalConflict || forcedTerminal;
+
+  const retryable = !terminal;
+  const recoveryStage = terminal
     ? RecoveryStage.NONE
     : effectiveCoreCommitted
       ? RecoveryStage.ENRICHMENT_ONLY

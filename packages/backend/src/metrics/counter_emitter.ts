@@ -327,10 +327,7 @@ export class CounterMetricEmitter {
    * @param stopReasonCode a stable code, never the free-form `stop_reason` prose,
    *   which would be unbounded as a dimension value
    */
-  recordInsufficientData(
-    stopReasonCode: string,
-    context: CounterContext = {},
-  ): EmfLogLine | null {
+  recordInsufficientData(stopReasonCode: string, context: CounterContext = {}): EmfLogLine | null {
     return this.emitter
       .withActionType(stopReasonCode)
       .emit(
