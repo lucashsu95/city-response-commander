@@ -61,6 +61,14 @@ export type {
 // ─── LLM Boundary (§9) ──────────────────────────────────────
 export { LLM_PROHIBITED_FIELDS } from './llm_boundary.js';
 
+// ─── Unified Adaptive Reasoning Engine (UARE) ───────────────
+export type {
+  UniversalPrincipleId,
+  UniversalPrinciple,
+  GroundingCandidate,
+  SopMatchResult,
+} from './universal_defense.js';
+
 // ─── Decision Narrative (§10.11b) ──────────────────────────
 export type {
   DecisionNarrative,

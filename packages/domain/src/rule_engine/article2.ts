@@ -45,8 +45,13 @@ const TRIGGER_SEVERITIES: ReadonlySet<string> = new Set([Severity.Critical, Seve
 /** Prefix for road segment events (art.2 applies) */
 const ROAD_SEGMENT_PREFIX = 'RD_';
 
-/** Minimum capacity for candidate qualification */
-const CAPACITY_THRESHOLD = 1000;
+/**
+ * Minimum capacity for candidate qualification.
+ * Exported for reuse by `universal_defense.ts` (UARE), which applies the same
+ * physical-capacity floor to its own grounding candidates without redeclaring
+ * the threshold value (design.md §5.1).
+ */
+export const CAPACITY_THRESHOLD = 1000;
 
 // ─── Trigger ───────────────────────────────────────────────
 

@@ -20,4 +20,12 @@ describe('LLM_PROHIBITED_FIELDS sync', () => {
   it('eslint-local-rules.cjs matches the shared-schemas canonical list', () => {
     expect([...localRules.LLM_PROHIBITED_FIELDS].sort()).toEqual([...CANONICAL].sort());
   });
+
+  it('covers the UARE fields added by TASK-UARE-03', () => {
+    const uareFields = ['sop_matched', 'sop_authority', 'universal_principles', 'grounding_candidates'];
+    for (const field of uareFields) {
+      expect(CANONICAL.has(field)).toBe(true);
+      expect(localRules.LLM_PROHIBITED_FIELDS.has(field)).toBe(true);
+    }
+  });
 });

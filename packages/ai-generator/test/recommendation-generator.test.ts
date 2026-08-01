@@ -104,3 +104,105 @@ describe('buildRecommendationPrompt', () => {
     expect(prompt).not.toContain('road_set_definition');
   });
 });
+
+// ─── UARE (TASK-UARE-10): sop_matched:false prompt branch ──────────────────
+// Spec: .kiro/specs/unified-adaptive-reasoning-engine/requirements.md R4, R9.6
+
+describe('buildRecommendationPrompt — UARE sop_matched branch', () => {
+  it('R9.6 no-regression: sop_matched:true renders the exact pre-UARE line, byte-identical prompt', () => {
+    const matchedCore: DecisionCore = { ...decisionFixture(), sop_matched: true };
+    const unmatchedFieldCore = decisionFixture(); // sop_matched left undefined, as all pre-UARE cores are
+
+    const promptWithTrue = buildRecommendationPrompt(matchedCore);
+    const promptWithUndefined = buildRecommendationPrompt(unmatchedFieldCore);
+
+    // Both must produce the exact same line the pre-UARE template always did.
+    expect(promptWithTrue).toContain('- 觸發 SOP 條款: 1, 2');
+    expect(promptWithUndefined).toContain('- 觸發 SOP 條款: 1, 2');
+    // sop_matched:true and sop_matched:undefined must render identically —
+    // the branch condition is specifically `=== false`, not a truthiness check.
+    expect(promptWithTrue).toBe(promptWithUndefined);
+    // Neither must ever mention the UARE universal-defense section.
+    expect(promptWithTrue).not.toContain('通用防禦性交通處置原則');
+  });
+
+  it('sop_matched:false with grounding candidates: anti-refusal instruction, only whitelisted road names, principle text', () => {
+    const core: DecisionCore = {
+      ...decisionFixture(),
+      triggered_articles: [],
+      sop_matched: false,
+      sop_authority: 'SYSTEM_DEFAULT_PRINCIPLE',
+      universal_principles: [
+        { principle_id: 'UPSTREAM_CONTAINMENT', title: '上游截流', description: '上游截流說明' },
+        { principle_id: 'PERIMETER_GUIDANCE', title: '周邊引導', description: '周邊引導說明' },
+        { principle_id: 'PUBLIC_NOTIFICATION', title: '資訊通報', description: '資訊通報說明' },
+      ],
+      grounding_candidates: [
+        {
+          segment_id: 'RD_TPE_004',
+          road_name: '市民大道四段',
+          saturation_score: 0.2,
+          capacity_vph: 2500,
+          status_text: '暢通',
+        },
+        {
+          segment_id: 'RD_TPE_005',
+          road_name: '仁愛路四段',
+          saturation_score: 0.9,
+          capacity_vph: 1800,
+          status_text: '注意',
+        },
+      ],
+    };
+
+    const prompt = buildRecommendationPrompt(core);
+
+    expect(prompt).toContain('本事件類型未於 emergency_traffic_sop.txt 查得對應條款');
+    expect(prompt).toContain('不得回覆「無法判斷」、「查無資料」或語意相近之拒答語句');
+    expect(prompt).toContain('上游截流：上游截流說明');
+    expect(prompt).toContain('周邊引導：周邊引導說明');
+    expect(prompt).toContain('資訊通報：資訊通報說明');
+    expect(prompt).toContain('市民大道四段（暢通');
+    expect(prompt).toContain('仁愛路四段（注意');
+    expect(prompt).toContain('本事件無預設 SOP 條款，已啟動動態通用防衛模式');
+    // Must never leak the old, now-superseded line for this branch.
+    expect(prompt).not.toContain('觸發 SOP 條款:');
+    // Zero-hallucination guard at the prompt level: no out-of-whitelist road
+    // name is ever introduced by this file itself.
+    expect(prompt).not.toContain('逸仙路');
+  });
+
+  it('sop_matched:false with no grounding candidates forbids naming any specific road and requires the R6 AC2 disclosure sentence', () => {
+    const core: DecisionCore = {
+      ...decisionFixture(),
+      triggered_articles: [],
+      // Realistic for this scenario: only SOP-5 ever sets cms_core_text, and
+      // no article triggered here — this also isolates the assertion below to
+      // the universal-defense section itself, not an unrelated deterministic field.
+      cms_core_text: null as unknown as string,
+      primary_evacuation: null,
+      secondary_evacuation: [],
+      sop_matched: false,
+      sop_authority: 'SYSTEM_DEFAULT_PRINCIPLE',
+      universal_principles: [
+        { principle_id: 'UPSTREAM_CONTAINMENT', title: '上游截流', description: '上游截流說明' },
+        { principle_id: 'PERIMETER_GUIDANCE', title: '周邊引導', description: '周邊引導說明' },
+        { principle_id: 'PUBLIC_NOTIFICATION', title: '資訊通報', description: '資訊通報說明' },
+      ],
+      grounding_candidates: [],
+    };
+
+    const prompt = buildRecommendationPrompt(core);
+
+    // requirements.md R6 AC2 — literal disclosure sentence for the case where
+    // grounding_candidates is empty (whether because the location itself
+    // couldn't be anchored or its alternatives were filtered to nothing).
+    expect(prompt).toContain(
+      '本事件地點資料亦無法定位可用替代路段，建議應變依通用原則執行並儘速人工確認',
+    );
+    expect(prompt).toContain('禁止提及任何具體道路名稱');
+    // Still carries the unconditional sop_matched:false disclosure (R4 AC6).
+    expect(prompt).toContain('本事件無預設 SOP 條款，已啟動動態通用防衛模式');
+    expect(prompt).not.toContain('市民大道四段');
+  });
+});

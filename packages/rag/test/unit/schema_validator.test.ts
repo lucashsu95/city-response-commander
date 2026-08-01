@@ -72,6 +72,34 @@ describe('validateBedrockPayload — REPORT', () => {
     }
   });
 
+  it('rejects on LLM-prohibited UARE fields: sop_matched, sop_authority, universal_principles, grounding_candidates (TASK-UARE-11)', () => {
+    // Adversarial payload: Bedrock output attempting to overwrite the 4 UARE
+    // decision fields (spec: .kiro/specs/unified-adaptive-reasoning-engine/,
+    // requirements.md R5 AC3/AC4, R8 AC4). These were added to
+    // LLM_PROHIBITED_FIELDS in TASK-UARE-03; this test proves the existing
+    // §9 boundary path (step 3 of validateBedrockPayload) already covers them
+    // with zero validator code changes, confirming design.md §8's prediction.
+    const result = validateBedrockPayload(NarrativeType.REPORT, {
+      report_text: 'ok',
+      sop_matched: true,
+      sop_authority: 'OFFICIAL_SOP',
+      universal_principles: [],
+      grounding_candidates: [{ segment_id: 'RD_TPE_999', road_name: '虛構路' }],
+    });
+    expect(result.outcome).toBe('use_template');
+    if (result.outcome === 'use_template') {
+      expect(result.reason).toBe('prohibited_field_overwrite');
+      expect(result.offendingFields).toEqual(
+        expect.arrayContaining([
+          'sop_matched',
+          'sop_authority',
+          'universal_principles',
+          'grounding_candidates',
+        ]),
+      );
+    }
+  });
+
   it('rejects on non-whitelisted field', () => {
     const result = validateBedrockPayload(NarrativeType.REPORT, {
       report_text: 'ok',

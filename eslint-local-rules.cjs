@@ -39,6 +39,10 @@ const LLM_PROHIBITED_FIELDS = new Set([
   'evidence',
   'policy',
   'cms_core_text',
+  'sop_matched',
+  'sop_authority',
+  'universal_principles',
+  'grounding_candidates',
   'provisional',
   'schema_version',
 ]);

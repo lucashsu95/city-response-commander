@@ -68,3 +68,61 @@ describe('canonical core_hash and DecisionCore assembly', () => {
     expect(calculateCoreHash(hashlessCore)).toBe(originalHash);
   });
 });
+
+// ─── UARE fields reach the built DecisionCore (fixes a review finding: ─────
+// buildDecisionCore's structuredClone previously had its own separate
+// 24-field allowlist that silently dropped sop_matched/sop_authority/
+// universal_principles/grounding_candidates even when the caller supplied
+// them — nothing that constructs a real DecisionCore via this function would
+// ever have carried the 4 UARE fields. Spec: .kiro/specs/unified-adaptive-
+// reasoning-engine/requirements.md R5 AC1, AC5.
+describe('UARE fields on the built DecisionCore', () => {
+  it('propagates sop_matched:false, sop_authority, universal_principles and grounding_candidates', () => {
+    const core = buildDecisionCore({
+      ...baseInput(),
+      triggered_articles: [],
+      sop_matched: false,
+      sop_authority: 'SYSTEM_DEFAULT_PRINCIPLE',
+      universal_principles: [
+        { principle_id: 'UPSTREAM_CONTAINMENT', title: '上游截流', description: '上游截流說明' },
+      ],
+      grounding_candidates: [
+        {
+          segment_id: 'RD_TPE_004',
+          road_name: '市民大道四段',
+          saturation_score: 0.2,
+          capacity_vph: 2500,
+          status_text: '暢通',
+        },
+      ],
+    });
+
+    expect(core.sop_matched).toBe(false);
+    expect(core.sop_authority).toBe('SYSTEM_DEFAULT_PRINCIPLE');
+    expect(core.universal_principles).toHaveLength(1);
+    expect(core.grounding_candidates).toEqual([
+      {
+        segment_id: 'RD_TPE_004',
+        road_name: '市民大道四段',
+        saturation_score: 0.2,
+        capacity_vph: 2500,
+        status_text: '暢通',
+      },
+    ]);
+  });
+
+  it('does not affect core_hash — UARE fields are advisory, not decision-identity facts (§10.11a-1)', () => {
+    const withoutUare = buildDecisionCore(baseInput());
+    const withUare = buildDecisionCore({
+      ...baseInput(),
+      sop_matched: false,
+      sop_authority: 'SYSTEM_DEFAULT_PRINCIPLE',
+      universal_principles: [
+        { principle_id: 'UPSTREAM_CONTAINMENT', title: '上游截流', description: '說明' },
+      ],
+      grounding_candidates: [],
+    });
+
+    expect(withUare.core_hash).toBe(withoutUare.core_hash);
+  });
+});
