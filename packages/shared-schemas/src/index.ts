@@ -109,6 +109,17 @@ export type { PolicyMetadata } from './policy_metadata.js';
 
 // ─── API Contracts (§12) ───────────────────────────────────
 export type {
+  ApiDataStatus,
+  ObservationStalenessState,
+  ObservationMetadata,
+  ResponseProvenance,
+  StationScopeMode,
+  StationScopePolicy,
+  CrowdFlag,
+  RoadPanelSegment,
+  CrowdPanelStation,
+  DecisionExecutionStatus,
+  DecisionReadModel,
   InjectIncidentRequest,
   InjectIncidentResponse,
   GetDecisionResponse,
