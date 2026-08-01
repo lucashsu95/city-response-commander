@@ -162,12 +162,20 @@ export function derivePerimeterAnchors(
   roadNetwork: RoadNetworkModel,
 ): readonly PerimeterAnchor[];
 
+export interface BoundarySnapperConfigError {
+  readonly error: 'CONFIG_MISSING';
+  readonly missing_key: 'boundary_snapping.max_snap_distance_meters';
+}
+
 export function snap(
   incident: Incident,
   roadNetwork: RoadNetworkModel,
   config: BoundarySnapperConfig,
-): SnapResult;
+  eventCoordinate?: AnchorGazetteerEntry, // TASK-BS-06 addendum, see below
+): SnapResult | BoundarySnapperConfigError;
 ```
+
+> **實作期補充（TASK-BS-06）**：`Incident` 型別本身不含任何座標欄位（官方資料集無座標），因此座標路徑（Req 3）需要的 WGS84 座標不可能從 `incident` 推導出來，只能由呼叫端額外提供（例如未來 Dashboard 地圖點選）。`snap` 因此多了一個可選的第四參數 `eventCoordinate`；對官方資料集而言這個參數恆為 `undefined`，座標路徑維持 §11 所述的「介面已備妥、實際不可觸達」狀態。另外，`max_snap_distance_meters` 雖然在 `BoundarySnapperConfig` 型別上是必填數字，但其執行期真實來源是 `ConfigProvider`（schema 層為 `required:false`，見 §9 修正），型別系統無法保證呼叫端真的有值；`snap` 因此在函式內部做一次防禦性執行期檢查，缺值時回傳 `BoundarySnapperConfigError` 而非拋例外或靜默吸附（Req 5 AC1/AC2）。`Anchor_Gazetteer` 的鍵值採用 `PerimeterAnchor.segment_id`（唯一穩定識別碼）。
 
 ### 4.1 Entity_Scope_Check（Requirement 2）
 
