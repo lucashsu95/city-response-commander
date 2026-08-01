@@ -69,7 +69,7 @@ Task ID scheme: `TASK-BS-01..TASK-BS-19`, flat and sequential. `CHECKPOINT` line
   - tests_required: run existing Strategy D test suite as regression proof; no new tests needed for this pure move.
   - done_definition: Single source of truth for the match logic; zero behavior change verified by unmodified existing tests passing.
 
-- [ ] TASK-BS-04 Implement `checkEntityScope` (Requirement 2)
+- [x] TASK-BS-04 Implement `checkEntityScope` (Requirement 2)
   - objective: Deterministically classify whether an incident's location falls inside the road-network coverage using only `affected_segment` / `affected_road` / `location` text — no coordinates required.
   - requirements_covered: R2
   - design_sections: §4.1
