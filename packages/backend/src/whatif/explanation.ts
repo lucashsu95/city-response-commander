@@ -22,7 +22,11 @@
  * @module backend/whatif/explanation
  */
 
-import { NarrativeType, formatCitationLocation, FALLBACK_DISCLOSURE } from '@city-commander/shared-schemas';
+import {
+  NarrativeType,
+  formatCitationLocation,
+  FALLBACK_DISCLOSURE,
+} from '@city-commander/shared-schemas';
 import { validateBedrockPayload } from '@city-commander/rag';
 import type { SopRetriever, SopCitationResult } from '@city-commander/rag';
 import type { BedrockInvoker } from '@city-commander/rag';
