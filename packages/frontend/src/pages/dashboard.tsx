@@ -53,6 +53,7 @@ import { TimelinePanel } from '../timeline/timeline_panel.js';
 import { useTimelinePlayback } from '../timeline/use_timeline_playback.js';
 import { RoadPanel } from '../roads/road_panel.js';
 import { useRoadTraffic } from '../roads/use_road_traffic.js';
+import { OperationsMap } from '../map/operations_map.js';
 
 /**
  * Dashboard page component.
@@ -277,6 +278,14 @@ export function DashboardPage(): ReactNode {
       roadsContent={<RoadPanel traffic={roads} onRetry={roads.refresh} />}
       crowdContent={<CrowdPanel snapshot={crowd} onRetry={crowd.refresh} />}
       whatifContent={<WhatIfDialog client={transport} />}
+      mapContent={
+        <OperationsMap
+          roads={roads}
+          crowd={crowd}
+          currentTimestamp={timeline.currentTimestamp}
+          degraded={realtime.connectionMode === 'polling'}
+        />
+      }
       decisionContent={
         <>
           <ReportPanel decision={decision} onRetry={decision.refresh} />

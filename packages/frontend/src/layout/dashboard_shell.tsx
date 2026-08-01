@@ -132,6 +132,17 @@ interface WhatIfRegionProps {
   readonly content?: ReactNode;
 }
 
+interface MapRegionProps {
+  /**
+   * Dashboard Operations Map (schematic SVG). `undefined` (the default)
+   * preserves an empty state so a `DashboardShell` rendered without a
+   * `mapContent` prop is unchanged. This region is layout-only: no fetch,
+   * classification, or map-rendering logic lives here — that stays inside
+   * `map/operations_map.tsx`, which is injected by the Dashboard page.
+   */
+  readonly content?: ReactNode;
+}
+
 interface InjectionRegionProps {
   /**
    * TASK-128 admin session control + incident injection panel. `undefined`
@@ -189,6 +200,30 @@ function WhatIfRegion({ content }: WhatIfRegionProps): ReactNode {
       </h2>
       <div className="dashboard-region__content dashboard-region__content--stacked">
         {content ?? <EmptyState message="尚無 What-if 假設情境" />}
+      </div>
+    </section>
+  );
+}
+
+/**
+ * Dashboard Operations Map region.
+ *
+ * Renders the injected schematic SVG map (`map/operations_map.tsx`) when
+ * supplied; otherwise falls back to the shared empty state. Placed as its
+ * own top-level region so it never displaces Timeline/Roads/Crowd/Decision/
+ * What-if/Injection.
+ */
+function MapRegion({ content }: MapRegionProps): ReactNode {
+  return (
+    <section
+      className="dashboard-region dashboard-region--map"
+      aria-labelledby="map-heading"
+    >
+      <h2 id="map-heading" className="dashboard-region__heading">
+        事件態勢地圖
+      </h2>
+      <div className="dashboard-region__content dashboard-region__content--stacked">
+        {content ?? <EmptyState message="尚無地圖資料" />}
       </div>
     </section>
   );
@@ -268,6 +303,12 @@ export interface DashboardShellProps {
    */
   readonly whatifContent?: ReactNode;
   /**
+   * Dashboard Operations Map content (schematic SVG). Injected by the
+   * Dashboard page for the same reason as `timelineContent`: the shell stays
+   * a layout-only component with no map-rendering logic of its own.
+   */
+  readonly mapContent?: ReactNode;
+  /**
    * TASK-128 admin session control + incident injection panel content.
    * Injected by the Dashboard page for the same reason as `timelineContent`:
    * the shell stays a layout-only component with no fetch, auth, or
@@ -322,6 +363,7 @@ export function DashboardShell({
   crowdContent,
   decisionContent,
   whatifContent,
+  mapContent,
   injectionContent,
   overlayContent,
 }: DashboardShellProps = {}): ReactNode {
@@ -349,6 +391,7 @@ export function DashboardShell({
             content={decisionContent}
           />
           <WhatIfRegion content={whatifContent} />
+          <MapRegion content={mapContent} />
           <InjectionRegion content={injectionContent} />
         </div>
       </main>
