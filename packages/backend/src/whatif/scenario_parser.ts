@@ -77,9 +77,14 @@ ${wrapUntrustedQuestion(rawQuestion)}
 {
   "status": "parsed",
   "assumptions": [
-    {"entity_id": "BS_MRT_BL17", "field": "User_Count", "operator": "=", "value": 40000}
+    {"entity_id": "RD_TPE_005", "field": "Saturation_Score", "operator": "=", "value": 0.85}
   ]
 }
+
+⚠️ 上面的 entity_id、field、value 只是「輸出格式」的範例，不是常見答案。
+entity_id 必須是你從 user_question 標籤內文字實際辨識出的實體代碼
+（含簡稱，如「BL16」需展開為 BS_MRT_BL16），絕不可直接沿用本範例中的
+RD_TPE_005，除非使用者確實在問題中提到它。
 
 無法解析（問題模糊或無法識別實體/欄位）時：
 {
@@ -119,6 +124,59 @@ function validateAssumption(item: unknown): WhatIfAssumption | null {
     operator: operator as WhatIfAssumption['operator'],
     value,
   };
+}
+
+// ─── Entity mismatch guard ─────────────────────────────────────────────────────
+
+/**
+ * 決定性防護：偵測 `raw_question` 中「明確寫出的實體代碼」，
+ * 並與 Bedrock 解析出的 `entity_id` 交叉比對。
+ *
+ * 動機：few-shot 範例與真實問句的數值/格式相近時，LLM 可能把範例（或先前看過
+ * 的其他實體）誤植進輸出，而不是真的從使用者文字抽取實體。stage 2 的
+ * `validateEntityExists` 只確認 entity_id 是否存在於已載入資料中——若誤植的
+ * 實體剛好也是合法站點/路段，該驗證無法攔截。此處補上一層與 LLM 輸出無關的
+ * 決定性比對。
+ *
+ * 只在能從原文明確辨識出實體代碼時才比對（避免對自然語言問句誤判）；
+ * 辨識不到時放行，交由既有的 stage 2 驗證把關。
+ */
+const FULL_ENTITY_ID_PATTERN = /\b(?:BS_[A-Z]+_[A-Z0-9]+|RD_TPE_\d+)\b/gi;
+
+/** MRT 站點的口語簡稱，如「BL16」「BL 17」→ 展開為 BS_MRT_BL16 */
+const SHORT_MRT_STATION_PATTERN = /\bBL\s?(\d{1,3})\b/gi;
+
+function extractMentionedEntityIds(rawQuestion: string): ReadonlySet<string> {
+  const ids = new Set<string>();
+  for (const match of rawQuestion.matchAll(FULL_ENTITY_ID_PATTERN)) {
+    ids.add(match[0].toUpperCase());
+  }
+  for (const match of rawQuestion.matchAll(SHORT_MRT_STATION_PATTERN)) {
+    ids.add(`BS_MRT_BL${match[1]}`.toUpperCase());
+  }
+  return ids;
+}
+
+/**
+ * 若原文能明確辨識出實體代碼，但 Bedrock 輸出的某個 `entity_id` 不在其中，
+ * 回傳澄清訊息；否則回傳 `null`（放行）。
+ */
+function findEntityMismatch(
+  rawQuestion: string,
+  assumptions: readonly WhatIfAssumption[],
+): string | null {
+  const mentioned = extractMentionedEntityIds(rawQuestion);
+  if (mentioned.size === 0) return null;
+
+  for (const a of assumptions) {
+    if (!mentioned.has(a.entity_id.toUpperCase())) {
+      return (
+        `系統解析出的實體「${a.entity_id}」與您問題中提到的代碼不符` +
+        `（偵測到：${[...mentioned].join('、')}）。為避免誤判，請確認您指的基地台/路段代碼後重新提問。`
+      );
+    }
+  }
+  return null;
 }
 
 // ─── Main function ────────────────────────────────────────────────────────────
@@ -216,6 +274,15 @@ export async function parseScenario(
       };
     }
     assumptions.push(assumption);
+  }
+
+  // ── 5. 決定性交叉比對：原文提到的實體代碼 vs. Bedrock 解析出的 entity_id ──
+  const mismatch = findEntityMismatch(rawQuestion, assumptions);
+  if (mismatch !== null) {
+    return {
+      parse_status: 'clarification_required',
+      clarification_prompt: sanitizeReason(mismatch),
+    };
   }
 
   return {

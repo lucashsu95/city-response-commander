@@ -44,6 +44,7 @@ const LLM_PROHIBITED_FIELDS = new Set([
   'universal_principles',
   'grounding_candidates',
   'pre_warning_segments',
+  'crowd_pre_warnings',
   'signal_conflicts',
   'cascading_risk',
   'self_blocked_exclusions',

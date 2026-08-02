@@ -48,6 +48,27 @@ import {
   SnapshotSelector,
   type SnapshotSelectorConfigProvider,
 } from '@city-commander/domain';
+// GZAE (Grey-Zone Arbitration Engine): same rule-engine module
+// decision_pipeline.ts uses internally, re-exported from @city-commander/domain
+// so this hand-assembled demo route can surface the same additive annotations
+// (R1 self-blocked exclusion, R2 threshold-boundary trend pre-warning —
+// including the SOP-3/4/6 crowd_pre_warnings extension, R3 signal conflicts,
+// R4 cascading risk) instead of silently dropping them.
+import {
+  excludeSelfBlockedCandidates,
+  diffSelfBlockedExclusions,
+  detectPreWarning,
+  detectSignalConflicts,
+  buildAdjacencyGraph,
+  detectCascadingRisk,
+  detectSop3UserCountPreWarning,
+  detectSop3GrowthRatePreWarning,
+  detectSop4GrowthRatePreWarning,
+  detectSop6RoamingPreWarning,
+  type SaturationHistoryPoint,
+  type NumericHistoryPoint,
+} from '@city-commander/domain';
+import type { CrowdPreWarning, SignalConflict, CascadingRisk } from '@city-commander/shared-schemas';
 import {
   buildRagTrace,
   computeEte,
@@ -954,6 +975,21 @@ function findIncident(incidents: readonly Incident[], eventId: string): Incident
   throw new Error(`Incident not found: ${eventId}`);
 }
 
+/** Most recent 3 raw observations at or before `cutoff`, time-ascending (GZAE §GZAE-R2). */
+function recentHistoryBefore(
+  timestamps: readonly Date[],
+  values: readonly number[],
+  cutoff: Date,
+): readonly NumericHistoryPoint[] {
+  return values
+    .map((value, i) => ({ value, at: timestamps[i] }))
+    .filter((point): point is { value: number; at: Date } => point.at !== undefined)
+    .filter((point) => point.at.getTime() <= cutoff.getTime())
+    .sort((a, b) => a.at.getTime() - b.at.getTime())
+    .slice(-3)
+    .map((point) => ({ value: point.value }));
+}
+
 function handleIncident(body: string | null | undefined): APIGatewayProxyResult {
   const startedAt = Date.now();
   const data = _data;
@@ -976,6 +1012,12 @@ function handleIncident(body: string | null | undefined): APIGatewayProxyResult 
   }
 
   const config = makeConfig();
+  // Shared cutoff for both art.3's SnapshotSelector and every GZAE recent-history
+  // window below — previously each call site derived its own copy of this.
+  const targetTime = incident.timestamp
+    ? new Date(incident.timestamp.replace(' ', 'T'))
+    : new Date();
+  const otherActiveIncidents = data.incidents.filter((i) => i.event_id !== incident.event_id);
 
   // Traffic classification — RawTrafficRecord uses Segment_ID and Saturation_Score
   const primaryTraffic = data.traffic.filter((r) => r.Segment_ID === incident.affected_segment);
@@ -995,9 +1037,6 @@ function handleIncident(body: string | null | undefined): APIGatewayProxyResult 
   let art3Adds: number[] = [];
   if (incident.type === IncidentType.Crowd_Surge_Injury) {
     const selector = new SnapshotSelector(config as SnapshotSelectorConfigProvider);
-    const targetTime = incident.timestamp
-      ? new Date(incident.timestamp.replace(' ', 'T'))
-      : new Date();
     const crowdRecords = data.crowd
       .filter((r) => r.BS_ID === incident.affected_segment)
       .map((r) => ({
@@ -1030,13 +1069,14 @@ function handleIncident(body: string | null | undefined): APIGatewayProxyResult 
     .filter((s) => s.segment_id === incident.affected_segment)
     .flatMap((s) => s.nearby_stations);
   let art6Trig = false;
+  const roamingTriggeredStationIds = new Set<string>();
   for (const bsId of incidentNearbyStations) {
     const bsRecords = data.crowd.filter((r) => r.BS_ID === bsId);
     if (bsRecords.length > 0) {
       const latestPct = bsRecords[bsRecords.length - 1].roaming_pct_value;
       if (latestPct >= SOP_ART6_ROAMING_THRESHOLD) {
         art6Trig = true;
-        break;
+        roamingTriggeredStationIds.add(bsId);
       }
     }
   }
@@ -1053,12 +1093,21 @@ function handleIncident(body: string | null | undefined): APIGatewayProxyResult 
       if (rec) candidateScores.set(seg.segment_id, rec.Saturation_Score);
     }
   }
-  const candidates = qualifyCandidates(
+  const candidatesBeforeGzae = qualifyCandidates(
     incident.affected_segment,
     anchor.anchor_intersection,
     data.roadNetwork,
     candidateScores,
   );
+  // GZAE §GZAE-R1: exclude candidates that are themselves blocked by another
+  // active incident. Runs strictly after the existing 3-AND qualification
+  // above and never upgrades an already-excluded candidate.
+  const candidates = excludeSelfBlockedCandidates(
+    candidatesBeforeGzae,
+    incident.event_id,
+    otherActiveIncidents,
+  );
+  const selfBlockedExclusions = diffSelfBlockedExclusions(candidatesBeforeGzae, candidates);
   const evacuation = selectEvacuation(candidates);
 
   // Article aggregation
@@ -1145,6 +1194,95 @@ function handleIncident(body: string | null | undefined): APIGatewayProxyResult 
     data_points: [],
   });
 
+  // ── GZAE §GZAE-R2/R3/R4: additive-only annotations ──────────────────────────
+  // Same rule-engine module decision_pipeline.ts uses internally. R2 is
+  // extended here beyond SOP-1's saturation threshold to also cover SOP-3
+  // (User_Count/Growth_Rate), SOP-4 (Growth_Rate) and SOP-6 (Roaming_User_Pct)
+  // — none of these change `classifications.level` or `triggered_articles`.
+  const crowdSeriesFor = (bsId: string) =>
+    data.crowd
+      .map((r, i) => ({ r, at: data.crowdTimestamps[i]?.timestamp_normalized }))
+      .filter((x): x is { r: RawCrowdRecord; at: Date } => x.at !== undefined && x.r.BS_ID === bsId)
+      .sort((a, b) => a.at.getTime() - b.at.getTime())
+      .filter((x) => x.at.getTime() <= targetTime.getTime());
+
+  const preWarningSegments: string[] = [];
+  {
+    const ownSegmentTraffic = data.traffic
+      .map((r, i) => ({ r, at: data.trafficTimestamps[i]?.timestamp_normalized }))
+      .filter(
+        (x): x is { r: RawTrafficRecord; at: Date } =>
+          x.at !== undefined && x.r.Segment_ID === incident.affected_segment,
+      )
+      .sort((a, b) => a.at.getTime() - b.at.getTime());
+    const satHistory: SaturationHistoryPoint[] = recentHistoryBefore(
+      ownSegmentTraffic.map((x) => x.at),
+      ownSegmentTraffic.map((x) => x.r.Saturation_Score),
+      targetTime,
+    ).map((p) => ({ saturation_score: p.value }));
+    if (detectPreWarning(satScore, satHistory)) {
+      preWarningSegments.push(incident.affected_segment);
+    }
+  }
+
+  const crowdPreWarnings: CrowdPreWarning[] = [];
+  {
+    const bl17 = crowdSeriesFor('BS_MRT_BL17');
+    const current = bl17[bl17.length - 1];
+    if (current !== undefined) {
+      const userCountWarning = detectSop3UserCountPreWarning(
+        'BS_MRT_BL17',
+        current.r.User_Count,
+        recentHistoryBefore(bl17.map((x) => x.at), bl17.map((x) => x.r.User_Count), targetTime),
+      );
+      if (userCountWarning !== null) crowdPreWarnings.push(userCountWarning);
+
+      const growthRateWarning = detectSop3GrowthRatePreWarning(
+        'BS_MRT_BL17',
+        current.r.Growth_Rate,
+        recentHistoryBefore(bl17.map((x) => x.at), bl17.map((x) => x.r.Growth_Rate), targetTime),
+      );
+      if (growthRateWarning !== null) crowdPreWarnings.push(growthRateWarning);
+    }
+
+    const dome = crowdSeriesFor('BS_TPE_DOME');
+    const domeCurrent = dome[dome.length - 1];
+    if (domeCurrent !== undefined) {
+      const historicalPeak = Math.max(...dome.map((x) => x.r.User_Count));
+      const growthRateWarning = detectSop4GrowthRatePreWarning(
+        'BS_TPE_DOME',
+        historicalPeak >= SOP_ART4_DOME_PEAK_THRESHOLD,
+        domeCurrent.r.Growth_Rate,
+        recentHistoryBefore(dome.map((x) => x.at), dome.map((x) => x.r.Growth_Rate), targetTime),
+      );
+      if (growthRateWarning !== null) crowdPreWarnings.push(growthRateWarning);
+    }
+
+    for (const bsId of incidentNearbyStations) {
+      const series = crowdSeriesFor(bsId);
+      const stationCurrent = series[series.length - 1];
+      if (stationCurrent === undefined) continue;
+      const roamingWarning = detectSop6RoamingPreWarning(
+        bsId,
+        stationCurrent.r.roaming_pct_value,
+        recentHistoryBefore(series.map((x) => x.at), series.map((x) => x.r.roaming_pct_value), targetTime),
+      );
+      if (roamingWarning !== null) crowdPreWarnings.push(roamingWarning);
+    }
+  }
+
+  const crowdTriggeredStationIds = new Set<string>(roamingTriggeredStationIds);
+  if (art3Trig) crowdTriggeredStationIds.add('BS_MRT_BL17');
+  const signalConflicts: readonly SignalConflict[] = detectSignalConflicts(
+    classifications,
+    (segmentId) => data.roadNetwork.nearbyStations(segmentId),
+    crowdTriggeredStationIds,
+  );
+  const cascadingRisk: CascadingRisk | null = detectCascadingRisk(
+    [incident, ...otherActiveIncidents],
+    buildAdjacencyGraph(data.roadNetwork.getAllSegments()),
+  );
+
   // Decision core
   const baseTime = incident.timestamp ?? new Date().toISOString().slice(0, 16);
   const core = buildDecisionCore({
@@ -1196,6 +1334,11 @@ function handleIncident(body: string | null | undefined): APIGatewayProxyResult 
       saturated_vs_congested: 'PARTIALLY_DEFINED',
     },
     cms_core_text: `${incident.affected_segment} — primary: ${evacuation.primary_evacuation ?? 'N/A'}`,
+    pre_warning_segments: preWarningSegments,
+    crowd_pre_warnings: crowdPreWarnings,
+    signal_conflicts: signalConflicts,
+    cascading_risk: cascadingRisk,
+    self_blocked_exclusions: selfBlockedExclusions,
     provisional: true,
     schema_version: '1.0.0',
   });
@@ -1317,7 +1460,15 @@ function handleIncident(body: string | null | undefined): APIGatewayProxyResult 
     rag_trace: ragTrace,
     route_reasoning_trace: routeReasoningTrace,
     ...(eteCalculationTrace !== null && { ete_calculation: eteCalculationTrace }),
+<<<<<<< HEAD
     elapsed_ms: Date.now() - startedAt,
+=======
+    pre_warning_segments: core.pre_warning_segments ?? [],
+    crowd_pre_warnings: core.crowd_pre_warnings ?? [],
+    signal_conflicts: core.signal_conflicts ?? [],
+    cascading_risk: core.cascading_risk ?? null,
+    self_blocked_exclusions: core.self_blocked_exclusions ?? [],
+>>>>>>> 7323faf6c1d42bacb8c471e400a92c9db42ab1cc
     data_status: 'ready',
     text_source: 'deterministic',
   });
