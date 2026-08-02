@@ -7,6 +7,7 @@
  */
 
 import type { APIGatewayProxyEventV2 } from 'aws-lambda';
+import type { ArticleTriggerGrounding } from '@city-commander/shared-schemas';
 import type { WhatIfAssumption, RecomputeResult } from './whatif_types.js';
 import type { LoadedEntityCatalog } from './validators.js';
 
@@ -28,6 +29,12 @@ export interface RuleEngineWhatIfFacts {
   readonly ete_avg_saturation?: number;
   /** Event timestamp for recovery_at */
   readonly ete_base_timestamp?: string;
+  /**
+   * Deterministic per-article trigger grounding for the crowd-scoped articles
+   * (3/4/6) — which entity's value actually satisfied the condition. See
+   * `DeterministicDecisionFacts.trigger_grounding` (member-1 owned).
+   */
+  readonly trigger_grounding?: readonly ArticleTriggerGrounding[];
 }
 
 /**
@@ -62,6 +69,7 @@ export function recompute(input: RecomputeInput): RecomputeResult {
     triggered_articles: facts.triggered_articles,
     applied_formula_articles: facts.applied_formula_articles,
     expected_actions: facts.expected_actions,
+    trigger_grounding: facts.trigger_grounding ?? [],
     ...(facts.ete_minutes !== undefined && {
       ete_preview: { ete_minutes: facts.ete_minutes },
     }),

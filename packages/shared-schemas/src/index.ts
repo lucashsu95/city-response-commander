@@ -116,6 +116,7 @@ export type {
   DataPoint,
   ClassificationReasoning,
   ExcludedRouteReason,
+  ArticleTriggerGrounding,
 } from './evidence.js';
 
 // ─── Policy Metadata (§10.6) ───────────────────────────────

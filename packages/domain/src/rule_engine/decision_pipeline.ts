@@ -22,6 +22,7 @@
 import type {
   AffectedIntersectionScope,
   Art1Measures,
+  ArticleTriggerGrounding,
   CascadingRisk,
   ClassificationReasoning,
   CrowdPreWarning,
@@ -56,7 +57,12 @@ import { classifySegments } from './classification_engine.js';
 import { evaluateArticle1 } from './article1.js';
 import { isArticle2Triggered, qualifyCandidates } from './article2.js';
 import { ARTICLE3_STATION_ID, evaluateArticle3 } from './article3.js';
-import { ARTICLE4_STATION_ID, DOME_PEAK_THRESHOLD, evaluateArticle4 } from './article4.js';
+import {
+  ARTICLE4_STATION_ID,
+  DOME_PEAK_THRESHOLD,
+  DOME_GROWTH_THRESHOLD,
+  evaluateArticle4,
+} from './article4.js';
 import { evaluateArticle5, isArticle5Triggered } from './article5.js';
 import { evaluateArticle6 } from './article6.js';
 import { selectEvacuation } from './evacuation_selector.js';
@@ -176,6 +182,17 @@ export interface DeterministicDecisionFacts {
   /** GZAE (§GZAE-R1). `segment_id`s excluded because they are themselves blocked by another active incident. */
   readonly self_blocked_exclusions: readonly string[];
 
+  /**
+   * Deterministic per-article trigger grounding for the crowd-scoped articles
+   * (3, 4, 6) — which entity's value actually satisfied the condition, and
+   * why. Each of these articles is hard-bound to one specific station
+   * (BS_MRT_BL17 for art.3, BS_TPE_DOME for art.4, the roaming-triggering
+   * station(s) for art.6); a caller cannot infer that binding from
+   * `triggered_articles` alone. Populated only when the article actually
+   * triggers; never affects the trigger determination itself.
+   */
+  readonly trigger_grounding: readonly ArticleTriggerGrounding[];
+
   readonly provisional: true;
 }
 
@@ -269,6 +286,9 @@ export function runDeterministicDecision(
   const crowdPreWarnings: CrowdPreWarning[] = [];
   let selfBlockedExclusions: readonly string[] = [];
   const crowdTriggeredStationIds = new Set<string>();
+  // Which entity's value actually satisfied each triggered crowd article
+  // (3/4/6) — see DeterministicDecisionFacts.trigger_grounding.
+  const triggerGrounding: ArticleTriggerGrounding[] = [];
 
   const isRoadEvent = incident.affected_segment.startsWith('RD_');
 
@@ -407,6 +427,11 @@ export function runDeterministicDecision(
     if (article3.triggered) {
       evaluations.push({ article: 3, triggered: true });
       crowdTriggeredStationIds.add(ARTICLE3_STATION_ID);
+      triggerGrounding.push({
+        article: 3,
+        entity_id: ARTICLE3_STATION_ID,
+        reason: article3.trigger_reason ?? 'Growth_Rate or User_Count threshold met',
+      });
     }
 
     // GZAE §GZAE-R2 extension: User_Count / Growth_Rate grey-zone trend
@@ -449,6 +474,11 @@ export function runDeterministicDecision(
         invoked_procedures: article4.invoked_procedures,
       });
       crowdTriggeredStationIds.add(ARTICLE4_STATION_ID);
+      triggerGrounding.push({
+        article: 4,
+        entity_id: ARTICLE4_STATION_ID,
+        reason: `Historical_peak ${article4.historical_peak} >= ${DOME_PEAK_THRESHOLD} AND Growth_Rate ${current?.growth_rate ?? 'null'} <= ${DOME_GROWTH_THRESHOLD}`,
+      });
     }
 
     // GZAE §GZAE-R2 extension: Growth_Rate grey-zone trend pre-warning,
@@ -494,6 +524,11 @@ export function runDeterministicDecision(
     for (const stationId of article6.triggering_station_ids) {
       crowdTriggeredStationIds.add(stationId);
     }
+    triggerGrounding.push({
+      article: 6,
+      entity_id: article6.triggering_station_ids.join(', '),
+      reason: `Roaming_User_Pct >= 30% at station(s): ${article6.triggering_station_ids.join(', ')}`,
+    });
   }
 
   // GZAE §GZAE-R3: cross-article traffic (art.1) vs crowd (art.3/4/6) signal
@@ -608,6 +643,7 @@ export function runDeterministicDecision(
     signal_conflicts: signalConflicts,
     cascading_risk: cascadingRisk,
     self_blocked_exclusions: selfBlockedExclusions,
+    trigger_grounding: triggerGrounding,
     provisional: true,
   };
 

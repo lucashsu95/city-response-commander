@@ -52,6 +52,24 @@ export interface ExcludedRouteReason {
 }
 
 /**
+ * Deterministic per-article trigger grounding: which entity's value actually
+ * satisfied the article's condition. Distinct from `ClassificationReasoning`
+ * (art.1 only) — covers the crowd-scoped articles (3/4/6), each of which is
+ * hard-bound to one specific station regardless of which entity a What-if
+ * assumption targeted. Without this, an explanation composer has no
+ * grounded way to know whether a triggered article's cause matches the
+ * entity a caller asked about, or is unrelated pre-existing baseline data.
+ */
+export interface ArticleTriggerGrounding {
+  /** SOP article number (3, 4, or 6) */
+  readonly article: number;
+  /** The entity whose value(s) actually satisfied the condition */
+  readonly entity_id: string;
+  /** Deterministic, non-empty reason string (e.g. "Growth_Rate 0.5 > 0.3") */
+  readonly reason: string;
+}
+
+/**
  * EvidenceTrace — complete decision explanation chain
  *
  * Every excluded route MUST have a non-empty reason.

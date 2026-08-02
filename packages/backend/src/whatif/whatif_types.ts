@@ -13,6 +13,8 @@
  * @module backend/whatif/whatif_types
  */
 
+import type { ArticleTriggerGrounding } from '@city-commander/shared-schemas';
+
 // ─── Stage 1 輸出：假設條件 ────────────────────────────────────────────────
 
 /**
@@ -87,5 +89,12 @@ export interface RecomputeResult {
   readonly ete_avg_saturation?: number;
   /** Incident timestamp used as base for recovery_at */
   readonly ete_base_timestamp?: string;
+  /**
+   * Deterministic per-article trigger grounding for the crowd-scoped articles
+   * (3/4/6) — which entity's value actually satisfied the condition. Stage 4
+   * uses this to avoid attributing a trigger to an entity the assumption
+   * didn't target.
+   */
+  readonly trigger_grounding: readonly ArticleTriggerGrounding[];
   readonly does_not_mutate_state: true;
 }

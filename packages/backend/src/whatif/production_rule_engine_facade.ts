@@ -201,6 +201,7 @@ export class ProductionRuleEngineWhatIfFacade implements RuleEngineWhatIfFacade 
       triggered_articles,
       applied_formula_articles,
       expected_actions,
+      trigger_grounding: result.facts?.trigger_grounding ?? [],
     };
     const withEte = {
       ...out,
