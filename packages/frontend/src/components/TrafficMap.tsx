@@ -34,7 +34,12 @@ interface ResolvedRoadSegment {
   readonly roadName: string;
   readonly alertLevel: TrafficAlertLevel;
   readonly saturation: number;
-  readonly coordinates: readonly LatLngExpression[];
+  /**
+   * Leaflet's `Polyline` prop types (`LatLngExpression[]`) are mutable, so
+   * the frozen `readonly [lat, lng]` tuples from `roadDictionary.ts` are
+   * copied into fresh mutable tuples here rather than passed through.
+   */
+  readonly coordinates: LatLngExpression[];
 }
 
 // ─── Constants ───────────────────────────────────────────────
@@ -91,7 +96,7 @@ function resolveSegments(trafficData: readonly TrafficDataItem[]): readonly Reso
       roadName,
       alertLevel: row.alert_level,
       saturation: row.saturation,
-      coordinates,
+      coordinates: coordinates.map(([lat, lng]): LatLngExpression => [lat, lng]),
     });
   }
 
