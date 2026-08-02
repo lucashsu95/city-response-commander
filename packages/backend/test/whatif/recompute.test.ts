@@ -41,6 +41,7 @@ describe('recompute — member-1 facade delegation', () => {
       triggered_articles: [3],
       applied_formula_articles: [7],
       expected_actions: ['SOP-3：啟動分流'],
+      trigger_grounding: [],
       ete_preview: { ete_minutes: 42 },
       does_not_mutate_state: true,
     });

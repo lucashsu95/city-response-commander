@@ -33,6 +33,7 @@ function makeRecomputeResultArticle7(): RecomputeResult {
     triggered_articles: [1, 2],
     applied_formula_articles: [7],
     expected_actions: ['SOP-1：封閉事故路段', 'SOP-2：替代路線導引'],
+    trigger_grounding: [],
     ete_preview: { ete_minutes: 64.4 },
     ete_severity: 'Critical',
     // ACC_001 gold standard: ETE=64.4, base_clearance=60 → congestion_penalty=4.4
@@ -48,6 +49,9 @@ function makeRecomputeResultNoEte(): RecomputeResult {
     triggered_articles: [3],
     applied_formula_articles: [],
     expected_actions: ['SOP-3：啟動分流'],
+    trigger_grounding: [
+      { article: 3, entity_id: 'BS_MRT_BL17', reason: 'User_Count 31000 > 25000' },
+    ],
     does_not_mutate_state: true,
   };
 }
@@ -123,7 +127,15 @@ function makeBedrockFailure(): BedrockInvoker {
 
 describe('buildWhatIfSummaryText', () => {
   it('summarizes deterministic SOP, first action, and ETE facts in one paragraph', () => {
-    expect(buildWhatIfSummaryText(makeRecomputeResult())).toBe(
+    const recomputeResult: RecomputeResult = {
+      triggered_articles: [1, 2],
+      applied_formula_articles: [],
+      expected_actions: ['SOP-1：封閉事故路段', 'SOP-2：替代路線導引'],
+      trigger_grounding: [],
+      ete_preview: { ete_minutes: 45 },
+      does_not_mutate_state: true,
+    };
+    expect(buildWhatIfSummaryText(recomputeResult)).toBe(
       '觸發 SOP 第 1、2 條；首要動作：SOP-1：封閉事故路段；預估恢復時間 45 分鐘。',
     );
   });
@@ -350,6 +362,7 @@ describe('explainWhatIf', () => {
         triggered_articles: [7],
         applied_formula_articles: [7],
         expected_actions: [],
+        trigger_grounding: [],
         ete_preview: undefined,
         does_not_mutate_state: true,
       },
@@ -375,6 +388,7 @@ describe('explainWhatIf', () => {
         triggered_articles: [2],
         applied_formula_articles: [7],
         expected_actions: ['SOP-2 替代路線'],
+        trigger_grounding: [],
         ete_preview: { ete_minutes: 64.4 },
         ete_severity: 'Critical',
         ete_avg_saturation: 0.5 + 4.4 / 60, // = 0.5733...

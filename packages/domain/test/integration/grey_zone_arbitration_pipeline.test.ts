@@ -630,3 +630,97 @@ describe('GZAE R2 extension integration — crowd pre-warnings (SOP-3/4/6)', () 
     expect(facts.crowd_pre_warnings).toEqual([]);
   });
 });
+
+// ─── trigger_grounding — per-article entity attribution ────────────────────
+
+describe('trigger_grounding — which entity actually satisfied each crowd article', () => {
+  it('does NOT attribute art.3 to BS_TPE_DOME when BL17 independently exceeds its own threshold', () => {
+    // Reproduces the reported bug: a What-if assumption targets BS_TPE_DOME
+    // only, but BL17's own pre-existing baseline data independently exceeds
+    // SOP-3's threshold. Article 3 correctly triggers, but the cause is
+    // BL17's own data — never the DOME assumption.
+    const incident = makeIncident({
+      event_id: 'TPE_2026_EVT_GROUNDING',
+      type: IncidentType.Crowd_Surge_Injury,
+      affected_segment: 'BS_TPE_DOME',
+      status: IncidentStatus.Caution,
+      severity: Severity.Medium,
+      timestamp: '2026-05-20 22:20',
+    });
+    const ingestion = makeIngestion({
+      incidents: [incident],
+      crowd: [
+        // BL17: unrelated to the DOME assumption, already over threshold.
+        crowdRecord('BS_MRT_BL17', '2026-05-20 22:20', 33_000, 0.5, 0.1),
+        // DOME: the What-if assumption's target — peak met, growth rate
+        // does NOT satisfy the falling threshold, so art.4 stays untriggered.
+        crowdRecord('BS_TPE_DOME', '2026-05-20 21:00', 40_000, 0.1, 0.1),
+        crowdRecord('BS_TPE_DOME', '2026-05-20 22:20', 40_000, 0.1, 0.1),
+      ],
+    });
+
+    const facts = runDeterministicDecision({ ingestion, config, incident }).facts;
+    expect(facts).not.toBeNull();
+    if (facts === null) return;
+
+    expect(facts.triggered_articles).toContain(3);
+    expect(facts.triggered_articles).not.toContain(4);
+    expect(facts.trigger_grounding).toEqual([
+      { article: 3, entity_id: 'BS_MRT_BL17', reason: expect.any(String) },
+    ]);
+    // The grounding entity for art.3 is BL17 — never the DOME entity the
+    // assumption targeted.
+    expect(facts.trigger_grounding[0]?.entity_id).toBe('BS_MRT_BL17');
+    expect(facts.trigger_grounding.find((g) => g.entity_id === 'BS_TPE_DOME')).toBeUndefined();
+  });
+
+  it('attributes art.4 to BS_TPE_DOME with the historical-peak and growth-rate values in the reason', () => {
+    const incident = makeIncident({
+      event_id: 'TPE_2026_EVT_GROUNDING_ART4',
+      type: IncidentType.Crowd_Surge_Injury,
+      affected_segment: 'BS_TPE_DOME',
+      status: IncidentStatus.Caution,
+      severity: Severity.Medium,
+      timestamp: '2026-05-20 22:20',
+    });
+    const ingestion = makeIngestion({
+      incidents: [incident],
+      crowd: [
+        crowdRecord('BS_TPE_DOME', '2026-05-20 21:00', 40_000, 0.5, 0.1),
+        crowdRecord('BS_TPE_DOME', '2026-05-20 22:20', 5_000, -0.25, 0.1),
+      ],
+    });
+
+    const facts = runDeterministicDecision({ ingestion, config, incident }).facts;
+    expect(facts).not.toBeNull();
+    if (facts === null) return;
+
+    expect(facts.triggered_articles).toContain(4);
+    const art4Grounding = facts.trigger_grounding.find((g) => g.article === 4);
+    expect(art4Grounding).toBeDefined();
+    expect(art4Grounding?.entity_id).toBe('BS_TPE_DOME');
+    expect(art4Grounding?.reason).toContain('40000');
+    expect(art4Grounding?.reason).toContain('-0.25');
+  });
+
+  it('is empty when no crowd article triggers', () => {
+    const incident = makeIncident({
+      event_id: 'TPE_2026_EVT_GROUNDING_NONE',
+      type: IncidentType.Crowd_Surge_Injury,
+      affected_segment: 'BS_MRT_BL17',
+      status: IncidentStatus.Caution,
+      severity: Severity.Medium,
+      timestamp: '2026-05-20 22:20',
+    });
+    const ingestion = makeIngestion({
+      incidents: [incident],
+      crowd: [crowdRecord('BS_MRT_BL17', '2026-05-20 22:20', 5_000, 0.05, 0.05)],
+    });
+
+    const facts = runDeterministicDecision({ ingestion, config, incident }).facts;
+    expect(facts).not.toBeNull();
+    if (facts === null) return;
+
+    expect(facts.trigger_grounding).toEqual([]);
+  });
+});
