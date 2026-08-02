@@ -114,6 +114,9 @@ export interface SopRetrieveBothFailed {
 
 export type SopRetrieveResult = SopRetrieveSuccess | SopRetrieveBothFailed;
 
+// Re-export from shared-schemas for backward compatibility
+export { formatCitationLocation } from '@city-commander/shared-schemas';
+
 // ─── SopRetriever ─────────────────────────────────────────────────────────────
 
 /**

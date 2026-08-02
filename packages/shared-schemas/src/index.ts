@@ -78,6 +78,17 @@ export type { IdempotencyRecord } from './idempotency.js';
 // ─── Route Candidate (§10.8) ───────────────────────────────
 export type { RouteCandidate } from './route_candidate.js';
 
+// ─── HG-001 Shared Literal Types ───────────────────────────
+export type { SelectionMode, GuidanceId } from './hg001_literals.js';
+
+// ─── Selected Snapshot (§10.5, Strategy A) ─────────────────
+export type { SelectedSnapshot } from './selected_snapshot.js';
+export { createSelectedSnapshot } from './selected_snapshot.js';
+
+// ─── Affected Road Context (§11.2, Strategy B) ─────────────
+export type { AffectedRoadContext } from './affected_road_context.js';
+export { displayAndContextOnlyAffectedRoadContext } from './affected_road_context.js';
+
 // ─── ETE Result (§10.9) ────────────────────────────────────
 export type {
   ETEResult,
@@ -101,6 +112,17 @@ export type { PolicyMetadata } from './policy_metadata.js';
 
 // ─── API Contracts (§12) ───────────────────────────────────
 export type {
+  ApiDataStatus,
+  ObservationStalenessState,
+  ObservationMetadata,
+  ResponseProvenance,
+  StationScopeMode,
+  StationScopePolicy,
+  CrowdFlag,
+  RoadPanelSegment,
+  CrowdPanelStation,
+  DecisionExecutionStatus,
+  DecisionReadModel,
   InjectIncidentRequest,
   InjectIncidentResponse,
   GetDecisionResponse,
@@ -113,6 +135,14 @@ export type {
 
 // ─── Config ────────────────────────────────────────────────
 export type { EnvironmentProfile, ConfigSchema, StrategyConfig } from './config.js';
+
+// ─── Citation Formatting (§14.1, §21) ──────────────────────
+export {
+  formatCitationLocation,
+  FALLBACK_DISCLOSURE,
+  ensureFallbackDisclosure,
+  type CitationLocationInput,
+} from './citation_formatting.js';
 
 // ─── Discriminated union for API/event payloads (§12/§13) ──
 export type {

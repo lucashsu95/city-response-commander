@@ -16,10 +16,11 @@ import {
   composeExplanation,
   type ExplanationComposerInput,
 } from '../../src/explanation_composer.js';
-import { NarrativeType } from '@city-commander/shared-schemas';
+import { NarrativeType, FALLBACK_DISCLOSURE } from '@city-commander/shared-schemas';
 import type { NarrativeTableClient, NarrativeItem } from '../../src/narrative_writer.js';
 import type { BedrockInvoker, BedrockResult } from '../../src/bedrock_adapter.js';
 import type { DecisionCore } from '@city-commander/shared-schemas';
+import type { SopCitationResult } from '../../src/sop_retriever.js';
 
 // ─── Stub helpers ──────────────────────────────────────────────────────────
 
@@ -60,9 +61,7 @@ function makeCore(): DecisionCore {
       classification_reasoning: [
         { segment_id: 'RD_TPE_002', value: 0.97, threshold: '>= 0.95', conclusion: 'A 級' },
       ],
-      excluded_routes: [
-        { segment_id: 'RD_TPE_008', reason: 'capacity_vph < 1000' },
-      ],
+      excluded_routes: [{ segment_id: 'RD_TPE_008', reason: 'capacity_vph < 1000' }],
       sop_citations: [],
       data_points: [],
     },
@@ -81,6 +80,26 @@ function makeCore(): DecisionCore {
 function committedClient(): NarrativeTableClient {
   return { conditionalPut: vi.fn(async () => 'committed') };
 }
+
+const SAMPLE_KB_CITATIONS: readonly SopCitationResult[] = [
+  {
+    article_no: 2,
+    content: 'SOP 第 2 條原文',
+    source_location: 's3://bucket/sop/article-2.json',
+    relevancy_score: null,
+    source: 'kb',
+  },
+];
+
+const SAMPLE_S3_FALLBACK_CITATIONS: readonly SopCitationResult[] = [
+  {
+    article_no: 2,
+    content: 'SOP 第 2 條原文',
+    source_location: 's3://bucket/sop/article-2.json',
+    relevancy_score: null,
+    source: 's3_fallback',
+  },
+];
 
 function makeBedrockSuccess(text: string): BedrockInvoker {
   return {
@@ -186,7 +205,9 @@ describe('composeExplanation', () => {
 
   it('DDB error → outcome: failed', async () => {
     const client: NarrativeTableClient = {
-      conditionalPut: vi.fn(async () => { throw new Error('DDB down'); }),
+      conditionalPut: vi.fn(async () => {
+        throw new Error('DDB down');
+      }),
     };
     const result = await composeExplanation(makeInput({ narrativeClient: client }));
     expect(result.outcome).toBe('failed');
@@ -217,5 +238,102 @@ describe('composeExplanation', () => {
     const before = JSON.stringify(core);
     await composeExplanation(makeInput({ core }));
     expect(JSON.stringify(core)).toBe(before);
+  });
+
+  it('s3_fallback citation → fallback explanation_text includes source_location AND 類比引用 marker', async () => {
+    const client = committedClient();
+    await composeExplanation(
+      makeInput({ citations: SAMPLE_S3_FALLBACK_CITATIONS, narrativeClient: client }),
+    );
+    const item = (client.conditionalPut as ReturnType<typeof vi.fn>).mock
+      .calls[0]?.[0] as NarrativeItem;
+    const payload = item.payload as { explanation_text: string };
+    expect(payload.explanation_text).toContain('s3://bucket/sop/article-2.json');
+    expect(payload.explanation_text).toContain('類比引用');
+    expect(payload.explanation_text).toContain(FALLBACK_DISCLOSURE.trim());
+  });
+
+  it('kb citation → fallback explanation_text includes source_location WITHOUT 類比引用 marker', async () => {
+    const client = committedClient();
+    await composeExplanation(
+      makeInput({ citations: SAMPLE_KB_CITATIONS, narrativeClient: client }),
+    );
+    const item = (client.conditionalPut as ReturnType<typeof vi.fn>).mock
+      .calls[0]?.[0] as NarrativeItem;
+    const payload = item.payload as { explanation_text: string };
+    expect(payload.explanation_text).toContain('s3://bucket/sop/article-2.json');
+    expect(payload.explanation_text).not.toContain('類比引用');
+  });
+
+  it('Bedrock success + s3_fallback citation WITHOUT disclosure → appends fallback disclosure', async () => {
+    const json = JSON.stringify({ explanation_text: '這是 Bedrock 產生的解釋文字，不含揭露' });
+    const client = committedClient();
+    const result = await composeExplanation(
+      makeInput({
+        bedrockInvoker: makeBedrockSuccess(json),
+        citations: SAMPLE_S3_FALLBACK_CITATIONS,
+        narrativeClient: client,
+      }),
+    );
+    if (result.outcome !== 'failed') {
+      expect(result.text_source).toBe('bedrock');
+    }
+    const item = (client.conditionalPut as ReturnType<typeof vi.fn>).mock
+      .calls[0]?.[0] as NarrativeItem;
+    const payload = item.payload as { explanation_text: string };
+    expect(payload.explanation_text).toContain('類比引用');
+    expect(payload.explanation_text).toContain('這是 Bedrock 產生的解釋文字');
+  });
+
+  it('Bedrock success + s3_fallback citation with partial disclosure → appends complete disclosure', async () => {
+    const json = JSON.stringify({ explanation_text: '這是解釋，本次含類比引用資料' });
+    const client = committedClient();
+    await composeExplanation(
+      makeInput({
+        bedrockInvoker: makeBedrockSuccess(json),
+        citations: SAMPLE_S3_FALLBACK_CITATIONS,
+        narrativeClient: client,
+      }),
+    );
+    const item = (client.conditionalPut as ReturnType<typeof vi.fn>).mock
+      .calls[0]?.[0] as NarrativeItem;
+    const payload = item.payload as { explanation_text: string };
+    expect(payload.explanation_text).toContain(FALLBACK_DISCLOSURE.trim());
+  });
+
+  it('Bedrock success + s3_fallback citation with complete disclosure → does NOT double-append', async () => {
+    const json = JSON.stringify({ explanation_text: `這是解釋${FALLBACK_DISCLOSURE}` });
+    const client = committedClient();
+    const result = await composeExplanation(
+      makeInput({
+        bedrockInvoker: makeBedrockSuccess(json),
+        citations: SAMPLE_S3_FALLBACK_CITATIONS,
+        narrativeClient: client,
+      }),
+    );
+    if (result.outcome !== 'failed') {
+      expect(result.text_source).toBe('bedrock');
+    }
+    const item = (client.conditionalPut as ReturnType<typeof vi.fn>).mock
+      .calls[0]?.[0] as NarrativeItem;
+    const payload = item.payload as { explanation_text: string };
+    expect(payload.explanation_text.split(FALLBACK_DISCLOSURE.trim())).toHaveLength(2);
+  });
+
+  it('Bedrock success + kb-only citation → no fallback disclosure appended', async () => {
+    const json = JSON.stringify({ explanation_text: '純 KB 解釋文字' });
+    const client = committedClient();
+    await composeExplanation(
+      makeInput({
+        bedrockInvoker: makeBedrockSuccess(json),
+        citations: SAMPLE_KB_CITATIONS,
+        narrativeClient: client,
+      }),
+    );
+    const item = (client.conditionalPut as ReturnType<typeof vi.fn>).mock
+      .calls[0]?.[0] as NarrativeItem;
+    const payload = item.payload as { explanation_text: string };
+    expect(payload.explanation_text).not.toContain('類比引用');
+    expect(payload.explanation_text).toBe('純 KB 解釋文字');
   });
 });
