@@ -185,6 +185,29 @@ a:hover {
   gap: var(--space-4);
 }
 
+.cmd-header__brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.cmd-header__brand-logo {
+  display: block;
+  flex: 0 0 auto;
+  width: 30px;
+  height: 30px;
+  object-fit: contain;
+  object-position: center;
+}
+
+.cmd-header__brand-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
 .cmd-header__title-block {
   display: flex;
   flex-direction: column;
@@ -3485,6 +3508,11 @@ a:hover {
   :root {
     --header-height: 56px;
     --ai-column-width: 100%;
+  }
+
+  .cmd-header__brand-logo {
+    width: 26px;
+    height: 26px;
   }
 
   .cmd-body {

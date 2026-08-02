@@ -69,11 +69,18 @@ function CommandHeader({
 
   return (
     <header className="cmd-header" role="banner">
-      {/* Left: Title */}
+      {/* Left: Title with CHT brand logo */}
       <div className="cmd-header__left">
-        <div className="cmd-header__title-block">
-          <h1 className="cmd-header__title">城市交通應變 AI 指揮台</h1>
-          <span className="cmd-header__subtitle">中華電信命題</span>
+        <div className="cmd-header__brand">
+          <img
+            src={`${import.meta.env.BASE_URL}cht_favicon.png`}
+            alt="中華電信"
+            className="cmd-header__brand-logo"
+          />
+          <div className="cmd-header__brand-text">
+            <h1 className="cmd-header__title">城市交通應變 AI 指揮台</h1>
+            <span className="cmd-header__subtitle">中華電信命題</span>
+          </div>
         </div>
       </div>
 
