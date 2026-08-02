@@ -161,6 +161,7 @@ function normalizePercentScale(assumption: WhatIfAssumption): NormalizeResult {
 
 /** entity_id 前綴驗證（SchemaValidator） */
 function validateEntityPrefix(assumption: WhatIfAssumption): string | null {
+  if (assumption.entity_id === 'AUTO') return null;
   const type = classifyEntity(assumption.entity_id);
   if (type === null) {
     return `無法識別實體「${echo(assumption.entity_id)}」。實體 ID 必須以 ${ROAD_SEGMENT_PREFIX}（路段）或 ${BASE_STATION_PREFIX}（基地台）開頭。`;
@@ -173,6 +174,7 @@ function validateEntityExists(
   assumption: WhatIfAssumption,
   catalog: LoadedEntityCatalog,
 ): string | null {
+  if (assumption.entity_id === 'AUTO') return null;
   const entityType = classifyEntity(assumption.entity_id);
   if (entityType === null) return null;
 

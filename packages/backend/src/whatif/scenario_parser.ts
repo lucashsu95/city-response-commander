@@ -73,7 +73,7 @@ ${wrapUntrustedQuestion(rawQuestion)}
 ## 輸出格式
 請回傳一個 JSON 物件，格式如下：
 
-成功解析時：
+成功解析時（有明確實體）：
 {
   "status": "parsed",
   "assumptions": [
@@ -81,10 +81,19 @@ ${wrapUntrustedQuestion(rawQuestion)}
   ]
 }
 
-⚠️ 上面的 entity_id、field、value 只是「輸出格式」的範例，不是常見答案。
-entity_id 必須是你從 user_question 標籤內文字實際辨識出的實體代碼
-（含簡稱，如「BL16」需展開為 BS_MRT_BL16），絕不可直接沿用本範例中的
-RD_TPE_005，除非使用者確實在問題中提到它。
+成功解析時（無明確實體，描述趨勢或通用情境）：
+{
+  "status": "parsed",
+  "assumptions": [
+    {"entity_id": "AUTO", "field": "Saturation_Score", "operator": "=", "value": 0.849}
+  ]
+}
+
+⚠️ entity_id 說明：
+- 使用者明確提到路段代碼（如 RD_TPE_005）或基地台代碼（如 BS_MRT_BL17）→ 直接使用
+- 使用者提到簡稱（如「BL16」）→ 展開為 BS_MRT_BL16
+- 使用者未指定具體實體，但描述了數值或趨勢 → 使用 "AUTO"
+- 絕不可使用 "UNKNOWN" 或其他自創的 placeholder
 
 無法解析（問題完全無法理解，連趨勢或數值都無法辨識）時：
 {
@@ -93,8 +102,6 @@ RD_TPE_005，除非使用者確實在問題中提到它。
 }
 
 ## 解析規則
-- entity_id：優先從使用者文字中辨識具體路段/基地台代碼（如 BS_MRT_BL17、RD_TPE_002）
-- 若使用者未指定具體實體，但描述了數值趨勢（如「飽和度 84.9%，每分鐘暴增 5%」），嘗試從描述中提取 field 和 value，entity_id 使用最可能匹配的路段代碼
 - field 必須是已知欄位（如 User_Count、Saturation_Score、Growth_Rate、Roaming_User_Pct）
 - operator 只能是 =、>、<、>=、<= 其中之一
 - value 必須是數字

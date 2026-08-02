@@ -11,6 +11,31 @@ import type { ArticleTriggerGrounding } from '@city-commander/shared-schemas';
 import type { WhatIfAssumption, RecomputeResult } from './whatif_types.js';
 import type { LoadedEntityCatalog } from './validators.js';
 
+const ROAD_FIELDS = new Set(['Saturation_Score']);
+const CROWD_FIELDS = new Set(['User_Count', 'Growth_Rate', 'Roaming_User_Pct']);
+
+function expandAutoAssumptions(
+  assumptions: readonly WhatIfAssumption[],
+  catalog: LoadedEntityCatalog,
+): WhatIfAssumption[] {
+  const expanded: WhatIfAssumption[] = [];
+  for (const a of assumptions) {
+    if (a.entity_id !== 'AUTO') {
+      expanded.push(a);
+      continue;
+    }
+    const ids = ROAD_FIELDS.has(a.field)
+      ? catalog.roadSegmentIds
+      : CROWD_FIELDS.has(a.field)
+        ? catalog.baseStationIds
+        : [...catalog.roadSegmentIds, ...catalog.baseStationIds];
+    for (const id of ids) {
+      expanded.push({ ...a, entity_id: id });
+    }
+  }
+  return expanded;
+}
+
 /** Opaque full-input snapshot plus the entity catalog derived by its owner. */
 export interface RuleEngineWhatIfBaseline {
   readonly inputSnapshot: unknown;
@@ -60,9 +85,10 @@ export interface RecomputeInput {
 
 /** Delegate the full rerun, then translate its deterministic facts only. */
 export function recompute(input: RecomputeInput): RecomputeResult {
+  const expanded = expandAutoAssumptions(input.assumptions, input.baseline.loadedEntities);
   const facts = input.facade.rerun({
     baseline: input.baseline,
-    assumptions: input.assumptions,
+    assumptions: expanded,
   });
 
   return {
