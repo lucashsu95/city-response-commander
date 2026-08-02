@@ -57,12 +57,21 @@ export interface WhatIfFnDependencies {
   readonly sopRetriever: SopRetriever;
   /** Member-1-owned single facade for baseline loading and full deterministic reruns. */
   readonly ruleEngineFacade: RuleEngineWhatIfFacade;
+  /**
+   * Authority label for the SOP retriever.
+   * - "aws_bedrock_kb"             → real managed AWS Bedrock Knowledge Base
+   * - "local_sop_knowledge_base"  → in-memory SOP (emergency_traffic_sop.txt)
+   *
+   * This MUST reflect the actual retriever in use — never claim AWS KB
+   * when using a local SOP.
+   */
+  readonly retrieverType: 'aws_bedrock_kb' | 'local_sop_knowledge_base';
 }
 
 // ─── HTTP helpers ─────────────────────────────────────────────────────────────
 
-/** HTTP 回應的 Content-Type header */
-const JSON_CONTENT_TYPE = 'application/json';
+/** HTTP 回應的 Content-Type header（含 UTF-8 charset，符合 AWS HTTP API Lambda proxy 慣例） */
+const JSON_CONTENT_TYPE = 'application/json; charset=utf-8';
 
 /** schema_version 常數（所有回應均包含） */
 const SCHEMA_VER = SCHEMA_VERSION;
@@ -160,6 +169,15 @@ const OPERATOR_GROUP = 'operators';
  * 此處 Cognito group check 是應用層防線。
  */
 function isAuthorizedOperator(event: APIGatewayProxyEventV2): boolean {
+  // The competition Demo Lambda intentionally opts into a public mode for
+  // /what-if. The env var is set by the DynamoBackendStack at deploy time;
+  // production deployments omit it. This is the only application-layer
+  // bypass allowed in main; the IAM Deny on WhatIfFnRole is the final
+  // production-side defence.
+  if (process.env['DEMO_PUBLIC_WHATIF'] === 'true') {
+    return true;
+  }
+
   // HTTP API Gateway JWT authorizer 型別用 unknown 轉型後嚴格提取
   const ctx = event.requestContext as unknown as {
     authorizer?: { jwt?: { claims?: Record<string, unknown> } };
@@ -227,7 +245,7 @@ function extractRequestId(event: APIGatewayProxyEventV2): string {
 export function createWhatIfHandler(
   deps: WhatIfFnDependencies,
 ): (event: APIGatewayProxyEventV2) => Promise<APIGatewayProxyResultV2> {
-  const { bedrockInvoker, sopRetriever, ruleEngineFacade } = deps;
+  const { bedrockInvoker, sopRetriever, ruleEngineFacade, retrieverType } = deps;
 
   return async function whatIfHandler(
     event: APIGatewayProxyEventV2,
@@ -314,11 +332,13 @@ export function createWhatIfHandler(
         rawQuestion,
         sopRetriever,
         bedrockInvoker,
+        retrieverType,
       });
 
       // ── 組裝最終 WhatIfResponse ──────────────────────────────────────────
       // 所有決定性欄位來自 stage 3（LLM-prohibited）
-      // explanation_text 來自 stage 4（LLM-writable）
+      // summary_text 是 stage 3 事實的決定性摘要；explanation_text 是 stage 4 文字
+      // rag_trace / ete_calculation 由 stage 4 組裝，但不含 LLM 決策
       const response: WhatIfResponse = {
         schema_version: SCHEMA_VER,
         trace_id: traceId,
@@ -339,8 +359,16 @@ export function createWhatIfHandler(
           source_location: c.source_location,
           source: c.source,
         })),
+        // LLM-prohibited：只重述 stage 3 已驗證事實
+        summary_text: explanationResult.summary_text,
         // LLM-writable：stage 4 Bedrock 或 template fallback
         explanation_text: explanationResult.explanation_text,
+        // rag_trace：SOP retrieval provenance（deterministic, no LLM authorship）
+        rag_trace: explanationResult.rag_trace,
+        // ete_calculation：SOP-7 公式代入追蹤（deterministic, no LLM authorship）
+        ...(explanationResult.ete_calculation !== null && {
+          ete_calculation: explanationResult.ete_calculation,
+        }),
         // does_not_mutate_state: const true（靜態型別保證）
         does_not_mutate_state: true,
         provisional: true,

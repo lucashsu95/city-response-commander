@@ -61,6 +61,17 @@ export type {
 // ─── LLM Boundary (§9) ──────────────────────────────────────
 export { LLM_PROHIBITED_FIELDS } from './llm_boundary.js';
 
+// ─── Unified Adaptive Reasoning Engine (UARE) ───────────────
+export type {
+  UniversalPrincipleId,
+  UniversalPrinciple,
+  GroundingCandidate,
+  SopMatchResult,
+} from './universal_defense.js';
+
+// ─── Grey-Zone Arbitration Engine (GZAE) ────────────────────
+export type { SignalConflict, CascadingRisk, CrowdPreWarning } from './grey_zone.js';
+
 // ─── Decision Narrative (§10.11b) ──────────────────────────
 export type {
   DecisionNarrative,
@@ -105,6 +116,7 @@ export type {
   DataPoint,
   ClassificationReasoning,
   ExcludedRouteReason,
+  ArticleTriggerGrounding,
 } from './evidence.js';
 
 // ─── Policy Metadata (§10.6) ───────────────────────────────
@@ -144,6 +156,15 @@ export {
   type CitationLocationInput,
 } from './citation_formatting.js';
 
+// ─── RAG Trace (§14.x) ──────────────────────────────────────────
+export type { RagTrace, RagTraceChunk } from './rag_trace.js';
+
+// ─── ETE Calculation Trace (§14.x) ──────────────────────────────
+export type { EteCalculationTrace, EteCalculationVariable } from './ete_calculation.js';
+
+// ─── Route Reasoning Trace ───────────────────────────────────────
+export type { RouteReasoningTrace, RouteReasoningEntry } from './route_reasoning_trace.js';
+
 // ─── Discriminated union for API/event payloads (§12/§13) ──
 export type {
   WebSocketEvent,
@@ -156,3 +177,14 @@ export type {
   PublishStatusChangedEvent,
   ProcessingFailedEvent,
 } from './events.js';
+
+// ─── Demo API Types (non-canonical, demo-only) ──────────────────────────────
+export type {
+  DemoTimeseriesAnomaly,
+  DemoControlCenterRecommendation,
+  DemoTechnicalAction,
+  DemoPublicAlerts,
+  DemoPublishRequest,
+  DemoAlertRequest,
+  DemoAlertResponse,
+} from './demo-types.js';

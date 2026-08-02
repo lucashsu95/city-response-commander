@@ -22,15 +22,22 @@
 import type {
   AffectedIntersectionScope,
   Art1Measures,
+  ArticleTriggerGrounding,
+  CascadingRisk,
   ClassificationReasoning,
+  CrowdPreWarning,
   EvidenceTrace,
+  GroundingCandidate,
   Incident,
   IncidentAnchor,
   PolicyMetadata,
   RouteCandidate,
   SegmentClassification,
   Severity,
+  SignalConflict,
   SopCitation,
+  SopMatchResult,
+  UniversalPrinciple,
 } from '@city-commander/shared-schemas';
 
 import type { IngestionDataStatus, IngestionResult } from '../ingestion/data_ingestion_service.js';
@@ -41,6 +48,7 @@ import {
 } from '../strategies/policy_strategy_bundle.js';
 import type { AffectedRoadStrategyResult } from '../strategies/affected_road_strategy.js';
 import type { CurrentStationSnapshot } from '../strategies/multilingual_scope_strategy.js';
+import type { RoadNetworkModel } from '../road_network/road_network_model.js';
 import {
   selectLatestCommonExactSnapshot,
   type EteTrafficReading,
@@ -49,13 +57,37 @@ import { classifySegments } from './classification_engine.js';
 import { evaluateArticle1 } from './article1.js';
 import { isArticle2Triggered, qualifyCandidates } from './article2.js';
 import { ARTICLE3_STATION_ID, evaluateArticle3 } from './article3.js';
-import { ARTICLE4_STATION_ID, evaluateArticle4 } from './article4.js';
+import {
+  ARTICLE4_STATION_ID,
+  DOME_PEAK_THRESHOLD,
+  DOME_GROWTH_THRESHOLD,
+  evaluateArticle4,
+} from './article4.js';
 import { evaluateArticle5, isArticle5Triggered } from './article5.js';
 import { evaluateArticle6 } from './article6.js';
 import { selectEvacuation } from './evacuation_selector.js';
 import { aggregateArticles, type ArticleEvaluationSummary } from './article_aggregation.js';
 import { calculateEte, type EteCalculationResult } from '../ete/ete_calculator.js';
 import { buildEvidenceTrace } from '../evidence/evidence_trace_builder.js';
+import {
+  resolveSopMatch,
+  selectGroundingCandidates,
+  UNIVERSAL_DEFENSE_PRINCIPLES,
+} from './universal_defense.js';
+import {
+  excludeSelfBlockedCandidates,
+  diffSelfBlockedExclusions,
+  detectPreWarning,
+  detectSignalConflicts,
+  buildAdjacencyGraph,
+  detectCascadingRisk,
+  detectSop3UserCountPreWarning,
+  detectSop3GrowthRatePreWarning,
+  detectSop4GrowthRatePreWarning,
+  detectSop6RoamingPreWarning,
+  type SaturationHistoryPoint,
+  type NumericHistoryPoint,
+} from './grey_zone_arbitration.js';
 
 // ─── Public Input / Result Types ───────────────────────────
 
@@ -117,6 +149,50 @@ export interface DeterministicDecisionFacts {
   /** Official CMS core text; only SOP-5 produces one deterministically. */
   readonly cms_core_text: string | null;
   readonly policy: PolicyMetadata;
+
+  /**
+   * UARE (Unified Adaptive Reasoning Engine, spec:
+   * .kiro/specs/unified-adaptive-reasoning-engine/). `sop_matched` is a pure
+   * projection of `triggered_articles` (§UARE-R1) — always populated, never
+   * `undefined`, unlike its optional counterpart on `DecisionCore`.
+   */
+  readonly sop_matched: boolean;
+  readonly sop_authority: SopMatchResult['sop_authority'];
+  /** Non-empty only when `sop_matched` is `false` (§UARE-R2). */
+  readonly universal_principles: readonly UniversalPrinciple[];
+  /** Non-empty only when `sop_matched` is `false` and a grounding anchor was resolvable (§UARE-R3, R6). */
+  readonly grounding_candidates: readonly GroundingCandidate[];
+
+  /**
+   * GZAE (Grey-Zone Arbitration Engine, spec:
+   * .kiro/specs/grey-zone-arbitration-engine/). §GZAE-R2: segments in the
+   * `[0.80, 0.85)` grey zone with a strictly rising 3-point trend. Never
+   * affects `classifications`.
+   */
+  readonly pre_warning_segments: readonly string[];
+  /**
+   * GZAE (§GZAE-R2 extension). Same grey-zone trend pre-warning as
+   * `pre_warning_segments`, generalized to SOP-3/4/6's crowd thresholds.
+   */
+  readonly crowd_pre_warnings: readonly CrowdPreWarning[];
+  /** GZAE (§GZAE-R3). Cross-article traffic/crowd signal contradictions, advisory-only. */
+  readonly signal_conflicts: readonly SignalConflict[];
+  /** GZAE (§GZAE-R4). Adjacent, individually-non-escalating incidents; `null` when none detected. */
+  readonly cascading_risk: CascadingRisk | null;
+  /** GZAE (§GZAE-R1). `segment_id`s excluded because they are themselves blocked by another active incident. */
+  readonly self_blocked_exclusions: readonly string[];
+
+  /**
+   * Deterministic per-article trigger grounding for the crowd-scoped articles
+   * (3, 4, 6) — which entity's value actually satisfied the condition, and
+   * why. Each of these articles is hard-bound to one specific station
+   * (BS_MRT_BL17 for art.3, BS_TPE_DOME for art.4, the roaming-triggering
+   * station(s) for art.6); a caller cannot infer that binding from
+   * `triggered_articles` alone. Populated only when the article actually
+   * triggers; never affects the trigger determination itself.
+   */
+  readonly trigger_grounding: readonly ArticleTriggerGrounding[];
+
   readonly provisional: true;
 }
 
@@ -181,6 +257,12 @@ export function runDeterministicDecision(
   const roadNetwork = ingestion.roadNetwork;
   const eventDate = normalizeTimestamp(incident.timestamp).timestamp_normalized;
 
+  // GZAE (§GZAE-R1, R4): other incidents from the same ingested set, excluding
+  // the one being decided. Reuses `ingestion.incidents` — no new input surface.
+  const otherActiveIncidents: readonly Incident[] = (ingestion.incidents ?? []).filter(
+    (candidate) => candidate.event_id !== incident.event_id,
+  );
+
   const trafficByStation = groupTraffic(ingestion);
   const crowdByStation = groupCrowd(ingestion);
 
@@ -197,6 +279,16 @@ export function runDeterministicDecision(
   let affectedIntersectionScope: AffectedIntersectionScope | null = null;
   let ete: EteCalculationResult | null = null;
   let cmsCoreText: string | null = null;
+
+  // GZAE (§GZAE-R1..R4) outputs — additive except self_blocked_exclusions,
+  // which reflects R1's post-hoc correction of `candidates`/`excludedCandidates`.
+  let preWarningSegments: readonly string[] = [];
+  const crowdPreWarnings: CrowdPreWarning[] = [];
+  let selfBlockedExclusions: readonly string[] = [];
+  const crowdTriggeredStationIds = new Set<string>();
+  // Which entity's value actually satisfied each triggered crowd article
+  // (3/4/6) — see DeterministicDecisionFacts.trigger_grounding.
+  const triggerGrounding: ArticleTriggerGrounding[] = [];
 
   const isRoadEvent = incident.affected_segment.startsWith('RD_');
 
@@ -243,12 +335,22 @@ export function runDeterministicDecision(
       ? null
       : anchor.anchor_intersection;
 
-    const candidates = qualifyCandidates(
+    const candidatesBeforeGzae = qualifyCandidates(
       incident.affected_segment,
       anchorIntersection,
       roadNetwork,
       saturationMap,
     );
+    // GZAE §GZAE-R1: exclude candidates that are themselves blocked by another
+    // active incident. Runs strictly after the existing 3-AND qualification
+    // above and never upgrades an already-excluded candidate.
+    const candidates = excludeSelfBlockedCandidates(
+      candidatesBeforeGzae,
+      incident.event_id,
+      otherActiveIncidents,
+    );
+    selfBlockedExclusions = diffSelfBlockedExclusions(candidatesBeforeGzae, candidates);
+
     const evacuation = selectEvacuation(candidates);
     primaryEvacuation = evacuation.primary_evacuation;
     secondaryEvacuation = evacuation.secondary_evacuation;
@@ -256,6 +358,18 @@ export function runDeterministicDecision(
 
     if (isArticle2Triggered(incident)) {
       evaluations.push({ article: 2, triggered: true });
+    }
+
+    // GZAE §GZAE-R2: threshold-boundary trend pre-warning for the incident's
+    // own segment. Additive-only — never changes `classifications.level`.
+    if (incidentSaturation !== null) {
+      const history = recentSaturationHistoryBefore(
+        trafficByStation.get(incident.affected_segment) ?? [],
+        eventDate,
+      );
+      if (detectPreWarning(incidentSaturation, history)) {
+        preWarningSegments = [incident.affected_segment];
+      }
     }
 
     // ETE affected-set (Strategy C) + latest common exact snapshot + art.7.
@@ -312,6 +426,30 @@ export function runDeterministicDecision(
     });
     if (article3.triggered) {
       evaluations.push({ article: 3, triggered: true });
+      crowdTriggeredStationIds.add(ARTICLE3_STATION_ID);
+      triggerGrounding.push({
+        article: 3,
+        entity_id: ARTICLE3_STATION_ID,
+        reason: article3.trigger_reason ?? 'Growth_Rate or User_Count threshold met',
+      });
+    }
+
+    // GZAE §GZAE-R2 extension: User_Count / Growth_Rate grey-zone trend
+    // pre-warning. Additive-only — never affects article3's own trigger.
+    if (record !== null && record !== undefined) {
+      const userCountWarning = detectSop3UserCountPreWarning(
+        ARTICLE3_STATION_ID,
+        record.user_count,
+        recentCrowdHistoryBefore(bl17Records, eventDate, (r) => r.user_count),
+      );
+      if (userCountWarning !== null) crowdPreWarnings.push(userCountWarning);
+
+      const growthRateWarning = detectSop3GrowthRatePreWarning(
+        ARTICLE3_STATION_ID,
+        record.growth_rate,
+        recentCrowdHistoryBefore(bl17Records, eventDate, (r) => r.growth_rate),
+      );
+      if (growthRateWarning !== null) crowdPreWarnings.push(growthRateWarning);
     }
   }
 
@@ -335,6 +473,24 @@ export function runDeterministicDecision(
         triggered: true,
         invoked_procedures: article4.invoked_procedures,
       });
+      crowdTriggeredStationIds.add(ARTICLE4_STATION_ID);
+      triggerGrounding.push({
+        article: 4,
+        entity_id: ARTICLE4_STATION_ID,
+        reason: `Historical_peak ${article4.historical_peak} >= ${DOME_PEAK_THRESHOLD} AND Growth_Rate ${current?.growth_rate ?? 'null'} <= ${DOME_GROWTH_THRESHOLD}`,
+      });
+    }
+
+    // GZAE §GZAE-R2 extension: Growth_Rate grey-zone trend pre-warning,
+    // gated on the historical-peak precondition already being met.
+    if (current !== null && current !== undefined) {
+      const growthRateWarning = detectSop4GrowthRatePreWarning(
+        ARTICLE4_STATION_ID,
+        article4.historical_peak !== null && article4.historical_peak >= DOME_PEAK_THRESHOLD,
+        current.growth_rate,
+        recentCrowdHistoryBefore(domeRecords, eventDate, (r) => r.growth_rate),
+      );
+      if (growthRateWarning !== null) crowdPreWarnings.push(growthRateWarning);
     }
   }
 
@@ -346,6 +502,18 @@ export function runDeterministicDecision(
       bs_id: bsId,
       roaming_pct_value: selected.record?.roaming_pct_value ?? null,
     });
+
+    // GZAE §GZAE-R2 extension: Roaming_User_Pct grey-zone trend pre-warning,
+    // per in-scope station (mirrors this loop's existing per-station scope).
+    const roamingRecord = selected.record;
+    if (roamingRecord !== null && roamingRecord !== undefined) {
+      const roamingWarning = detectSop6RoamingPreWarning(
+        bsId,
+        roamingRecord.roaming_pct_value,
+        recentCrowdHistoryBefore(records, eventDate, (r) => r.roaming_pct_value),
+      );
+      if (roamingWarning !== null) crowdPreWarnings.push(roamingWarning);
+    }
   }
   const multilingualScopeResult = bundle.multilingualScope.stationsInScope(currentStations, {
     mode: bundle.metadata.multilingual_scope.mode,
@@ -353,7 +521,35 @@ export function runDeterministicDecision(
   const article6 = evaluateArticle6(multilingualScopeResult);
   if (article6.triggered) {
     evaluations.push({ article: 6, triggered: true });
+    for (const stationId of article6.triggering_station_ids) {
+      crowdTriggeredStationIds.add(stationId);
+    }
+    triggerGrounding.push({
+      article: 6,
+      entity_id: article6.triggering_station_ids.join(', '),
+      reason: `Roaming_User_Pct >= 30% at station(s): ${article6.triggering_station_ids.join(', ')}`,
+    });
   }
+
+  // GZAE §GZAE-R3: cross-article traffic (art.1) vs crowd (art.3/4/6) signal
+  // contradiction, keyed by the existing `nearby_stations` field. Additive-only.
+  const signalConflicts: readonly SignalConflict[] =
+    roadNetwork !== undefined
+      ? detectSignalConflicts(
+          classifications,
+          (segmentId) => roadNetwork.nearbyStations(segmentId),
+          crowdTriggeredStationIds,
+        )
+      : [];
+
+  // GZAE §GZAE-R4: adjacent, individually-non-escalating incidents. Additive-only.
+  const cascadingRisk: CascadingRisk | null =
+    roadNetwork !== undefined
+      ? detectCascadingRisk(
+          [incident, ...otherActiveIncidents],
+          buildAdjacencyGraph(roadNetwork.getAllSegments()),
+        )
+      : null;
 
   // ─── Aggregate the three distinct article sets (art.7 stays a formula) ──
   const appliedFormulaArticles = ete !== null ? [...ete.applied_formula_articles] : [];
@@ -361,6 +557,27 @@ export function runDeterministicDecision(
     evaluations,
     applied_formula_articles: appliedFormulaArticles,
   });
+
+  // ─── UARE: SOP-match judgment + grounding candidates when no article triggered ──
+  // (spec: .kiro/specs/unified-adaptive-reasoning-engine/, design.md §3, §5.2, §5.3)
+  const sopMatch = resolveSopMatch(articles.triggered_articles);
+  let universalPrinciples: readonly UniversalPrinciple[] = [];
+  let groundingCandidates: readonly GroundingCandidate[] = [];
+  if (!sopMatch.sop_matched) {
+    universalPrinciples = UNIVERSAL_DEFENSE_PRINCIPLES;
+    const anchorSegmentId = resolveGroundingAnchor(incident, roadNetwork);
+    if (anchorSegmentId !== null && roadNetwork !== undefined) {
+      groundingCandidates = selectGroundingCandidates(
+        anchorSegmentId,
+        roadNetwork,
+        selectSaturation,
+      ).candidates;
+    }
+    // anchorSegmentId === null (neither affected_segment nor affected_road is in
+    // Road_Whitelist) → groundingCandidates stays [] per design.md §5.3; this is
+    // NOT insufficient_data (R6 AC3) — the caller (backend prompt layer) is
+    // expected to fall back to a route-free universal advisory.
+  }
 
   // ─── Evidence trace (deterministic facts only) ──
   const classificationReasoning: ClassificationReasoning[] = classifications
@@ -417,6 +634,16 @@ export function runDeterministicDecision(
     evidence,
     cms_core_text: cmsCoreText,
     policy: bundle.metadata,
+    sop_matched: sopMatch.sop_matched,
+    sop_authority: sopMatch.sop_authority,
+    universal_principles: universalPrinciples,
+    grounding_candidates: groundingCandidates,
+    pre_warning_segments: preWarningSegments,
+    crowd_pre_warnings: crowdPreWarnings,
+    signal_conflicts: signalConflicts,
+    cascading_risk: cascadingRisk,
+    self_blocked_exclusions: selfBlockedExclusions,
+    trigger_grounding: triggerGrounding,
     provisional: true,
   };
 
@@ -444,6 +671,28 @@ function resolveIncident(input: DeterministicDecisionInput): Incident {
   throw new Error('runDeterministicDecision requires either `incident` or `event_id`.');
 }
 
+/**
+ * UARE anchor precedence (design.md §5.1): prefer `affected_segment` when it is
+ * in the Road_Whitelist, else `affected_road`, else `null` (no legal anchor —
+ * caller must not call `selectGroundingCandidates`, design.md §5.3).
+ */
+function resolveGroundingAnchor(
+  incident: Incident,
+  roadNetwork: RoadNetworkModel | undefined,
+): string | null {
+  if (roadNetwork === undefined) return null;
+  if (roadNetwork.getSegment(incident.affected_segment) !== undefined) {
+    return incident.affected_segment;
+  }
+  if (
+    incident.affected_road !== undefined &&
+    roadNetwork.getSegment(incident.affected_road) !== undefined
+  ) {
+    return incident.affected_road;
+  }
+  return null;
+}
+
 function groupTraffic(ingestion: IngestionResult): ReadonlyMap<string, TrafficSelectRecord[]> {
   const byStation = new Map<string, TrafficSelectRecord[]>();
   const traffic = ingestion.traffic ?? [];
@@ -459,6 +708,43 @@ function groupTraffic(ingestion: IngestionResult): ReadonlyMap<string, TrafficSe
     byStation.set(record.Segment_ID, list);
   });
   return byStation;
+}
+
+/**
+ * GZAE §GZAE-R2: the most recent 3 raw saturation observations at or before
+ * `cutoff`, time-ascending. Reuses `groupTraffic`'s already-in-memory,
+ * per-segment array (design.md §4) — no new data-read path. Returns fewer
+ * than 3 points (including zero) when history is insufficient; never
+ * interpolates or defaults a missing point.
+ */
+function recentSaturationHistoryBefore(
+  records: readonly TrafficSelectRecord[],
+  cutoff: Date,
+): readonly SaturationHistoryPoint[] {
+  return records
+    .filter((record) => record.timestamp_normalized.getTime() <= cutoff.getTime())
+    .sort((a, b) => a.timestamp_normalized.getTime() - b.timestamp_normalized.getTime())
+    .slice(-3)
+    .map((record) => ({ saturation_score: record.saturation_score }));
+}
+
+/**
+ * GZAE §GZAE-R2 extension: the most recent 3 raw crowd observations at or
+ * before `cutoff`, time-ascending, projected through `valueOf` to the field
+ * being trended (User_Count / Growth_Rate / Roaming_User_Pct). Mirrors
+ * `recentSaturationHistoryBefore` — reuses `groupCrowd`'s already-in-memory,
+ * per-station array; never interpolates or defaults a missing point.
+ */
+function recentCrowdHistoryBefore(
+  records: readonly CrowdSelectRecord[],
+  cutoff: Date,
+  valueOf: (record: CrowdSelectRecord) => number,
+): readonly NumericHistoryPoint[] {
+  return records
+    .filter((record) => record.timestamp_normalized.getTime() <= cutoff.getTime())
+    .sort((a, b) => a.timestamp_normalized.getTime() - b.timestamp_normalized.getTime())
+    .slice(-3)
+    .map((record) => ({ value: valueOf(record) }));
 }
 
 function groupCrowd(ingestion: IngestionResult): ReadonlyMap<string, CrowdSelectRecord[]> {

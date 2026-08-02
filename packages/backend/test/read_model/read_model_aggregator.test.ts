@@ -194,6 +194,74 @@ describe('data_status', () => {
   });
 });
 
+// ─── UARE (TASK-UARE-11): sop_matched/sop_authority/universal_principles/
+// grounding_candidates reach GET /decisions/{id} unchanged ─────────────────
+// Spec: .kiro/specs/unified-adaptive-reasoning-engine/requirements.md R5, R10
+//
+// The read model wraps `core` by reference (read_model_aggregator.ts:186
+// assigns `core` straight into the model, never reconstructing it field by
+// field), so the 4 UARE fields on DecisionCore need no separate mapping code
+// here — this test proves that pass-through actually holds, rather than just
+// asserting it from reading the source.
+
+describe('UARE fields reach DecisionReadModel.core unchanged', () => {
+  it('passes sop_matched:false, sop_authority, universal_principles and grounding_candidates through untouched', async () => {
+    const uareCore = core({
+      triggered_articles: [],
+      sop_matched: false,
+      sop_authority: 'SYSTEM_DEFAULT_PRINCIPLE',
+      universal_principles: [
+        { principle_id: 'UPSTREAM_CONTAINMENT', title: '上游截流', description: '上游截流說明' },
+        { principle_id: 'PERIMETER_GUIDANCE', title: '周邊引導', description: '周邊引導說明' },
+        { principle_id: 'PUBLIC_NOTIFICATION', title: '資訊通報', description: '資訊通報說明' },
+      ],
+      grounding_candidates: [
+        {
+          segment_id: 'RD_TPE_004',
+          road_name: '市民大道四段',
+          saturation_score: 0.2,
+          capacity_vph: 2500,
+          status_text: '暢通',
+        },
+      ],
+    });
+    const ports = createPorts({ core: uareCore });
+
+    const model = await aggregateDecisionReadModel(ports, { decisionId: DECISION, traceId: TRACE });
+
+    expect(model.core?.sop_matched).toBe(false);
+    expect(model.core?.sop_authority).toBe('SYSTEM_DEFAULT_PRINCIPLE');
+    expect(model.core?.universal_principles).toHaveLength(3);
+    expect(model.core?.grounding_candidates).toEqual([
+      {
+        segment_id: 'RD_TPE_004',
+        road_name: '市民大道四段',
+        saturation_score: 0.2,
+        capacity_vph: 2500,
+        status_text: '暢通',
+      },
+    ]);
+  });
+
+  it('passes sop_matched:true through with empty universal_principles/grounding_candidates', async () => {
+    const uareCore = core({
+      triggered_articles: [1, 2],
+      sop_matched: true,
+      sop_authority: 'OFFICIAL_SOP',
+      universal_principles: [],
+      grounding_candidates: [],
+    });
+    const ports = createPorts({ core: uareCore });
+
+    const model = await aggregateDecisionReadModel(ports, { decisionId: DECISION, traceId: TRACE });
+
+    expect(model.core?.sop_matched).toBe(true);
+    expect(model.core?.sop_authority).toBe('OFFICIAL_SOP');
+    expect(model.core?.universal_principles).toEqual([]);
+    expect(model.core?.grounding_candidates).toEqual([]);
+  });
+});
+
 // ─── Four-source merge ─────────────────────────────────────
 
 describe('four-source merge', () => {

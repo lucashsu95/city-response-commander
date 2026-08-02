@@ -4,6 +4,8 @@ import type { EvidenceTrace } from './evidence.js';
 import type { PolicyMetadata } from './policy_metadata.js';
 import type { ETEResult } from './ete.js';
 import type { RouteCandidate } from './route_candidate.js';
+import type { UniversalPrinciple, GroundingCandidate } from './universal_defense.js';
+import type { SignalConflict, CascadingRisk, CrowdPreWarning } from './grey_zone.js';
 
 export interface SegmentClassification {
   readonly segment_id: string;
@@ -91,6 +93,45 @@ export interface DecisionCore {
   readonly evidence: EvidenceTrace;
   readonly policy: PolicyMetadata;
   readonly cms_core_text: string;
+
+  /**
+   * UARE (Unified Adaptive Reasoning Engine, §UARE-R1). `true` when
+   * `triggered_articles` is non-empty. Optional for backwards-compatible
+   * read models built before UARE wiring (decision_pipeline.ts, TASK-UARE-08).
+   */
+  readonly sop_matched?: boolean;
+  /** UARE (§UARE-R1). `OFFICIAL_SOP` when `sop_matched`, else `SYSTEM_DEFAULT_PRINCIPLE`. */
+  readonly sop_authority?: 'OFFICIAL_SOP' | 'SYSTEM_DEFAULT_PRINCIPLE';
+  /** UARE (§UARE-R2). Non-empty only when `sop_matched` is `false`. */
+  readonly universal_principles?: readonly UniversalPrinciple[];
+  /** UARE (§UARE-R3, R6). Non-empty only when `sop_matched` is `false` and a grounding anchor was resolvable. */
+  readonly grounding_candidates?: readonly GroundingCandidate[];
+
+  /**
+   * GZAE (§GZAE-R2). `segment_id`s in the grey zone `[0.80, 0.85)` with a
+   * strictly rising 3-point trend. Never affects `classifications.level`.
+   * Optional for backwards-compatible read models built before GZAE wiring.
+   */
+  readonly pre_warning_segments?: readonly string[];
+  /**
+   * GZAE (§GZAE-R2 extension). Same trend-based grey-zone pre-warning as
+   * `pre_warning_segments`, generalized to SOP-3 (User_Count/Growth_Rate),
+   * SOP-4 (Growth_Rate) and SOP-6 (Roaming_User_Pct). Never affects
+   * `triggered_articles` or any article's own trigger determination.
+   */
+  readonly crowd_pre_warnings?: readonly CrowdPreWarning[];
+  /** GZAE (§GZAE-R3). Cross-article traffic/crowd signal contradictions, advisory-only. */
+  readonly signal_conflicts?: readonly SignalConflict[];
+  /** GZAE (§GZAE-R4). Adjacent, individually-non-escalating incidents, advisory-only; `null` when none detected. */
+  readonly cascading_risk?: CascadingRisk | null;
+  /**
+   * GZAE (§GZAE-R1). `segment_id`s excluded from evacuation candidacy because
+   * they are themselves the `affected_segment` of another active, blocking
+   * incident. Subset of `excluded_candidates`; recorded separately to
+   * distinguish this mechanism's exclusions from the existing 3-AND ones.
+   */
+  readonly self_blocked_exclusions?: readonly string[];
+
   readonly provisional: boolean;
   readonly schema_version: string;
 }

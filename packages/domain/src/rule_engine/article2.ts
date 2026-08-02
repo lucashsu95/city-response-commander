@@ -32,8 +32,13 @@ import type { RoadNetworkModel } from '../road_network/road_network_model.js';
 
 // ─── Constants ─────────────────────────────────────────────
 
-/** Status values that satisfy the first trigger condition */
-const TRIGGER_STATUSES: ReadonlySet<string> = new Set([
+/**
+ * Status values that satisfy the first trigger condition.
+ * Exported for reuse by `grey_zone_arbitration.ts` (GZAE-R1), which checks
+ * whether a candidate segment is itself blocked by another active incident
+ * using the same blocking-status definition, without redeclaring it.
+ */
+export const TRIGGER_STATUSES: ReadonlySet<string> = new Set([
   IncidentStatus.Closed,
   IncidentStatus.Blocked,
   IncidentStatus.Restricted,
@@ -45,8 +50,13 @@ const TRIGGER_SEVERITIES: ReadonlySet<string> = new Set([Severity.Critical, Seve
 /** Prefix for road segment events (art.2 applies) */
 const ROAD_SEGMENT_PREFIX = 'RD_';
 
-/** Minimum capacity for candidate qualification */
-const CAPACITY_THRESHOLD = 1000;
+/**
+ * Minimum capacity for candidate qualification.
+ * Exported for reuse by `universal_defense.ts` (UARE), which applies the same
+ * physical-capacity floor to its own grounding candidates without redeclaring
+ * the threshold value (design.md §5.1).
+ */
+export const CAPACITY_THRESHOLD = 1000;
 
 // ─── Trigger ───────────────────────────────────────────────
 

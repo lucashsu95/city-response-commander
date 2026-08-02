@@ -42,9 +42,15 @@ const ruleEngineFacade: RuleEngineWhatIfFacade = {
 };
 
 function createWhatIfHandler(
-  deps: Omit<WhatIfFnDependencies, 'ruleEngineFacade'>,
+  deps: Omit<WhatIfFnDependencies, 'ruleEngineFacade'> & {
+    retrieverType?: WhatIfFnDependencies['retrieverType'];
+  },
 ): ReturnType<typeof createRawWhatIfHandler> {
-  return createRawWhatIfHandler({ ...deps, ruleEngineFacade });
+  return createRawWhatIfHandler({
+    ...deps,
+    ruleEngineFacade,
+    retrieverType: deps.retrieverType ?? 'local_sop_knowledge_base',
+  });
 }
 
 // ─── Stubs ────────────────────────────────────────────────────────────────────
@@ -148,6 +154,7 @@ describe('WhatIfFn — Cognito operator 授權', () => {
         },
       },
       sopRetriever: retrieverStub(),
+      retrieverType: 'local_sop_knowledge_base',
     });
 
     const result = await handler(makeEvent({ body: '{"query":"x"}', claims: null }));
@@ -160,6 +167,7 @@ describe('WhatIfFn — Cognito operator 授權', () => {
     const handler = createWhatIfHandler({
       bedrockInvoker: bedrockReturning(PARSED_BL17),
       sopRetriever: retrieverStub(),
+      retrieverType: 'local_sop_knowledge_base',
     });
     const result = await handler(
       makeEvent({
@@ -300,6 +308,7 @@ describe('WhatIfFn — clarification 短路（§14.5）', () => {
     expect(body.status).toBe('answered');
     expect(body.triggered_articles).toEqual([3]);
     expect(Array.isArray(body.expected_actions)).toBe(true);
+    expect(body.summary_text).toBe('觸發 SOP 第 3 條；首要動作：SOP-3：啟動分流。');
   });
 
   it('answered 回應保留 citation 的來源位置與 fallback 類型', async () => {

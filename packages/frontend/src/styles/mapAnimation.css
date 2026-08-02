@@ -1,0 +1,81 @@
+/**
+ * Traffic map polyline animations — pulse (RED), flowing dashes (YELLOW/GREEN).
+ *
+ * Applied via Leaflet Polyline `pathOptions.className`.
+ */
+
+@keyframes leaflet-red-pulse {
+  0% {
+    opacity: 0.25;
+    filter: drop-shadow(0 0 2px #ff3b30);
+  }
+
+  50% {
+    opacity: 0.95;
+    filter: drop-shadow(0 0 10px #ff3b30);
+  }
+
+  100% {
+    opacity: 0.25;
+    filter: drop-shadow(0 0 2px #ff3b30);
+  }
+}
+
+@keyframes leaflet-yellow-pulse {
+  0% {
+    opacity: 0.45;
+  }
+
+  50% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0.45;
+  }
+}
+
+@keyframes leaflet-flow-dash {
+  to {
+    stroke-dashoffset: -36;
+  }
+}
+
+.pulsing-red-road {
+  animation: leaflet-red-pulse 1.4s ease-in-out infinite;
+}
+
+.pulsing-yellow-road {
+  animation: leaflet-yellow-pulse 2s ease-in-out infinite;
+}
+
+.flowing-yellow-road {
+  stroke-dasharray: 12 16;
+  animation: leaflet-flow-dash 1.6s linear infinite;
+}
+
+.flowing-green-road {
+  stroke-dasharray: 8 20;
+  animation: leaflet-flow-dash 2.4s linear infinite;
+}
+
+.traffic-map {
+  width: 100%;
+  height: 100%;
+  min-height: inherit;
+}
+
+.traffic-map__container {
+  width: 100%;
+  height: 100%;
+  min-height: inherit;
+  border-radius: inherit;
+  background: #0a1628;
+}
+
+.traffic-map__popup {
+  display: grid;
+  gap: 0.35rem;
+  font-size: 0.875rem;
+  line-height: 1.4;
+}

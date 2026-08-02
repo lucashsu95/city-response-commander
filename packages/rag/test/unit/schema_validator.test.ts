@@ -72,6 +72,66 @@ describe('validateBedrockPayload — REPORT', () => {
     }
   });
 
+  it('rejects on LLM-prohibited UARE fields: sop_matched, sop_authority, universal_principles, grounding_candidates (TASK-UARE-11)', () => {
+    // Adversarial payload: Bedrock output attempting to overwrite the 4 UARE
+    // decision fields (spec: .kiro/specs/unified-adaptive-reasoning-engine/,
+    // requirements.md R5 AC3/AC4, R8 AC4). These were added to
+    // LLM_PROHIBITED_FIELDS in TASK-UARE-03; this test proves the existing
+    // §9 boundary path (step 3 of validateBedrockPayload) already covers them
+    // with zero validator code changes, confirming design.md §8's prediction.
+    const result = validateBedrockPayload(NarrativeType.REPORT, {
+      report_text: 'ok',
+      sop_matched: true,
+      sop_authority: 'OFFICIAL_SOP',
+      universal_principles: [],
+      grounding_candidates: [{ segment_id: 'RD_TPE_999', road_name: '虛構路' }],
+    });
+    expect(result.outcome).toBe('use_template');
+    if (result.outcome === 'use_template') {
+      expect(result.reason).toBe('prohibited_field_overwrite');
+      expect(result.offendingFields).toEqual(
+        expect.arrayContaining([
+          'sop_matched',
+          'sop_authority',
+          'universal_principles',
+          'grounding_candidates',
+        ]),
+      );
+    }
+  });
+
+  it('rejects on LLM-prohibited GZAE fields: pre_warning_segments, signal_conflicts, cascading_risk, self_blocked_exclusions (TASK-GZAE-10)', () => {
+    // Adversarial payload: Bedrock output attempting to overwrite the 4 GZAE
+    // decision fields (spec: .kiro/specs/grey-zone-arbitration-engine/,
+    // requirements.md R5 AC3/AC9). These were added to LLM_PROHIBITED_FIELDS
+    // in TASK-GZAE-03; this test proves the existing §9 boundary path (step 3
+    // of validateBedrockPayload) already covers them with zero validator code
+    // changes, mirroring the UARE proof above.
+    const result = validateBedrockPayload(NarrativeType.REPORT, {
+      report_text: 'ok',
+      pre_warning_segments: ['RD_TPE_999'],
+      crowd_pre_warnings: [
+        { bs_id: 'BS_MRT_BL17', article: 3, field: 'User_Count', advisory_text: '虛構預警' },
+      ],
+      signal_conflicts: [{ segment_id: 'RD_TPE_999', conflict_type: 'crowd_heavy_traffic_light' }],
+      cascading_risk: { event_ids: ['FAKE_001'], advisory_text: '虛構建議' },
+      self_blocked_exclusions: ['RD_TPE_999'],
+    });
+    expect(result.outcome).toBe('use_template');
+    if (result.outcome === 'use_template') {
+      expect(result.reason).toBe('prohibited_field_overwrite');
+      expect(result.offendingFields).toEqual(
+        expect.arrayContaining([
+          'pre_warning_segments',
+          'crowd_pre_warnings',
+          'signal_conflicts',
+          'cascading_risk',
+          'self_blocked_exclusions',
+        ]),
+      );
+    }
+  });
+
   it('rejects on non-whitelisted field', () => {
     const result = validateBedrockPayload(NarrativeType.REPORT, {
       report_text: 'ok',

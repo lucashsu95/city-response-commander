@@ -1,0 +1,6 @@
+{
+  "app": "node infra/dist/bin/app.js",
+  "requireApproval": "never",
+  "watchport": 80,
+  "stacks": {}
+}

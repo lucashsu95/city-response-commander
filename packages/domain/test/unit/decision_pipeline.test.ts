@@ -152,6 +152,11 @@ describe('runDeterministicDecision facade', () => {
         ?.exclusion_reason,
     ).toContain('600');
     expect(facts.ete?.ete_minutes).toBeCloseTo(78.6, 10);
+    // UARE (R9.1): official events always carry an official SOP citation.
+    expect(facts.sop_matched).toBe(true);
+    expect(facts.sop_authority).toBe('OFFICIAL_SOP');
+    expect(facts.universal_principles).toEqual([]);
+    expect(facts.grounding_candidates).toEqual([]);
   });
 
   it('reproduces the EVT_002 golden (art.3 from BL17, affected_road context-only, no ETE)', () => {
@@ -188,6 +193,9 @@ describe('runDeterministicDecision facade', () => {
     });
     // ETE is not applicable for a BS_ event.
     expect(facts.ete).toBeNull();
+    // UARE (R9.1): official events always carry an official SOP citation.
+    expect(facts.sop_matched).toBe(true);
+    expect(facts.sop_authority).toBe('OFFICIAL_SOP');
   });
 
   it('reproduces the EVT_003 golden (art.5 unresolved police scope, official CMS, ETE 41)', () => {
@@ -243,6 +251,9 @@ describe('runDeterministicDecision facade', () => {
     });
     expect(facts.primary_evacuation).toBe('RD_TPE_011');
     expect(facts.ete?.ete_minutes).toBe(41);
+    // UARE (R9.1): official events always carry an official SOP citation.
+    expect(facts.sop_matched).toBe(true);
+    expect(facts.sop_authority).toBe('OFFICIAL_SOP');
   });
 
   it('reproduces the DOME + SOP-6 golden (art.4 dispersal linking art.3, multilingual at 35%)', () => {
@@ -270,6 +281,9 @@ describe('runDeterministicDecision facade', () => {
     expect(facts.invoked_procedures).toContain('article3_mrt_shuttle_mechanism');
     expect(facts.multilingual_required).toBe(true);
     expect(facts.multilingual_scope?.stations_in_scope).toContain('BS_TPE_DOME');
+    // UARE (R9.1): official events always carry an official SOP citation.
+    expect(facts.sop_matched).toBe(true);
+    expect(facts.sop_authority).toBe('OFFICIAL_SOP');
   });
 
   it('returns insufficient_data with facts:null on a source-hash STOP (never fabricates)', () => {
@@ -284,5 +298,76 @@ describe('runDeterministicDecision facade', () => {
     expect(result.data_status).toBe('insufficient_data');
     expect(result.stop_reason).toContain('mismatch');
     expect(result.facts).toBeNull();
+  });
+});
+
+// ─── UARE wiring (TASK-UARE-08) ────────────────────────────────────────────
+// End-to-end proof that runDeterministicDecision actually wires
+// resolveSopMatch + selectGroundingCandidates, beyond the pure-function unit
+// tests in universal_defense.test.ts. The fuller ≥3-unknown-type scenario
+// matrix lives in TASK-UARE-09 (packages/backend integration tests).
+describe('runDeterministicDecision — UARE (spec: unified-adaptive-reasoning-engine)', () => {
+  it('falls back to the universal defense mode when no article triggers, grounded in real alternatives', () => {
+    // RD_TPE_002 at low saturation (no art.1 trigger); Caution/Low status+severity
+    // (no art.2 3-AND); a novel type/description (no art.5 keyword trigger); no
+    // crowd data (art.3/4/6 stay untriggered).
+    const incident = makeIncident({
+      event_id: 'TEST_UNKNOWN_001',
+      type: '無人機墜落橋樑' as IncidentType,
+      affected_segment: 'RD_TPE_002',
+      status: IncidentStatus.Caution,
+      severity: Severity.Medium,
+      description: '無人機墜落於橋面，暫無人員傷亡通報',
+    });
+    const ingestion = makeIngestion({
+      traffic: [
+        trafficRecord('RD_TPE_002', '光復南路', '2026-05-20 22:00', 0.3),
+        trafficRecord('RD_TPE_004', '市民大道四段', '2026-05-20 22:00', 0.2),
+        trafficRecord('RD_TPE_005', '仁愛路四段', '2026-05-20 22:00', 0.5),
+        trafficRecord('RD_TPE_006', '敦化南路一段', '2026-05-20 22:00', 0.4),
+        trafficRecord('RD_TPE_008', '延吉街', '2026-05-20 22:00', 0.1),
+      ],
+    });
+
+    const result = runDeterministicDecision({ ingestion, config, incident });
+    const facts = result.facts;
+    expect(facts).not.toBeNull();
+    if (facts === null) return;
+
+    expect(facts.triggered_articles).toEqual([]);
+    expect(facts.sop_matched).toBe(false);
+    expect(facts.sop_authority).toBe('SYSTEM_DEFAULT_PRINCIPLE');
+    expect(facts.universal_principles).toHaveLength(3);
+    // RD_TPE_008 (600 vph) fails the capacity floor; the rest are real,
+    // whitelisted alternatives of RD_TPE_002, ranked by saturation ascending.
+    expect(facts.grounding_candidates.map((c) => c.segment_id)).toEqual([
+      'RD_TPE_004',
+      'RD_TPE_006',
+      'RD_TPE_005',
+    ]);
+    expect(facts.grounding_candidates.map((c) => c.segment_id)).not.toContain('RD_TPE_008');
+  });
+
+  it('reports empty grounding_candidates (not insufficient_data) when neither affected_segment nor affected_road is in the whitelist (R6)', () => {
+    const incident = makeIncident({
+      event_id: 'TEST_UNKNOWN_002',
+      type: '未知氣體外洩' as IncidentType,
+      affected_segment: 'RD_TPE_UNKNOWN_999',
+      status: IncidentStatus.Caution,
+      severity: Severity.Medium,
+      description: '偵測到不明氣體異味，地點待確認',
+    });
+    const ingestion = makeIngestion({ traffic: [] });
+
+    const result = runDeterministicDecision({ ingestion, config, incident });
+
+    expect(result.data_status).toBe('ready'); // R6 AC3: never insufficient_data for this
+    const facts = result.facts;
+    expect(facts).not.toBeNull();
+    if (facts === null) return;
+
+    expect(facts.sop_matched).toBe(false);
+    expect(facts.universal_principles).toHaveLength(3);
+    expect(facts.grounding_candidates).toEqual([]);
   });
 });

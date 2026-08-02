@@ -1,0 +1,325 @@
+name: Deploy Temp Frontend to AWS
+
+on:
+  push:
+    branches:
+      - temp/restore-cdk-deployment-source
+    paths:
+      - "packages/frontend/**"
+      - "infra/lib/frontend_hosting_stack.ts"
+      - "infra/bin/app.ts"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/deploy-temp-frontend-aws.yml"
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: city-commander-temp-frontend-aws
+  cancel-in-progress: true
+
+env:
+  AWS_ACCOUNT_ID: "873354961545"
+  AWS_REGION: "us-west-2"
+  BACKEND_STACK: "CityCommanderDemoBackend"
+  FRONTEND_STACK: "CityCommanderFrontend"
+  DEPLOY_ROLE_ARN: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+
+jobs:
+  deploy-frontend:
+    name: Deploy frontend
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout pushed commit
+        uses: actions/checkout@v4
+
+      - name: Verify deployment commit
+        shell: bash
+        run: |
+          echo "GitHub SHA: $GITHUB_SHA"
+          echo "Checked-out SHA: $(git rev-parse HEAD)"
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build shared schemas
+        run: npm run build --workspace packages/shared-schemas
+
+      - name: Build domain and configuration (backend deps)
+        run: |
+          npm run build --workspace packages/domain
+          npm run build --workspace packages/config
+          npm run build --workspace packages/ai-generator
+          npm run build --workspace packages/rag
+
+      - name: Build backend so esbuild can resolve @city-commander/rag
+        run: npm run build --workspace packages/backend
+
+      - name: Configure AWS credentials through OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+          role-session-name: city-commander-github-frontend-deploy
+
+      - name: Verify AWS identity
+        shell: bash
+        run: |
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          echo "AWS Account: $ACCOUNT_ID"
+          test "$ACCOUNT_ID" = "$AWS_ACCOUNT_ID"
+
+      - name: Resolve backend API URL
+        id: backend
+        shell: bash
+        run: |
+          set -euo pipefail
+          API_URL="$(
+            aws cloudformation describe-stacks \
+              --stack-name "$BACKEND_STACK" \
+              --region "$AWS_REGION" \
+              --query "Stacks[0].Outputs[?OutputKey=='DemoApiUrl'].OutputValue | [0]" \
+              --output text
+          )"
+          if [ -z "$API_URL" ] || [ "$API_URL" = "None" ]; then
+            API_URL="$(
+              aws cloudformation describe-stacks \
+                --stack-name "$BACKEND_STACK" \
+                --region "$AWS_REGION" \
+                --query "Stacks[0].Outputs[?OutputKey=='ApiUrl'].OutputValue | [0]" \
+                --output text
+            )"
+          fi
+          if [ -z "$API_URL" ] || [ "$API_URL" = "None" ]; then
+            echo "ERROR: could not resolve backend API URL from stack outputs" >&2
+            exit 1
+          fi
+          API_URL="${API_URL%/}"
+          echo "backend_api_url=${API_URL}" >> "$GITHUB_OUTPUT"
+          echo "Backend API URL: $API_URL"
+
+      - name: Build frontend
+        working-directory: packages/frontend
+        env:
+          VITE_API_ENDPOINT: ${{ steps.backend.outputs.backend_api_url }}
+          VITE_API_MODE: demo
+          VITE_APP_ENV: DEMO
+          VITE_WS_ENDPOINT: ""
+        run: npm run build
+
+      - name: Build infrastructure
+        run: npm run build --workspace infra
+
+      - name: CDK synth (frontend)
+        working-directory: infra
+        run: |
+          npx cdk synth CityCommanderFrontend \
+            --context env=COMPETITION_AWS \
+            --context demoBackend=true \
+            --context frontend=true
+
+      - name: CDK diff (frontend)
+        working-directory: infra
+        shell: bash
+        run: |
+          set +e
+          npx cdk diff CityCommanderFrontend \
+            --context env=COMPETITION_AWS \
+            --context demoBackend=true \
+            --context frontend=true \
+            2>&1 | tee cdk-diff-frontend.txt
+          DIFF_EXIT=${PIPESTATUS[0]}
+          set -e
+
+          # Guard rails — the diff must never destroy backend resources or
+          # flip the frontend bucket public.
+          if grep -E "(DemoDataBucket|CityCommanderDemoBackend)" \
+              cdk-diff-frontend.txt -i; then
+            echo "Blocked: CDK diff touches backend resources." >&2
+            exit 1
+          fi
+          if grep -E "BlockPublicAccess.*false|BlockPublicAcls.*false" \
+              cdk-diff-frontend.txt -i; then
+            echo "Blocked: CDK diff may flip the frontend bucket public." >&2
+            exit 1
+          fi
+          if grep -E "amplify" cdk-diff-frontend.txt -i; then
+            echo "Blocked: CDK diff references Amplify." >&2
+            exit 1
+          fi
+
+          if [ "$DIFF_EXIT" -ne 0 ] && [ "$DIFF_EXIT" -ne 1 ]; then
+            exit "$DIFF_EXIT"
+          fi
+
+      - name: Deploy frontend stack
+        working-directory: infra
+        run: |
+          npx cdk deploy CityCommanderFrontend \
+            --context env=COMPETITION_AWS \
+            --context demoBackend=true \
+            --context frontend=true \
+            --require-approval never \
+            --outputs-file cdk-outputs-frontend.json
+
+      - name: Verify CloudFormation status (non-blocking)
+        shell: bash
+        run: |
+          set +e
+          STATUS=$(aws cloudformation describe-stacks \
+            --stack-name "$FRONTEND_STACK" \
+            --region "$AWS_REGION" \
+            --query "Stacks[0].StackStatus" \
+            --output text 2>/dev/null)
+          if [ -z "$STATUS" ] || [ "$STATUS" = "None" ]; then
+            echo "Backend health: failed to read CloudFormation status (likely IAM-limited on this role)" >&2
+            echo "FRONTEND_STACK_STATUS=unknown" >> "$GITHUB_ENV"
+            exit 0
+          fi
+          echo "FRONTEND_STACK_STATUS=$STATUS" >> "$GITHUB_ENV"
+          echo "Frontend Stack status: $STATUS"
+          case "$STATUS" in
+            CREATE_COMPLETE|UPDATE_COMPLETE) ;;
+            *) exit 1 ;;
+          esac
+
+      - name: Resolve frontend outputs
+        id: frontend
+        shell: bash
+        run: |
+          set -euo pipefail
+          FALLBACK_OUT="infra/cdk-outputs-frontend.json"
+          read_outputs() {
+            aws cloudformation describe-stacks \
+              --stack-name "$FRONTEND_STACK" \
+              --region "$AWS_REGION" \
+              --query "Stacks[0].Outputs[?OutputKey=='$1'].OutputValue | [0]" \
+              --output text 2>/dev/null
+          }
+          if [ -f "$FALLBACK_OUT" ] && command -v jq >/dev/null 2>&1; then
+            FRONTEND_BUCKET=$(jq -r '.CityCommanderFrontend.FrontendBucketName // empty' "$FALLBACK_OUT" 2>/dev/null || echo "")
+            FRONTEND_DISTRIBUTION_ID=$(jq -r '.CityCommanderFrontend.FrontendDistributionId // empty' "$FALLBACK_OUT" 2>/dev/null || echo "")
+            FRONTEND_URL=$(jq -r '.CityCommanderFrontend.FrontendUrl // empty' "$FALLBACK_OUT" 2>/dev/null || echo "")
+          fi
+          [ -z "$FRONTEND_BUCKET" ] && FRONTEND_BUCKET=$(read_outputs FrontendBucketName)
+          [ -z "$FRONTEND_DISTRIBUTION_ID" ] && FRONTEND_DISTRIBUTION_ID=$(read_outputs FrontendDistributionId)
+          [ -z "$FRONTEND_URL" ] && FRONTEND_URL=$(read_outputs FrontendUrl)
+          if [ -z "$FRONTEND_BUCKET" ] || [ -z "$FRONTEND_DISTRIBUTION_ID" ] || [ -z "$FRONTEND_URL" ]; then
+            echo "ERROR: could not resolve frontend outputs from CloudFormation or $FALLBACK_OUT" >&2
+            exit 1
+          fi
+          echo "frontend_bucket=${FRONTEND_BUCKET}" >> "$GITHUB_OUTPUT"
+          echo "frontend_distribution_id=${FRONTEND_DISTRIBUTION_ID}" >> "$GITHUB_OUTPUT"
+          echo "frontend_url=${FRONTEND_URL}" >> "$GITHUB_OUTPUT"
+          echo "Bucket: $FRONTEND_BUCKET"
+          echo "Distribution: $FRONTEND_DISTRIBUTION_ID"
+          echo "URL: $FRONTEND_URL"
+
+      - name: Upload hashed assets
+        shell: bash
+        run: |
+          aws s3 sync packages/frontend/dist \
+            "s3://${{ steps.frontend.outputs.frontend_bucket }}" \
+            --delete \
+            --exclude "index.html" \
+            --cache-control "public,max-age=31536000,immutable"
+
+      - name: Upload index.html (no cache)
+        shell: bash
+        run: |
+          aws s3 cp packages/frontend/dist/index.html \
+            "s3://${{ steps.frontend.outputs.frontend_bucket }}/index.html" \
+            --content-type "text/html; charset=utf-8" \
+            --cache-control "no-cache,no-store,must-revalidate"
+
+      - name: Create CloudFront invalidation
+        shell: bash
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id "${{ steps.frontend.outputs.frontend_distribution_id }}" \
+            --paths "/*"
+
+      - name: Frontend smoke test
+        shell: bash
+        run: |
+          URL="${{ steps.frontend.outputs.frontend_url }}"
+          BACKEND="${{ steps.backend.outputs.backend_api_url }}"
+          sleep 30
+          for attempt in $(seq 1 20); do
+            echo "Frontend smoke attempt $attempt/20"
+            RESP=$(curl -s -o /tmp/index.html -w '%{http_code}' "$URL" || echo "000")
+            if [ "$RESP" = "200" ]; then
+              CONTENT_TYPE=$(curl -s -I "$URL" | grep -i '^content-type' | head -1 | tr -d '\r')
+              if echo "$CONTENT_TYPE" | grep -qi 'text/html'; then
+                if grep -q 'id="root"' /tmp/index.html \
+                    || grep -q '城市交通應變 AI 指揮台' /tmp/index.html \
+                    || grep -q 'City Response Commander' /tmp/index.html; then
+                  echo "FRONTEND_SMOKE=pass" >> "$GITHUB_ENV"
+                  echo "Frontend smoke test passed on attempt $attempt"
+                  break
+                fi
+              fi
+            fi
+            if [ "$attempt" -eq 20 ]; then
+              echo "Frontend smoke test failed after 20 attempts" >&2
+              exit 1
+            fi
+            sleep 10
+          done
+
+          # Backend health
+          HSTATUS=$(curl -s -o /tmp/health.json -w '%{http_code}' "$BACKEND/health")
+          if [ "$HSTATUS" != "200" ]; then
+            echo "Backend health returned HTTP $HSTATUS" >&2
+            exit 1
+          fi
+          DATA_LOADED=$(grep -o '"data_loaded":true' /tmp/health.json || true)
+          if [ -z "$DATA_LOADED" ]; then
+            echo "Backend health did not report data_loaded=true: $(cat /tmp/health.json)" >&2
+            exit 1
+          fi
+          echo "BACKEND_HEALTH=pass" >> "$GITHUB_ENV"
+          echo "Backend health: HTTP 200, data_loaded=true"
+
+      - name: Deployment summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "## City Commander frontend AWS deployment"
+            echo ""
+            echo "- Branch: \`${GITHUB_REF_NAME}\`"
+            echo "- Commit: \`${GITHUB_SHA}\`"
+            echo "- AWS account: \`${AWS_ACCOUNT_ID}\`"
+            echo "- Region: \`${AWS_REGION}\`"
+            echo "- Frontend stack: \`${FRONTEND_STACK}\`"
+            echo "- Frontend stack status: \`${FRONTEND_STACK_STATUS:-unknown}\`"
+            echo "- Frontend bucket: \`${{ steps.frontend.outputs.frontend_bucket }}\`"
+            echo "- CloudFront distribution: \`${{ steps.frontend.outputs.frontend_distribution_id }}\`"
+            echo "- Frontend URL: \`${{ steps.frontend.outputs.frontend_url }}\`"
+            echo "- Backend API URL: \`${{ steps.backend.outputs.backend_api_url }}\`"
+            echo "- Frontend smoke: \`${FRONTEND_SMOKE:-skipped}\`"
+            echo "- Backend health: \`${BACKEND_HEALTH:-skipped}\`"
+            echo "- Backend CI/CD: independent workflow, untouched"
+            echo "- GitHub Pages workflow: disabled (.disabled extension)"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload deployment outputs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: city-commander-frontend-aws-output
+          path: infra/cdk-outputs-frontend.json
+          if-no-files-found: warn

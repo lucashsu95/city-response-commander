@@ -6,3 +6,4 @@
 # 不設定此規則時，Windows 上 core.autocrlf=true 會在 checkout 時
 # 把原始 LF 轉成 CRLF，造成本次修復前的完整性阻塞。
 中華電信資料集/* text eol=lf
+demo-data-source/* text eol=lf

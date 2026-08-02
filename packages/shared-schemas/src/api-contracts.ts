@@ -12,6 +12,8 @@
 import type { DecisionCore } from './decision_core.js';
 import type { DecisionNarrative } from './decision_narrative.js';
 import type { EvidenceTrace } from './evidence.js';
+import type { RagTrace } from './rag_trace.js';
+import type { EteCalculationTrace } from './ete_calculation.js';
 import type { IdempotencyStatus, LaneStatus, Language } from './enums.js';
 import type { GuidanceId, SelectionMode } from './hg001_literals.js';
 import type { PolicyMetadata } from './policy_metadata.js';
@@ -308,10 +310,16 @@ export interface WhatIfResponse {
     readonly source_location: string;
     readonly source: 'kb' | 's3_fallback';
   }[];
+  /** Concise deterministic summary derived from stage 3 facts (LLM-prohibited) */
+  readonly summary_text?: string;
   /** Stage 4 Bedrock explanation (LLM-writable) */
   readonly explanation_text?: string;
   /** Clarification prompt when status=clarification_required */
   readonly clarification_prompt?: string;
+  /** Full RAG retrieval trace for SOP grounding (optional, available after stage 4) */
+  readonly rag_trace?: import('./rag_trace.js').RagTrace;
+  /** ETE formula calculation trace when article 7 is applied */
+  readonly ete_calculation?: import('./ete_calculation.js').EteCalculationTrace;
   /** What-if never mutates state */
   readonly does_not_mutate_state: true;
   readonly provisional: boolean;

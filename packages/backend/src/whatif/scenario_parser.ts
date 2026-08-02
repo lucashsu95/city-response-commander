@@ -26,11 +26,11 @@ import {
 
 /** clarification prompt 模板（Bedrock 無法解析時使用） */
 const PARSE_FAILED_PROMPT =
-  '無法理解您的假設問題。請使用格式：「若 [實體] 的 [欄位] [運算子] [數值]」，例如：「若 BL17 人數達到 40000」。';
+  '無法理解您的假設問題。請描述您想假設的情境，例如：「若 BL17 人數達到 40000」或「飽和度 84.9% 且快速上升」。';
 
 /** Bedrock 無法回傳 JSON 時的 clarification prompt */
 const NON_JSON_PROMPT =
-  '系統無法解析您的問題。請以更明確的格式描述假設條件，例如：「若 BL17 的 User_Count = 40000」。';
+  '系統無法解析您的問題。請以更明確的格式描述假設條件，例如：「若 BL17 的 User_Count = 40000」或「飽和度 84.9% 且快速上升」。';
 
 /**
  * 清潔 Bedrock 回傳的 reason 字串（§17 boundary）。
@@ -73,22 +73,35 @@ ${wrapUntrustedQuestion(rawQuestion)}
 ## 輸出格式
 請回傳一個 JSON 物件，格式如下：
 
-成功解析時：
+成功解析時（有明確實體）：
 {
   "status": "parsed",
   "assumptions": [
-    {"entity_id": "BS_MRT_BL17", "field": "User_Count", "operator": "=", "value": 40000}
+    {"entity_id": "RD_TPE_005", "field": "Saturation_Score", "operator": "=", "value": 0.85}
   ]
 }
 
-無法解析（問題模糊或無法識別實體/欄位）時：
+成功解析時（無明確實體，描述趨勢或通用情境）：
+{
+  "status": "parsed",
+  "assumptions": [
+    {"entity_id": "AUTO", "field": "Saturation_Score", "operator": "=", "value": 0.849}
+  ]
+}
+
+⚠️ entity_id 說明：
+- 使用者明確提到路段代碼（如 RD_TPE_005）或基地台代碼（如 BS_MRT_BL17）→ 直接使用
+- 使用者提到簡稱（如「BL16」）→ 展開為 BS_MRT_BL16
+- 使用者未指定具體實體，但描述了數值或趨勢 → 使用 "AUTO"
+- 絕不可使用 "UNKNOWN" 或其他自創的 placeholder
+
+無法解析（問題完全無法理解，連趨勢或數值都無法辨識）時：
 {
   "status": "clarification_required",
   "reason": "無法識別的原因說明"
 }
 
-## 規則
-- entity_id 必須是實際存在的路段或基地台 ID（如 BS_MRT_BL17、RD_TPE_002）
+## 解析規則
 - field 必須是已知欄位（如 User_Count、Saturation_Score、Growth_Rate、Roaming_User_Pct）
 - operator 只能是 =、>、<、>=、<= 其中之一
 - value 必須是數字
@@ -119,6 +132,59 @@ function validateAssumption(item: unknown): WhatIfAssumption | null {
     operator: operator as WhatIfAssumption['operator'],
     value,
   };
+}
+
+// ─── Entity mismatch guard ─────────────────────────────────────────────────────
+
+/**
+ * 決定性防護：偵測 `raw_question` 中「明確寫出的實體代碼」，
+ * 並與 Bedrock 解析出的 `entity_id` 交叉比對。
+ *
+ * 動機：few-shot 範例與真實問句的數值/格式相近時，LLM 可能把範例（或先前看過
+ * 的其他實體）誤植進輸出，而不是真的從使用者文字抽取實體。stage 2 的
+ * `validateEntityExists` 只確認 entity_id 是否存在於已載入資料中——若誤植的
+ * 實體剛好也是合法站點/路段，該驗證無法攔截。此處補上一層與 LLM 輸出無關的
+ * 決定性比對。
+ *
+ * 只在能從原文明確辨識出實體代碼時才比對（避免對自然語言問句誤判）；
+ * 辨識不到時放行，交由既有的 stage 2 驗證把關。
+ */
+const FULL_ENTITY_ID_PATTERN = /\b(?:BS_[A-Z]+_[A-Z0-9]+|RD_TPE_\d+)\b/gi;
+
+/** MRT 站點的口語簡稱，如「BL16」「BL 17」→ 展開為 BS_MRT_BL16 */
+const SHORT_MRT_STATION_PATTERN = /\bBL\s?(\d{1,3})\b/gi;
+
+function extractMentionedEntityIds(rawQuestion: string): ReadonlySet<string> {
+  const ids = new Set<string>();
+  for (const match of rawQuestion.matchAll(FULL_ENTITY_ID_PATTERN)) {
+    ids.add(match[0].toUpperCase());
+  }
+  for (const match of rawQuestion.matchAll(SHORT_MRT_STATION_PATTERN)) {
+    ids.add(`BS_MRT_BL${match[1]}`.toUpperCase());
+  }
+  return ids;
+}
+
+/**
+ * 若原文能明確辨識出實體代碼，但 Bedrock 輸出的某個 `entity_id` 不在其中，
+ * 回傳澄清訊息；否則回傳 `null`（放行）。
+ */
+function findEntityMismatch(
+  rawQuestion: string,
+  assumptions: readonly WhatIfAssumption[],
+): string | null {
+  const mentioned = extractMentionedEntityIds(rawQuestion);
+  if (mentioned.size === 0) return null;
+
+  for (const a of assumptions) {
+    if (!mentioned.has(a.entity_id.toUpperCase())) {
+      return (
+        `系統解析出的實體「${a.entity_id}」與您問題中提到的代碼不符` +
+        `（偵測到：${[...mentioned].join('、')}）。為避免誤判，請確認您指的基地台/路段代碼後重新提問。`
+      );
+    }
+  }
+  return null;
 }
 
 // ─── Main function ────────────────────────────────────────────────────────────
@@ -216,6 +282,15 @@ export async function parseScenario(
       };
     }
     assumptions.push(assumption);
+  }
+
+  // ── 5. 決定性交叉比對：原文提到的實體代碼 vs. Bedrock 解析出的 entity_id ──
+  const mismatch = findEntityMismatch(rawQuestion, assumptions);
+  if (mismatch !== null) {
+    return {
+      parse_status: 'clarification_required',
+      clarification_prompt: sanitizeReason(mismatch),
+    };
   }
 
   return {
