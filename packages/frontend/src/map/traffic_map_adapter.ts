@@ -164,8 +164,7 @@ export function adaptDemoTrafficToTrafficData(
 
   const rows: TrafficDataItem[] = [];
   for (const row of latestByRoad.values()) {
-    const level =
-      typeof row.level === 'string' || row.level === null ? row.level : null;
+    const level = typeof row.level === 'string' || row.level === null ? row.level : null;
     const saturation =
       typeof row.Saturation_Score === 'number' && Number.isFinite(row.Saturation_Score)
         ? row.Saturation_Score

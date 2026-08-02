@@ -255,6 +255,6 @@ export type RoadStatus = 'clear' | 'caution' | 'blocked' | 'unknown';
 export function saturationToStatus(score: number | null): RoadStatus {
   if (score === null) return 'unknown';
   if (score >= 0.85) return 'blocked';
-  if (score >= 0.60) return 'caution';
+  if (score >= 0.6) return 'caution';
   return 'clear';
 }

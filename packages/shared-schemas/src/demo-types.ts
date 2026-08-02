@@ -70,7 +70,11 @@ export interface DemoTimeseriesAnomaly {
   /** Stable UUID-like id for this detection event */
   readonly id: string;
   /** SOP article that triggered: 1 | 3 | 4 | 6 */
-  readonly type: 'article1_saturation' | 'article3_bl17_surge' | 'article4_dome_dissipation' | 'article6_roaming';
+  readonly type:
+    | 'article1_saturation'
+    | 'article3_bl17_surge'
+    | 'article4_dome_dissipation'
+    | 'article6_roaming';
   /** SOP severity label */
   readonly severity: 'high' | 'medium';
   /** Always 'traffic' or 'crowd' */

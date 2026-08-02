@@ -13,9 +13,7 @@
 
 /** The three fixed, non-official defense principles UARE falls back to. */
 export type UniversalPrincipleId =
-  | 'UPSTREAM_CONTAINMENT'
-  | 'PERIMETER_GUIDANCE'
-  | 'PUBLIC_NOTIFICATION';
+  'UPSTREAM_CONTAINMENT' | 'PERIMETER_GUIDANCE' | 'PUBLIC_NOTIFICATION';
 
 /** A single universal defense principle. Text is decision-core-sourced, never LLM-generated. */
 export interface UniversalPrinciple {

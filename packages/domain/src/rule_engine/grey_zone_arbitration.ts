@@ -106,7 +106,8 @@ export function detectPreWarning(
   currentSaturation: number,
   recentHistory: readonly SaturationHistoryPoint[],
 ): boolean {
-  const inGreyZone = currentSaturation >= GREY_ZONE_LOWER_BOUND && currentSaturation < B_LEVEL_THRESHOLD;
+  const inGreyZone =
+    currentSaturation >= GREY_ZONE_LOWER_BOUND && currentSaturation < B_LEVEL_THRESHOLD;
   if (!inGreyZone) return false;
   if (recentHistory.length < 2) return false;
 

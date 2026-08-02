@@ -38,9 +38,7 @@ export function createProductionWhatIfHandler(
   // Eager-load ingestion to derive the SOP retriever's view of articles.
   // The facade also runs ingestData internally; we keep one source of truth.
   // Bypass hash verification in demo mode — data is from controlled S3 bucket.
-  const ingestionOptions = options?.skipHashVerification
-    ? { skipVerification: true }
-    : undefined;
+  const ingestionOptions = options?.skipHashVerification ? { skipVerification: true } : undefined;
   const ingestion = ingestData(provider, ingestionOptions);
   if (ingestion.data_status !== 'ready' || ingestion.sopArticles === undefined) {
     throw new Error(

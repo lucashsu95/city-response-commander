@@ -133,10 +133,7 @@ function requiredBoolean(record: Record<string, unknown>, key: string): Required
 }
 
 /** Optional string field: `null` when absent, `undefined` when present-but-wrong-typed. */
-function optionalString(
-  record: Record<string, unknown>,
-  key: string,
-): string | null | undefined {
+function optionalString(record: Record<string, unknown>, key: string): string | null | undefined {
   if (!(key in record)) {
     return null;
   }

@@ -130,7 +130,12 @@ export async function explainWhatIf(
     citations = retrieveResult.partial_citations;
 
     if (citations.length === 0) {
-      const ragTrace = buildRagTrace([], eventFacts, retrieverType, getKnowledgeSource(retrieverType));
+      const ragTrace = buildRagTrace(
+        [],
+        eventFacts,
+        retrieverType,
+        getKnowledgeSource(retrieverType),
+      );
       const eteCalc = buildEteCalculation(recomputeResult);
       return {
         summary_text: buildWhatIfSummaryText(recomputeResult),

@@ -22,10 +22,7 @@
  * @param fractionDigits - Number of decimal places (default 1)
  * @returns e.g. "10.0%", "30.0%", "0.0%", or "無資料"
  */
-export function formatRatioAsPercent(
-  value: number | null | undefined,
-  fractionDigits = 1,
-): string {
+export function formatRatioAsPercent(value: number | null | undefined, fractionDigits = 1): string {
   if (value === null || value === undefined || !Number.isFinite(value)) {
     return '無資料';
   }
@@ -70,7 +67,9 @@ export function roamingBarWidth(value: number | null | undefined): number {
  * @returns Average ratio, or null if no valid values
  */
 export function calculateAverageRatio(ratios: (number | null | undefined)[]): number | null {
-  const valid = ratios.filter((r): r is number => r !== null && r !== undefined && Number.isFinite(r));
+  const valid = ratios.filter(
+    (r): r is number => r !== null && r !== undefined && Number.isFinite(r),
+  );
   if (valid.length === 0) return null;
   const sum = valid.reduce((acc, r) => acc + r, 0);
   return sum / valid.length;

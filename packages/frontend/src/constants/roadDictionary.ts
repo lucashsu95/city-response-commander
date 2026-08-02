@@ -52,9 +52,7 @@ export const ROAD_DICTIONARY: Readonly<Record<string, readonly RoadCoordinate[]>
 });
 
 /** All road names that have known geometry. */
-export const ROAD_DICTIONARY_KEYS: readonly string[] = Object.freeze(
-  Object.keys(ROAD_DICTIONARY),
-);
+export const ROAD_DICTIONARY_KEYS: readonly string[] = Object.freeze(Object.keys(ROAD_DICTIONARY));
 
 /**
  * Resolve a CSV `road_name` to its polyline coordinates.

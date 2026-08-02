@@ -29,11 +29,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { RequestOptions, ApiResult } from '../api/client.js';
-import {
-  decodeRoadsResponse,
-  type RoadDecodeErrorCode,
-  type RoadReadModel,
-} from './road_model.js';
+import { decodeRoadsResponse, type RoadDecodeErrorCode, type RoadReadModel } from './road_model.js';
 
 // ─── Transport Seam ─────────────────────────────────────────
 
@@ -45,13 +41,7 @@ export interface RoadTransport {
 // ─── Public State Shape ─────────────────────────────────────
 
 export type RoadControllerStateName =
-  | 'idle'
-  | 'loading'
-  | 'ready'
-  | 'empty'
-  | 'insufficient'
-  | 'error'
-  | 'disposed';
+  'idle' | 'loading' | 'ready' | 'empty' | 'insufficient' | 'error' | 'disposed';
 
 export type RoadControllerErrorCode = RoadDecodeErrorCode | 'REQUEST_FAILED';
 

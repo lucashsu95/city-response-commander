@@ -156,7 +156,8 @@ export function buildRouteReasoningTrace(
 
   const primaryCongested =
     primaryRoute !== null
-      ? ((candidateSegments.find((s) => s.segment_id === primaryRoute)?.saturation_score ?? 0) >= 0.85)
+      ? (candidateSegments.find((s) => s.segment_id === primaryRoute)?.saturation_score ?? 0) >=
+        0.85
       : null;
 
   return Object.freeze({

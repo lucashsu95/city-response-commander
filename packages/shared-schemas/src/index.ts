@@ -157,22 +157,13 @@ export {
 } from './citation_formatting.js';
 
 // ─── RAG Trace (§14.x) ──────────────────────────────────────────
-export type {
-  RagTrace,
-  RagTraceChunk,
-} from './rag_trace.js';
+export type { RagTrace, RagTraceChunk } from './rag_trace.js';
 
 // ─── ETE Calculation Trace (§14.x) ──────────────────────────────
-export type {
-  EteCalculationTrace,
-  EteCalculationVariable,
-} from './ete_calculation.js';
+export type { EteCalculationTrace, EteCalculationVariable } from './ete_calculation.js';
 
 // ─── Route Reasoning Trace ───────────────────────────────────────
-export type {
-  RouteReasoningTrace,
-  RouteReasoningEntry,
-} from './route_reasoning_trace.js';
+export type { RouteReasoningTrace, RouteReasoningEntry } from './route_reasoning_trace.js';
 
 // ─── Discriminated union for API/event payloads (§12/§13) ──
 export type {

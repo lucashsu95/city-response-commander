@@ -111,7 +111,11 @@ export class ProductionRuleEngineWhatIfFacade implements RuleEngineWhatIfFacade 
   private readonly snapshot: ProductionBaselineSnapshot;
   private readonly configProvider: ConfigProvider;
 
-  constructor(provider: DataSourceProvider, configProvider?: ConfigProvider, options?: ProductionFacadeOptions) {
+  constructor(
+    provider: DataSourceProvider,
+    configProvider?: ConfigProvider,
+    options?: ProductionFacadeOptions,
+  ) {
     this.configProvider = configProvider ?? defaultConfigProvider();
 
     // Verify + parse all 5 official files at construction time.
@@ -119,9 +123,7 @@ export class ProductionRuleEngineWhatIfFacade implements RuleEngineWhatIfFacade 
     // insufficient_data, which we surface as a hard error so the Lambda
     // never silently serves unverified data.
     // In demo mode, hash verification is bypassed via DEMO_SKIP_HASH_VERIFICATION.
-    const ingestionOptions = options?.skipHashVerification
-      ? { skipVerification: true }
-      : undefined;
+    const ingestionOptions = options?.skipHashVerification ? { skipVerification: true } : undefined;
     const ingestion = ingestData(provider, ingestionOptions);
     if (ingestion.data_status !== 'ready') {
       throw new Error(`What-if baseline ingestion failed: ${ingestion.stop_reason ?? 'unknown'}`);
@@ -188,8 +190,7 @@ export class ProductionRuleEngineWhatIfFacade implements RuleEngineWhatIfFacade 
       eteMinutesRaw !== undefined && Number.isFinite(eteMinutesRaw) ? eteMinutesRaw : undefined;
 
     // ETE raw inputs for the trace builder
-    const ete_severity =
-      eteFacts && 'severity' in eteFacts ? String(eteFacts.severity) : undefined;
+    const ete_severity = eteFacts && 'severity' in eteFacts ? String(eteFacts.severity) : undefined;
     const ete_avg_saturation =
       eteFacts && eteFacts.calculation_status === 'computed' && eteFacts.avg_saturation !== null
         ? eteFacts.avg_saturation

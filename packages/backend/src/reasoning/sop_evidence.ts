@@ -77,7 +77,9 @@ export function buildRagTrace(
  * "s3_fallback"   → "local_sop_knowledge_base" (still falls back to local SOP text)
  * "kb_partial_s3_fallback" → "local_sop_knowledge_base"
  */
-export function mapRetrieverType(source: 'kb' | 's3_fallback' | 'kb_partial_s3_fallback'): RetrieverType {
+export function mapRetrieverType(
+  source: 'kb' | 's3_fallback' | 'kb_partial_s3_fallback',
+): RetrieverType {
   switch (source) {
     case 'kb':
       return 'aws_bedrock_kb';

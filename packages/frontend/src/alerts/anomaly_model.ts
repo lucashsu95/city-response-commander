@@ -375,10 +375,7 @@ function classifyRoadLevel(level: string | null): 'active' | 'inactive' | 'unrec
   return 'unrecognized';
 }
 
-function roadPresentation(
-  segment: RoadSegmentView,
-  model: RoadReadModel,
-): AnomalyPresentation {
+function roadPresentation(segment: RoadSegmentView, model: RoadReadModel): AnomalyPresentation {
   const observedAt = segment.observationTimestamp ?? model.timestamp;
   return {
     identity: buildIdentity(segment.segmentId, observedAt),
@@ -437,10 +434,7 @@ export function readRoadsAnomalySignal(model: RoadReadModel): ChannelSignalReadi
   return { signal: 'inactive', presentation: null };
 }
 
-function crowdPresentation(
-  station: CrowdStationRow,
-  model: CrowdReadModel,
-): AnomalyPresentation {
+function crowdPresentation(station: CrowdStationRow, model: CrowdReadModel): AnomalyPresentation {
   const observedAt = station.observationTimestamp ?? model.decisionCutoffTimestamp;
   return {
     identity: buildIdentity(station.bsId, observedAt),

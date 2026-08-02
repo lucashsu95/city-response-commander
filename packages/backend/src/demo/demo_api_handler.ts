@@ -13,7 +13,13 @@
  * @module backend/demo/demo_api_handler
  */
 
-import { IncidentStatus, IncidentType, Severity, Language, PublishStatus } from '@city-commander/shared-schemas';
+import {
+  IncidentStatus,
+  IncidentType,
+  Severity,
+  Language,
+  PublishStatus,
+} from '@city-commander/shared-schemas';
 import type {
   RawTrafficRecord,
   RawCrowdRecord,
@@ -68,7 +74,11 @@ import {
   type SaturationHistoryPoint,
   type NumericHistoryPoint,
 } from '@city-commander/domain';
-import type { CrowdPreWarning, SignalConflict, CascadingRisk } from '@city-commander/shared-schemas';
+import type {
+  CrowdPreWarning,
+  SignalConflict,
+  CascadingRisk,
+} from '@city-commander/shared-schemas';
 import {
   buildRagTrace,
   computeEte,
@@ -80,11 +90,11 @@ import {
 
 const SOP_ART1_B_THRESHOLD = 0.85;
 const SOP_ART1_A_THRESHOLD = 0.95;
-const SOP_ART3_BL17_GROWTH_THRESHOLD = 0.30;
+const SOP_ART3_BL17_GROWTH_THRESHOLD = 0.3;
 const SOP_ART3_BL17_USER_THRESHOLD = 25_000;
 const SOP_ART4_DOME_PEAK_THRESHOLD = 30_000;
-const SOP_ART4_DOME_GROWTH_THRESHOLD = -0.20;
-const SOP_ART6_ROAMING_THRESHOLD = 0.30;
+const SOP_ART4_DOME_GROWTH_THRESHOLD = -0.2;
+const SOP_ART6_ROAMING_THRESHOLD = 0.3;
 
 const SOP_ART7_BASE_CLEARANCE: Record<string, number> = {
   Critical: 60,
@@ -154,7 +164,12 @@ function createPublishRecord(
 ): InMemoryPublishRecord {
   const version = (existing?.version ?? 0) + 1;
   const now = formatAuditTs();
-  const action = targetState === PublishStatus.approved ? 'approved' : targetState === PublishStatus.published ? 'published' : 'mark_failed';
+  const action =
+    targetState === PublishStatus.approved
+      ? 'approved'
+      : targetState === PublishStatus.published
+        ? 'published'
+        : 'mark_failed';
   const entry = {
     actor,
     action,
@@ -284,7 +299,8 @@ function analyzeAnomalies(
       latest.User_Count > SOP_ART3_BL17_USER_THRESHOLD
     ) {
       const reason =
-        latest.Growth_Rate > SOP_ART3_BL17_GROWTH_THRESHOLD && latest.User_Count > SOP_ART3_BL17_USER_THRESHOLD
+        latest.Growth_Rate > SOP_ART3_BL17_GROWTH_THRESHOLD &&
+        latest.User_Count > SOP_ART3_BL17_USER_THRESHOLD
           ? `成長率 ${latest.Growth_Rate}（門檻 >${SOP_ART3_BL17_GROWTH_THRESHOLD}）且人數 ${latest.User_Count}（門檻 >${SOP_ART3_BL17_USER_THRESHOLD}）`
           : latest.Growth_Rate > SOP_ART3_BL17_GROWTH_THRESHOLD
             ? `成長率 ${latest.Growth_Rate}（門檻 >${SOP_ART3_BL17_GROWTH_THRESHOLD}）`
@@ -295,8 +311,14 @@ function analyzeAnomalies(
         severity: 'high',
         source: 'crowd',
         station_id: 'BS_MRT_BL17',
-        observed_value: latest.Growth_Rate > SOP_ART3_BL17_GROWTH_THRESHOLD ? latest.Growth_Rate : latest.User_Count,
-        threshold: latest.Growth_Rate > SOP_ART3_BL17_GROWTH_THRESHOLD ? SOP_ART3_BL17_GROWTH_THRESHOLD : SOP_ART3_BL17_USER_THRESHOLD,
+        observed_value:
+          latest.Growth_Rate > SOP_ART3_BL17_GROWTH_THRESHOLD
+            ? latest.Growth_Rate
+            : latest.User_Count,
+        threshold:
+          latest.Growth_Rate > SOP_ART3_BL17_GROWTH_THRESHOLD
+            ? SOP_ART3_BL17_GROWTH_THRESHOLD
+            : SOP_ART3_BL17_USER_THRESHOLD,
         unit: latest.Growth_Rate > SOP_ART3_BL17_GROWTH_THRESHOLD ? 'growth_rate' : 'user_count',
         triggered_article: 3,
         summary_zh: `【SOP第3條】捷運國父紀念館站（BS_MRT_BL17）${reason}，已達捷運分流標準。建議北捷「過站不停」並調度接駁專車。`,
@@ -411,7 +433,9 @@ function buildPublicAlerts(params: {
   // SOP Art.3: crowd surge → multilingual
   // SOP Art.6: roaming >= 30% → multilingual
   const multilingualRequired = params.art3Triggered || params.art6Triggered;
-  const languages: readonly string[] = multilingualRequired ? ['zh', 'en', 'ja', 'ko'] : ['zh', 'en'];
+  const languages: readonly string[] = multilingualRequired
+    ? ['zh', 'en', 'ja', 'ko']
+    : ['zh', 'en'];
 
   const msgs: Record<string, string> = {};
   if (multilingualRequired) {
@@ -483,7 +507,8 @@ function buildControlCenterRecommendation(params: {
 
   const cmsZh =
     `${inc.location ?? inc.affected_segment}封閉，請改道 ${primaryName}，` +
-    (params.eteMinutes !== undefined ? `預計延誤 ${eteStr} 分鐘` : '請配合現場指引') + '。';
+    (params.eteMinutes !== undefined ? `預計延誤 ${eteStr} 分鐘` : '請配合現場指引') +
+    '。';
 
   const cmsEn =
     `${inc.location ?? inc.affected_segment} closed. Use alternate route via ${primaryName}.` +
@@ -504,7 +529,9 @@ function buildControlCenterRecommendation(params: {
 
   // Art.1: Signal control
   if (params.art1Triggered) {
-    const affectedSeg = params.roadNetwork.getAllSegments().find((s) => s.segment_id === inc.affected_segment);
+    const affectedSeg = params.roadNetwork
+      .getAllSegments()
+      .find((s) => s.segment_id === inc.affected_segment);
     const affectedName = affectedSeg?.name ?? inc.affected_segment;
 
     if (params.level === 'A') {
@@ -523,7 +550,9 @@ function buildControlCenterRecommendation(params: {
       });
       // Alternative road green +25%
       if (params.primaryEvacuation) {
-        const altSeg = params.roadNetwork.getAllSegments().find((s) => s.segment_id === params.primaryEvacuation);
+        const altSeg = params.roadNetwork
+          .getAllSegments()
+          .find((s) => s.segment_id === params.primaryEvacuation);
         if (altSeg) {
           technicalActions.push({
             system: '號誌控制',
@@ -619,7 +648,9 @@ function buildControlCenterRecommendation(params: {
 
   // Art.5: Signal failure
   if (params.art5Triggered) {
-    const affectedSeg = params.roadNetwork.getAllSegments().find((s) => s.segment_id === inc.affected_segment);
+    const affectedSeg = params.roadNetwork
+      .getAllSegments()
+      .find((s) => s.segment_id === inc.affected_segment);
     const affectedName = affectedSeg?.name ?? inc.affected_segment;
     technicalActions.push({
       system: '號誌控制',
@@ -639,13 +670,12 @@ function buildControlCenterRecommendation(params: {
   if (params.art1Triggered) {
     coordinationActions.push(
       `通知交控中心啟動「${params.level === 'A' ? 'A級' : 'B級'}交通應變」，` +
-      `協調警力淨空 ${inc.location ?? inc.affected_segment} 路口。`,
+        `協調警力淨空 ${inc.location ?? inc.affected_segment} 路口。`,
     );
   }
   if (params.art2Triggered) {
     coordinationActions.push(
-      `協調交通警察於 ${primaryName} 沿線重要路口執行定點疏導，` +
-      `確保主疏散路徑暢通。`,
+      `協調交通警察於 ${primaryName} 沿線重要路口執行定點疏導，` + `確保主疏散路徑暢通。`,
     );
   }
   if (params.art3Triggered) {
@@ -655,7 +685,8 @@ function buildControlCenterRecommendation(params: {
   return {
     title: `${inc.type === 'Road_Collapse_Accident' ? '道路事故' : inc.type === 'Crowd_Surge_Injury' ? '人群意外' : '號誌故障'}應變建議書`,
     incident_summary: incidentSummary,
-    classification: params.level === 'A' ? 'A級癱瘓' : params.level === 'B' ? 'B級壅擠' : '一般事件',
+    classification:
+      params.level === 'A' ? 'A級癱瘓' : params.level === 'B' ? 'B級壅擠' : '一般事件',
     triggered_articles: [...params.triggeredArticles],
     technical_actions: technicalActions,
     route_actions: {
@@ -671,16 +702,21 @@ function buildControlCenterRecommendation(params: {
     },
     coordination_actions: coordinationActions,
     public_guidance: {
-      zh: `【交通應變】「${inc.location ?? inc.affected_segment}」${inc.severity}事件，` +
+      zh:
+        `【交通應變】「${inc.location ?? inc.affected_segment}」${inc.severity}事件，` +
         `建議改道至${primaryName}，` +
-        (params.eteMinutes !== undefined ? `預計延誤${eteStr}分鐘` : '請配合現場指引') + '。',
-      en: `[ALERT] ${inc.severity} incident at ${inc.location ?? inc.affected_segment}. ` +
+        (params.eteMinutes !== undefined ? `預計延誤${eteStr}分鐘` : '請配合現場指引') +
+        '。',
+      en:
+        `[ALERT] ${inc.severity} incident at ${inc.location ?? inc.affected_segment}. ` +
         `Use alternate route via ${primaryName}.` +
         (params.eteMinutes !== undefined ? ` Est. delay: ${eteStr} min.` : ''),
-      ja: `【交通應変】${inc.location ?? inc.affected_segment}で${inc.severity}インシデントが発生しました。` +
+      ja:
+        `【交通應変】${inc.location ?? inc.affected_segment}で${inc.severity}インシデントが発生しました。` +
         `${primaryName}へ迂回してください。` +
         (params.eteMinutes !== undefined ? ` 予想遅延:${eteStr}分。` : ''),
-      ko: `【교통 대응】${inc.location ?? inc.affected_segment}에서 ${inc.severity} 사고가 발생했습니다. ` +
+      ko:
+        `【교통 대응】${inc.location ?? inc.affected_segment}에서 ${inc.severity} 사고가 발생했습니다. ` +
         `${primaryName}으로 우회해 주세요.` +
         (params.eteMinutes !== undefined ? ` 예상 지연: ${eteStr}분.` : ''),
     },
@@ -1233,14 +1269,22 @@ function handleIncident(body: string | null | undefined): APIGatewayProxyResult 
       const userCountWarning = detectSop3UserCountPreWarning(
         'BS_MRT_BL17',
         current.r.User_Count,
-        recentHistoryBefore(bl17.map((x) => x.at), bl17.map((x) => x.r.User_Count), targetTime),
+        recentHistoryBefore(
+          bl17.map((x) => x.at),
+          bl17.map((x) => x.r.User_Count),
+          targetTime,
+        ),
       );
       if (userCountWarning !== null) crowdPreWarnings.push(userCountWarning);
 
       const growthRateWarning = detectSop3GrowthRatePreWarning(
         'BS_MRT_BL17',
         current.r.Growth_Rate,
-        recentHistoryBefore(bl17.map((x) => x.at), bl17.map((x) => x.r.Growth_Rate), targetTime),
+        recentHistoryBefore(
+          bl17.map((x) => x.at),
+          bl17.map((x) => x.r.Growth_Rate),
+          targetTime,
+        ),
       );
       if (growthRateWarning !== null) crowdPreWarnings.push(growthRateWarning);
     }
@@ -1253,7 +1297,11 @@ function handleIncident(body: string | null | undefined): APIGatewayProxyResult 
         'BS_TPE_DOME',
         historicalPeak >= SOP_ART4_DOME_PEAK_THRESHOLD,
         domeCurrent.r.Growth_Rate,
-        recentHistoryBefore(dome.map((x) => x.at), dome.map((x) => x.r.Growth_Rate), targetTime),
+        recentHistoryBefore(
+          dome.map((x) => x.at),
+          dome.map((x) => x.r.Growth_Rate),
+          targetTime,
+        ),
       );
       if (growthRateWarning !== null) crowdPreWarnings.push(growthRateWarning);
     }
@@ -1265,7 +1313,11 @@ function handleIncident(body: string | null | undefined): APIGatewayProxyResult 
       const roamingWarning = detectSop6RoamingPreWarning(
         bsId,
         stationCurrent.r.roaming_pct_value,
-        recentHistoryBefore(series.map((x) => x.at), series.map((x) => x.r.roaming_pct_value), targetTime),
+        recentHistoryBefore(
+          series.map((x) => x.at),
+          series.map((x) => x.r.roaming_pct_value),
+          targetTime,
+        ),
       );
       if (roamingWarning !== null) crowdPreWarnings.push(roamingWarning);
     }
@@ -1355,8 +1407,10 @@ function handleIncident(body: string | null | undefined): APIGatewayProxyResult 
     triggeredArticles: core.triggered_articles,
     primaryEvacuation: evacuation.primary_evacuation,
     secondaryEvacuation: evacuation.secondary_evacuation,
-    excludedCandidates: evacuation.excluded_candidates.map((c) => c.segment_id) as readonly string[],
-    eteMinutes: ete?.ete_minutes ?? undefined as number | undefined,
+    excludedCandidates: evacuation.excluded_candidates.map(
+      (c) => c.segment_id,
+    ) as readonly string[],
+    eteMinutes: ete?.ete_minutes ?? (undefined as number | undefined),
     roadNetwork: data.roadNetwork,
     traffic: data.traffic,
   });
@@ -1372,9 +1426,9 @@ function handleIncident(body: string | null | undefined): APIGatewayProxyResult 
 
   // ── Wire 1: retrieveSopEvidence() → rag_trace ─────────────────────────────────
   // Build SOP citations from the already-loaded sopArticles (LocalSopRetriever pattern)
-  const citationSet = [...new Set([...articles.triggered_articles, ...articles.applied_formula_articles])].sort(
-    (a, b) => a - b,
-  );
+  const citationSet = [
+    ...new Set([...articles.triggered_articles, ...articles.applied_formula_articles]),
+  ].sort((a, b) => a - b);
   const sopCitations = citationSet
     .map((articleNo) => {
       const chunk = data.sopArticles.getByArticleNo(articleNo);
@@ -1452,7 +1506,10 @@ function handleIncident(body: string | null | undefined): APIGatewayProxyResult 
       reason: c.exclusion_reason ?? '後端未提供排除原因',
       source_article: 2,
     })) as readonly { segment_id: string; reason: string; source_article: number }[],
-    ete: eteMinutes !== undefined ? { ete_minutes: eteMinutes, severity: (ete?.severity ?? incident.severity) as Severity } : null,
+    ete:
+      eteMinutes !== undefined
+        ? { ete_minutes: eteMinutes, severity: (ete?.severity ?? incident.severity) as Severity }
+        : null,
     evidence_trace: evidence,
     cms_core_text: core.cms_core_text,
     control_center_recommendation: recommendation,
@@ -1612,13 +1669,7 @@ function handlePublish(event: APIGatewayProxyEvent): APIGatewayProxyResult {
   }));
 
   // Build new record
-  const newRecord = createPublishRecord(
-    decisionId,
-    nextState,
-    approvedBy,
-    existing,
-    channels,
-  );
+  const newRecord = createPublishRecord(decisionId, nextState, approvedBy, existing, channels);
 
   // Store in memory
   _publishStore.set(decisionId, newRecord);

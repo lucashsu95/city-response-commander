@@ -77,7 +77,12 @@ export type RuntimeConfigResult =
 
 const VALID_API_PROTOCOLS = ['http:', 'https:'] as const;
 const VALID_WS_PROTOCOLS = ['ws:', 'wss:'] as const;
-const VALID_ENVIRONMENTS: readonly AppEnvironment[] = ['LOCAL_MOCK', 'COMPETITION_AWS', 'TEST', 'DEMO'];
+const VALID_ENVIRONMENTS: readonly AppEnvironment[] = [
+  'LOCAL_MOCK',
+  'COMPETITION_AWS',
+  'TEST',
+  'DEMO',
+];
 const VALID_API_MODES: readonly ApiMode[] = ['production', 'demo'];
 
 /**

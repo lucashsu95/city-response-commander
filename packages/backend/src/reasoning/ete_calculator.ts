@@ -55,7 +55,10 @@ export interface EteCalculationInputs {
  * @param article7Text — verbatim SOP Article 7 text (used to validate formula)
  * @returns EteCalculationTrace (deterministic — no LLM call)
  */
-export function computeEte(inputs: EteCalculationInputs, article7Text?: string): EteCalculationTrace {
+export function computeEte(
+  inputs: EteCalculationInputs,
+  article7Text?: string,
+): EteCalculationTrace {
   const { severity, avgSaturation, baseTimestamp, timezone = DEFAULT_TIMEZONE } = inputs;
 
   const variables: EteCalculationVariable[] = [];
@@ -144,9 +147,7 @@ export function computeEte(inputs: EteCalculationInputs, article7Text?: string):
   }
 
   // ── formula text ───────────────────────────────────────────
-  const formulaText = article7Text
-    ? extractFormulaFromArticle7(article7Text)
-    : SOP7_FORMULA;
+  const formulaText = article7Text ? extractFormulaFromArticle7(article7Text) : SOP7_FORMULA;
 
   return Object.freeze({
     source_article: 7,
@@ -191,7 +192,9 @@ function addMinutesToTimestamp(timestamp: string, minutes: number, timezone: str
   // Build a Date in local time (UTC offset assumed for timezone)
   const tzOffsetMinutes = getTzOffsetMinutes(timezone);
   const totalMs =
-    Date.UTC(year, month - 1, day, hour, minute, 0, 0) + tzOffsetMinutes * 60_000 + minutes * 60_000;
+    Date.UTC(year, month - 1, day, hour, minute, 0, 0) +
+    tzOffsetMinutes * 60_000 +
+    minutes * 60_000;
 
   const d = new Date(totalMs);
   const adj = new Date(d.getTime() - tzOffsetMinutes * 60_000);

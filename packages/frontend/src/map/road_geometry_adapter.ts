@@ -136,13 +136,13 @@ export function trafficVisualLevel(
     if (s.includes('normal') || s.includes('clear') || s.includes('暢通')) return 'normal';
   }
   if (saturationScore >= 0.85) return 'critical';
-  if (saturationScore >= 0.70) return 'warning';
+  if (saturationScore >= 0.7) return 'warning';
   return 'normal';
 }
 
 export const ROAD_COLORS: Record<TrafficVisualLevel, string> = {
   critical: '#ef4444',
-  warning:  '#eab308',
-  normal:   '#22c55e',
-  unknown:  '#64748b',
+  warning: '#eab308',
+  normal: '#22c55e',
+  unknown: '#64748b',
 };

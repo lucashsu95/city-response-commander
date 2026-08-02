@@ -173,7 +173,11 @@ interface DemoIncidentsResponseBody {
   readonly primary_evacuation: string;
   readonly secondary_evacuation: readonly string[];
   readonly excluded_routes?: readonly { segment_id: string; reason: string }[];
-  readonly exclusion_reasons?: readonly { segment_id: string; reason: string; source_article: number }[];
+  readonly exclusion_reasons?: readonly {
+    segment_id: string;
+    reason: string;
+    source_article: number;
+  }[];
   readonly ete: {
     readonly ete_minutes: number;
     readonly severity: string;
@@ -566,8 +570,7 @@ export function createDemoApiClient(config: DemoApiClientConfig): DemoApiClient 
 
   function toCanonicalTimeline(entry: DemoTimeseriesCacheEntry): unknown {
     const timestamps = entry.response.timeline;
-    const current =
-      timestamps.length > 0 ? timestamps[timestamps.length - 1] ?? null : null;
+    const current = timestamps.length > 0 ? (timestamps[timestamps.length - 1] ?? null) : null;
     return {
       schema_version: 'demo-1.0',
       trace_id: entry.traceId,
@@ -599,7 +602,8 @@ export function createDemoApiClient(config: DemoApiClientConfig): DemoApiClient 
         const r = row as { segment_id?: unknown; level?: unknown };
         return {
           segment_id: typeof r.segment_id === 'string' ? r.segment_id : '',
-          level: typeof r.level === 'string' || r.level === null ? (r.level as string | null) : null,
+          level:
+            typeof r.level === 'string' || r.level === null ? (r.level as string | null) : null,
         };
       });
     })();
@@ -641,7 +645,9 @@ export function createDemoApiClient(config: DemoApiClientConfig): DemoApiClient 
         timestamp: raw.ete?.base_timestamp ?? null,
       },
       primary_evacuation: raw.primary_evacuation,
-      secondary_evacuation: [...(Array.isArray(raw.secondary_evacuation) ? raw.secondary_evacuation : [])],
+      secondary_evacuation: [
+        ...(Array.isArray(raw.secondary_evacuation) ? raw.secondary_evacuation : []),
+      ],
       ete: {
         ete_minutes: raw.ete.ete_minutes,
         ete_lower_bound_minutes: 60,
@@ -728,14 +734,17 @@ export function createDemoApiClient(config: DemoApiClientConfig): DemoApiClient 
         source_article: a.source_article ?? null,
         parameter_status: a.parameter_status ?? null,
       })),
-      route_actions: rec.route_actions !== undefined ? {
-        primary_route: rec.route_actions.primary_route ?? null,
-        primary_route_segment_id: rec.route_actions.primary_route_segment_id ?? null,
-        secondary_routes: rec.route_actions.secondary_routes ?? [],
-        excluded_routes: rec.route_actions.excluded_routes ?? [],
-        cms_message_zh: rec.route_actions.cms_message_zh ?? null,
-        cms_message_en: rec.route_actions.cms_message_en ?? null,
-      } : null,
+      route_actions:
+        rec.route_actions !== undefined
+          ? {
+              primary_route: rec.route_actions.primary_route ?? null,
+              primary_route_segment_id: rec.route_actions.primary_route_segment_id ?? null,
+              secondary_routes: rec.route_actions.secondary_routes ?? [],
+              excluded_routes: rec.route_actions.excluded_routes ?? [],
+              cms_message_zh: rec.route_actions.cms_message_zh ?? null,
+              cms_message_en: rec.route_actions.cms_message_en ?? null,
+            }
+          : null,
       coordination_actions: rec.coordination_actions ?? [],
       public_guidance: {
         zh: publicGuidance?.zh ?? null,
@@ -777,7 +786,9 @@ export function createDemoApiClient(config: DemoApiClientConfig): DemoApiClient 
       triggeredArticles: [...raw.triggered_articles],
       invokedProcedures: [...raw.invoked_procedures],
       primaryEvacuation: raw.primary_evacuation,
-      secondaryEvacuation: Array.isArray(raw.secondary_evacuation) ? [...raw.secondary_evacuation] : [],
+      secondaryEvacuation: Array.isArray(raw.secondary_evacuation)
+        ? [...raw.secondary_evacuation]
+        : [],
       excludedRoutes: raw.excluded_routes ?? [],
       eteMinutes: raw.ete.ete_minutes,
       eteSeverity: raw.ete.severity,
@@ -985,9 +996,7 @@ export function createDemoApiClient(config: DemoApiClientConfig): DemoApiClient 
       return decisionViews.get(eventId) ?? null;
     },
 
-    async getDemoTimeseries(
-      options?: RequestOptions,
-    ): Promise<ApiResult<DemoTimeseriesResponse>> {
+    async getDemoTimeseries(options?: RequestOptions): Promise<ApiResult<DemoTimeseriesResponse>> {
       try {
         const entry = await loadTimeseries(options?.signal);
         return { ok: true, data: entry.response };
