@@ -73,7 +73,7 @@ function CommandHeader({
       <div className="cmd-header__left">
         <div className="cmd-header__brand">
           <img
-            src={`${import.meta.env.BASE_URL}cht_favicon.png`}
+            src={`${import.meta.env.BASE_URL}cht_favicon.ico`}
             alt="中華電信"
             className="cmd-header__brand-logo"
           />
