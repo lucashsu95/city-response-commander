@@ -203,7 +203,7 @@ export interface DemoAlertRequest {
   readonly severity?: 'Critical' | 'High' | 'Medium';
   /** Affected road name for contextual messages */
   readonly route?: string;
-  /** Languages to generate. Defaults to ['zh', 'en'] */
+  /** Languages to generate. Defaults to all supported languages: ['zh', 'en', 'ja', 'ko'] */
   readonly languages?: readonly Language[];
 }
 
