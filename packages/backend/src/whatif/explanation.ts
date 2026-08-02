@@ -54,11 +54,13 @@ export interface WhatIfExplanationInput {
  * `explainWhatIf()` 的回傳結果。
  *
  * - `explanation_text`：純文字解釋（Bedrock 生成或 template fallback）
+ * - `summary_text`：由 stage 3 事實組成的精簡摘要（決定性，不經 LLM）
  * - `sop_citations`：SopRetriever 取回的 verbatim SOP citations
  * - `text_source`：標記文字來源（供稽核與 dashboard 顯示）
  * - `does_not_mutate_state`：永遠為 `true`（靜態型別保證）
  */
 export interface WhatIfExplanationResult {
+  readonly summary_text: string;
   readonly explanation_text: string;
   readonly sop_citations: readonly SopCitationResult[];
   readonly text_source: 'bedrock' | 'template';
@@ -121,6 +123,7 @@ export async function explainWhatIf(
 
     if (citations.length === 0) {
       return {
+        summary_text: buildWhatIfSummaryText(recomputeResult),
         explanation_text: buildCitationUnavailableExplanationText(recomputeResult),
         sop_citations: citations,
         text_source: 'template',
@@ -185,11 +188,36 @@ export async function explainWhatIf(
   );
 
   return {
+    summary_text: buildWhatIfSummaryText(recomputeResult),
     explanation_text: explanationText,
     sop_citations: citations,
     text_source: textSource,
     does_not_mutate_state: true,
   };
+}
+
+/** 由 stage 3 決定性事實組成單段落摘要；完整細節仍在後續欄位。 */
+export function buildWhatIfSummaryText(recomputeResult: RecomputeResult): string {
+  const maxActionCharacters = 32;
+  const sopSummary =
+    recomputeResult.triggered_articles.length > 0
+      ? `觸發 SOP 第 ${recomputeResult.triggered_articles.join('、')} 條`
+      : '未觸發新的 SOP 條款';
+  const actionSummary =
+    recomputeResult.expected_actions.length > 0
+      ? `首要動作：${truncateSummaryText(recomputeResult.expected_actions[0] ?? '', maxActionCharacters)}`
+      : '目前無新增預期動作';
+  const eteSummary = recomputeResult.ete_preview
+    ? `預估恢復時間 ${recomputeResult.ete_preview.ete_minutes} 分鐘`
+    : null;
+
+  return `${[sopSummary, actionSummary, eteSummary].filter((item) => item !== null).join('；')}。`;
+}
+
+function truncateSummaryText(value: string, maxCharacters: number): string {
+  const characters = Array.from(value.trim());
+  if (characters.length <= maxCharacters) return characters.join('');
+  return `${characters.slice(0, maxCharacters - 1).join('')}…`;
 }
 
 // ─── Citation set builder ─────────────────────────────────────────────────────

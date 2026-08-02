@@ -308,6 +308,8 @@ export interface WhatIfResponse {
     readonly source_location: string;
     readonly source: 'kb' | 's3_fallback';
   }[];
+  /** Concise deterministic summary derived from stage 3 facts (LLM-prohibited) */
+  readonly summary_text?: string;
   /** Stage 4 Bedrock explanation (LLM-writable) */
   readonly explanation_text?: string;
   /** Clarification prompt when status=clarification_required */

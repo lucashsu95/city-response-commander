@@ -300,6 +300,7 @@ describe('WhatIfFn — clarification 短路（§14.5）', () => {
     expect(body.status).toBe('answered');
     expect(body.triggered_articles).toEqual([3]);
     expect(Array.isArray(body.expected_actions)).toBe(true);
+    expect(body.summary_text).toBe('觸發 SOP 第 3 條；首要動作：SOP-3：啟動分流。');
   });
 
   it('answered 回應保留 citation 的來源位置與 fallback 類型', async () => {
