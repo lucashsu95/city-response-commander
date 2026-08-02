@@ -1,16 +1,18 @@
 /**
- * Dashboard Page — Redesigned Command Center
+ * Dashboard Page — DEMO vs Production routing
  *
- * Main dashboard route component. Wires the CommandCenterShell with:
- * - OperationsMap (map)
- * - Timeline playback (timeline bar)
- * - Metric charts (roads/crowd/roaming)
- * - AI Decision cards (decision/route/multilingual)
- * - What-if dialog
- * - Injection modal
+ * Three-component split, each calling exactly the hooks it is allowed to call.
+ * No data hook is mounted conditionally; the demo path never imports the
+ * production realtime polling fallback, and the production path never imports
+ * the demo-only adapter.
  *
- * Preserves all existing API adapters and state management.
- * Demo mode bypasses production controllers as before.
+ *  DashboardPage         — pure router; reads only `useAppConfig()`
+ *  DemoDashboardPage     — single owner of `useDemoTimeseries`
+ *  ProductionDashboardPage — preserves the original TASK-122 wiring
+ *
+ * The DEMO page never issues `GET /roads`, `GET /crowd`, or `GET /timeline`
+ * because the demo backend does not serve them. All metrics are derived from
+ * the single `/demo/timeseries` snapshot, indexed by the local timeline index.
  *
  * @module frontend/pages/dashboard
  */
@@ -63,6 +65,7 @@ import type { PollingCycleResult } from '../realtime/polling_fallback.js';
 import type { ReadyEventCommit } from '../realtime/use_realtime.js';
 import type { RealtimeEventEnvelope } from '../realtime/transport_events.js';
 import { useAppConfig } from '../state/app_context.js';
+import type { ConnectionMode } from '../state/app_state.js';
 import { TimelinePanel } from '../timeline/timeline_panel.js';
 import { useTimelinePlayback } from '../timeline/use_timeline_playback.js';
 import { RoadPanel } from '../roads/road_panel.js';
@@ -72,63 +75,58 @@ import { WhatIfDialog } from '../whatif/whatif_dialog.js';
 import { DashboardShell } from '../layout/dashboard_shell.js';
 import { InjectionPanel } from '../inject/injection_panel.js';
 
-// ─── Demo Mode Entry ──────────────────────────────────────
+// ─── Dashboard Page Router ──────────────────────────────────────
 
+/**
+ * Routes between the DEMO and Production dashboards.
+ *
+ * `DashboardPage` itself calls no data hook — it only inspects the validated
+ * runtime configuration and mounts one of the two child dashboards. Each
+ * child is allowed to call exactly the data hooks its data flow needs.
+ */
 export function DashboardPage(): ReactNode {
   const config = useAppConfig();
-  const isDemoMode = config.apiMode === 'demo';
-
-  const [adminToken, setAdminToken] = useState<AdminToken>(null);
+  const isDemoMode = config.apiMode === 'demo' || config.environment === 'DEMO';
 
   if (isDemoMode) {
-    return (
-      <DemoCommandCenterPage
-        config={config}
-        adminToken={adminToken}
-        onAdminTokenChange={setAdminToken}
-      />
-    );
+    return <DemoDashboardPage />;
   }
-
-  return (
-    <ProductionDashboardPage
-      config={config}
-      adminToken={adminToken}
-      onAdminTokenChange={setAdminToken}
-    />
-  );
+  return <ProductionDashboardPage />;
 }
 
-// ─── Demo Command Center Page ──────────────────────────────
+// ─── Demo Dashboard Page ────────────────────────────────────────
 
-interface DemoCommandCenterProps {
-  readonly config: ReturnType<typeof useAppConfig>;
-  readonly adminToken: AdminToken;
-  readonly onAdminTokenChange: (token: AdminToken) => void;
-}
+/**
+ * Single polling owner: `useDemoTimeseries`.
+ *
+ * Never calls `useTimelinePlayback`, `useRoadTraffic`, `useCrowdSnapshot`, or
+ * `useRealtimeConnection`. Those would mount the §13 polling fallback and
+ * issue `GET /roads` / `GET /crowd` / `GET /timeline`, which the demo backend
+ * does not serve.
+ *
+ * Every metric shown to the operator is derived from the single
+ * `GET /demo/timeseries` snapshot, indexed by the local timeline index.
+ */
+function DemoDashboardPage(): ReactNode {
+  const config = useAppConfig();
 
-function DemoCommandCenterPage({
-  config,
-  adminToken,
-  onAdminTokenChange,
-}: DemoCommandCenterProps): ReactNode {
   const adapter = useMemo<DemoApiClient>(
     () => createDemoApiClient({ baseEndpoint: config.apiEndpoint }),
     [config.apiEndpoint],
   );
 
+  // SINGLE polling owner for DEMO mode. Everything below reads from this.
   const demoTimeseries = useDemoTimeseries(adapter);
 
-  // Auto-popup hook for demo-mode anomalies from /demo/timeseries
   const anomalyDemo = useDemoAnomalyPopup();
 
+  const [adminToken, setAdminToken] = useState<AdminToken>(null);
   const [injectedEventId, setInjectedEventId] = useState<string | null>(null);
   const [lastDecision, setLastDecision] = useState<DemoDecisionView | null>(null);
   const [timelineIndex, setTimelineIndex] = useState<number | null>(null);
   const [timelinePlaying, setTimelinePlaying] = useState(false);
   const [selectedSegmentId, setSelectedSegmentId] = useState<string | null>(null);
 
-  // Playback timer
   const playbackRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Ingest each new timeseries snapshot into the anomaly auto-popup hook
@@ -143,24 +141,17 @@ function DemoCommandCenterPage({
     setLastDecision(view);
   }, []);
 
-  const realtime = useRealtimeConnection({
-    apiEndpoint: config.apiEndpoint,
-    wsEndpoint: config.wsEndpoint,
-    transport: adapter,
-  });
-
-  // ── Single timeseries state: snapshots + timeline index ──────────────────────
-  const allSnapshots = demoTimeseries.snapshot?.snapshots ?? [];
-  const timestamps = demoTimeseries.snapshot?.timeline ?? [];
+  // ── Timeline state: snapshots + index (drives activeSnapshot below) ─────────
+  const timestamps = demoTimeseries.timeline;
+  const snapshots = demoTimeseries.snapshots;
   const isLoading = demoTimeseries.state === 'loading';
 
-  // Derive the active snapshot from the current timeline index.
-  // This is the ONE source of truth for all displayed data.
+  // activeSnapshot is the ONE source of truth for every visible metric.
   const activeSnapshot =
-    timelineIndex !== null && timelineIndex >= 0 && timelineIndex < allSnapshots.length
-      ? allSnapshots[timelineIndex]
-      : allSnapshots.length > 0
-        ? allSnapshots[allSnapshots.length - 1]
+    timelineIndex !== null && timelineIndex >= 0 && timelineIndex < snapshots.length
+      ? snapshots[timelineIndex]
+      : snapshots.length > 0
+        ? snapshots[snapshots.length - 1]
         : null;
 
   // ── Timeline controls ────────────────────────────────────────────────────────
@@ -188,7 +179,6 @@ function DemoCommandCenterPage({
 
   const handleTimelinePlay = useCallback(() => {
     if (timestamps.length === 0) return;
-    // If already at the last index, restart from the beginning
     if (timelineIndex === null || timelineIndex >= timestamps.length - 1) {
       setTimelineIndex(0);
     }
@@ -208,7 +198,6 @@ function DemoCommandCenterPage({
       }
       return;
     }
-    // Functional update avoids stale closure
     playbackRef.current = setInterval(() => {
       setTimelineIndex((prev) => {
         if (prev === null) return 0;
@@ -225,13 +214,11 @@ function DemoCommandCenterPage({
         playbackRef.current = null;
       }
     };
-    // Intentionally include timestamps.length — the stop condition depends on it.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [timelinePlaying, timestamps.length]);
 
   // ── Metrics derived from activeSnapshot ───────────────────────────────────────
 
-  // Road metrics from the active snapshot's traffic rows
   const roadMetrics = useMemo<readonly RoadMetricData[]>(() => {
     const traffic = activeSnapshot?.traffic ?? [];
     return traffic.map((t) => {
@@ -246,7 +233,6 @@ function DemoCommandCenterPage({
     });
   }, [activeSnapshot]);
 
-  // Crowd metrics from the active snapshot's crowd rows
   const crowdMetrics = useMemo<readonly CrowdMetricData[]>(() => {
     return (activeSnapshot?.crowd ?? []).map((c) => ({
       stationId: c.BS_ID,
@@ -256,7 +242,6 @@ function DemoCommandCenterPage({
     }));
   }, [activeSnapshot]);
 
-  // Roaming metrics from the active snapshot
   const roamingMetrics = useMemo<readonly RoamingMetricData[]>(() => {
     return (activeSnapshot?.crowd ?? [])
       .filter((c) => c.roaming_pct_value > 0)
@@ -267,64 +252,65 @@ function DemoCommandCenterPage({
       .sort((a, b) => (b.roamingPct ?? 0) - (a.roamingPct ?? 0));
   }, [activeSnapshot]);
 
-  // ── GeographicMap data ─────────────────────────────────────────────────────────
-  // Build a partial snapshot for GeographicMap: traffic/crowd from active snapshot,
-  // metadata from the full response. GeographicMap reads only .traffic/.crowd.
+  // GeographicMap needs the full response object; reuse the cached snapshot
+  // and overlay the active traffic/crowd slice. No additional fetch.
   const mapSnapshot = demoTimeseries.snapshot
     ? ({
         ...demoTimeseries.snapshot,
         traffic: activeSnapshot?.traffic ?? [],
         crowd: activeSnapshot?.crowd ?? [],
-      } as DemoTimeseriesResponse)
+      } as unknown as DemoTimeseriesResponse)
     : null;
 
-  // AI decision card — reads all fields from DemoDecisionView (ETE, recovery_at, SOP, RAG, etc.)
   const aiDecisionContent = <AiDecisionCardDemo decision={lastDecision} />;
-
-  // Route advice — primary, secondary, and excluded routes from API
   const routeAdviceContent = <RouteAdviceCardDemo decision={lastDecision} />;
-
-  // Control Center Recommendation panel — appears after injection
   const recommendationContent = lastDecision?.recommendation
     ? <ControlCenterRecommendationPanel recommendation={lastDecision.recommendation} />
     : null;
-
-  // Reasoning chain panel (RAG trace + route reasoning + ETE calc)
   const reasoningContent = <ReasoningChainPanel decision={lastDecision} />;
-
-  // Multilingual card with two-stage publish flow
   const multilingualContent = (
     <MultilingualCardDemo decision={lastDecision} adapter={adapter} />
   );
 
-  // What-if dialog
-  const whatifContent = useMemo(() => (
-    <WhatIfDialog client={adapter} />
-  ), [adapter]);
+  const whatifContent = useMemo(() => <WhatIfDialog client={adapter} />, [adapter]);
 
-  // Injection modal content
-  const injectionContent = useMemo(() => (
-    <>
-      <AdminSessionControl adminToken={adminToken} onAdminTokenChange={onAdminTokenChange} />
-      <DemoDecisionPanel
-        adapter={adapter}
-        injectedEventId={injectedEventId}
-        adminToken={adminToken}
-        onDecisionInjected={handleDecisionInjected}
-      />
-      {lastDecision !== null && (
-        <p className="injection-modal__last">
-          最近注入：<code>{lastDecision.decisionId}</code>（{lastDecision.severity}）
-        </p>
-      )}
-    </>
-  ), [adminToken, onAdminTokenChange, adapter, injectedEventId, lastDecision, handleDecisionInjected]);
+  const injectionContent = useMemo(
+    () => (
+      <>
+        <AdminSessionControl adminToken={adminToken} onAdminTokenChange={setAdminToken} />
+        <DemoDecisionPanel
+          adapter={adapter}
+          injectedEventId={injectedEventId}
+          adminToken={adminToken}
+          onDecisionInjected={handleDecisionInjected}
+        />
+        {lastDecision !== null && (
+          <p className="injection-modal__last">
+            最近注入：<code>{lastDecision.decisionId}</code>（{lastDecision.severity}）
+          </p>
+        )}
+      </>
+    ),
+    [adminToken, adapter, injectedEventId, lastDecision, handleDecisionInjected],
+  );
+
+  // ── Header status: from the single polling owner only ───────────────────────
+  // DEMO mode has no WebSocket and no §13 polling fallback, so the connection
+  // mode is reported as "polling" — it is the only existing label that lets
+  // `PollingDegradationNotice` render the success count and the error message
+  // (the notice hides entirely for `disconnected`). The error string is
+  // scoped to `GET /demo/timeseries`; `/roads`, `/crowd`, and `/timeline`
+  // are never referenced.
+  const connectionMode: ConnectionMode = 'polling';
+  const demoPollingErrorMessage =
+    demoTimeseries.error !== null ? `GET /demo/timeseries 更新失敗：${demoTimeseries.error}` : null;
+  const demoPollingUpdateCount = demoTimeseries.pollingCount;
 
   return (
     <CommandCenterShell
-      connectionMode={realtime.connectionMode}
-      pollingErrorMessage={realtime.pollingErrorMessage}
-      pollingUpdateCount={realtime.pollingUpdateCount}
+      connectionMode={connectionMode}
+      pollingErrorMessage={demoPollingErrorMessage}
+      pollingUpdateCount={demoPollingUpdateCount}
       timelineTimestamps={timestamps}
       timelineIndex={timelineIndex}
       timelinePlaying={timelinePlaying}
@@ -339,7 +325,7 @@ function DemoCommandCenterPage({
           snapshot={mapSnapshot}
           decision={lastDecision}
           loading={isLoading}
-          errorMessage={demoTimeseries.errorMessage}
+          errorMessage={demoTimeseries.error}
           selectedSegmentId={selectedSegmentId}
           onSegmentClick={setSelectedSegmentId}
         />
@@ -365,19 +351,16 @@ function DemoCommandCenterPage({
   );
 }
 
-// ─── Production Mode (preserved verbatim) ──────────────────
+// ─── Production Dashboard Page (preserved verbatim from TASK-122) ────────────
 
-interface ProductionDashboardProps {
-  readonly config: ReturnType<typeof useAppConfig>;
-  readonly adminToken: AdminToken;
-  readonly onAdminTokenChange: (token: AdminToken) => void;
-}
+/**
+ * Production dashboard — calls only the production data hooks. The DEMO
+ * path never instantiates this component.
+ */
+function ProductionDashboardPage(): ReactNode {
+  const config = useAppConfig();
+  const [adminToken, setAdminToken] = useState<AdminToken>(null);
 
-function ProductionDashboardPage({
-  config,
-  adminToken,
-  onAdminTokenChange,
-}: ProductionDashboardProps): ReactNode {
   const transport = useMemo(
     () => createApiClient({ baseEndpoint: config.apiEndpoint }),
     [config.apiEndpoint],
@@ -474,7 +457,6 @@ function ProductionDashboardPage({
     onPollingCycle: handlePollingCycle,
   });
 
-  // For production, fall back to the original shell (no map yet)
   return (
     <DashboardShell
       connectionMode={realtime.connectionMode}
@@ -517,7 +499,7 @@ function ProductionDashboardPage({
       }
       injectionContent={
         <>
-          <AdminSessionControl adminToken={adminToken} onAdminTokenChange={onAdminTokenChange} />
+          <AdminSessionControl adminToken={adminToken} onAdminTokenChange={setAdminToken} />
           <InjectionPanel client={transport} adminToken={adminToken} />
         </>
       }

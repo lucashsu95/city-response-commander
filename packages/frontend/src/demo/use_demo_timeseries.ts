@@ -1,12 +1,13 @@
 /**
- * Demo Timeseries Hook
+ * Demo Timeseries Hook — single source of truth for the DEMO dashboard.
  *
- * Drives `GET /demo/timeseries` through the Demo API Adapter. The raw projection
- * returned by the demo backend is consumed read-only — timeline rows, traffic
- * rows, and crowd rows are kept exactly as the backend sends them.
+ * Drives exactly one HTTP endpoint — `GET /demo/timeseries` — through the Demo
+ * API Adapter. Every panel under `DemoDashboardPage` reads from the returned
+ * controller (`snapshots`, `timeline`, `anomalies`, `pollingStatus`,
+ * `pollingCount`, `error`) and never issues its own production fetch.
  *
  * Concurrency guarantee: at most one active `GET /demo/timeseries` request at
- * a time, matching the same "no parallel refreshes" rule the production
+ * a time, mirroring the same "no parallel refreshes" rule the production
  * `useTimelinePlayback` enforces. A `refresh()` issued while a request is in
  * flight is coalesced into a single follow-up.
  *
@@ -16,24 +17,46 @@
  * @module frontend/demo/use_demo_timeseries
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { DemoApiClient, DemoTimeseriesResponse } from '../api/demo_api_adapter.js';
 
 export type DemoTimeseriesControllerState = 'idle' | 'loading' | 'ready' | 'error';
 
+export type DemoPollingStatus = 'idle' | 'refreshing';
+
+/**
+ * Single polling-owner controller exposed to `DemoDashboardPage`.
+ *
+ * No member of this controller ever points at `/roads`, `/crowd`, or
+ * `/timeline`. The demo backend does not serve those routes; the dashboard
+ * therefore does not ask for them.
+ */
 export interface DemoTimeseriesController {
   readonly state: DemoTimeseriesControllerState;
+  /** Raw timeseries snapshot, or `null` while still loading / after error. */
   readonly snapshot: DemoTimeseriesResponse | null;
-  readonly errorMessage: string | null;
-  readonly refreshStatus: 'idle' | 'refreshing';
+  /** Convenience: ordered timestamps from the snapshot. Empty while loading. */
+  readonly timeline: readonly string[];
+  /** Convenience: snapshot array — empty while loading. */
+  readonly snapshots: readonly DemoTimeseriesResponse['snapshots'][number][];
+  /** Convenience: anomalies surfaced by the demo backend, when present. */
+  readonly anomalies: readonly NonNullable<DemoTimeseriesResponse['anomalies']>[number][];
+  /** Last transport error message, or `null` when no error has occurred. */
+  readonly error: string | null;
+  /** `refreshing` while a background refresh is in flight, `idle` otherwise. */
+  readonly pollingStatus: DemoPollingStatus;
+  /** Number of times the controller has successfully refreshed since mount. */
+  readonly pollingCount: number;
+  /** Trigger one manual refresh; coalesced if a request is already in flight. */
   refresh(): void;
 }
 
 export function useDemoTimeseries(adapter: DemoApiClient): DemoTimeseriesController {
   const [state, setState] = useState<DemoTimeseriesControllerState>('idle');
   const [snapshot, setSnapshot] = useState<DemoTimeseriesResponse | null>(null);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [refreshStatus, setRefreshStatus] = useState<'idle' | 'refreshing'>('idle');
+  const [error, setError] = useState<string | null>(null);
+  const [pollingStatus, setPollingStatus] = useState<DemoPollingStatus>('idle');
+  const [pollingCount, setPollingCount] = useState(0);
 
   const adapterRef = useRef(adapter);
   adapterRef.current = adapter;
@@ -54,9 +77,9 @@ export function useDemoTimeseries(adapter: DemoApiClient): DemoTimeseriesControl
     const isFirstLoad = !everSucceededRef.current;
     if (isFirstLoad) {
       setState('loading');
-      setErrorMessage(null);
+      setError(null);
     } else {
-      setRefreshStatus('refreshing');
+      setPollingStatus('refreshing');
     }
     try {
       const result = await adapterRef.current.getDemoTimeseries();
@@ -64,16 +87,17 @@ export function useDemoTimeseries(adapter: DemoApiClient): DemoTimeseriesControl
         return;
       }
       if (!result.ok) {
-        setErrorMessage(result.error.message);
+        setError(result.error.message);
         setState((prev) => (everSucceededRef.current ? prev : 'error'));
-        setRefreshStatus('idle');
+        setPollingStatus('idle');
         return;
       }
       setSnapshot(result.data);
-      setErrorMessage(null);
+      setError(null);
       setState('ready');
-      setRefreshStatus('idle');
+      setPollingStatus('idle');
       everSucceededRef.current = true;
+      setPollingCount((prev) => prev + 1);
     } finally {
       inFlightRef.current = false;
       if (queuedFollowUpRef.current) {
@@ -91,11 +115,25 @@ export function useDemoTimeseries(adapter: DemoApiClient): DemoTimeseriesControl
     void runFetch();
   }, [runFetch]);
 
+  const timeline = useMemo<readonly string[]>(() => snapshot?.timeline ?? [], [snapshot]);
+  const snapshots = useMemo<DemoTimeseriesResponse['snapshots'][number][]>(
+    () => (snapshot?.snapshots === undefined ? [] : [...snapshot.snapshots]),
+    [snapshot],
+  );
+  const anomalies = useMemo<DemoTimeseriesController['anomalies']>(
+    () => (snapshot?.anomalies === undefined ? [] : [...snapshot.anomalies]),
+    [snapshot],
+  );
+
   return {
     state,
     snapshot,
-    errorMessage,
-    refreshStatus,
+    timeline,
+    snapshots,
+    anomalies,
+    error,
+    pollingStatus,
+    pollingCount,
     refresh,
   };
 }

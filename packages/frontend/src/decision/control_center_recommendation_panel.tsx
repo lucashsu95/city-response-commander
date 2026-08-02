@@ -51,6 +51,7 @@ function TechnicalActionRow({
     readonly time_window: string | null;
     readonly rationale: string | null;
     readonly source_article: number | null;
+    readonly parameter_status: string | null;
   };
   readonly index: number;
 }): ReactNode {
