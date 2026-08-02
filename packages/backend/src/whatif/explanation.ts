@@ -228,7 +228,7 @@ export async function explainWhatIf(
 
 /** 由 stage 3 決定性事實組成單段落摘要；完整細節仍在後續欄位。 */
 export function buildWhatIfSummaryText(recomputeResult: RecomputeResult): string {
-  const maxActionCharacters = 32;
+  const maxActionCharacters = 40;
   const sopSummary =
     recomputeResult.triggered_articles.length > 0
       ? `觸發 SOP 第 ${recomputeResult.triggered_articles.join('、')} 條`
@@ -247,7 +247,33 @@ export function buildWhatIfSummaryText(recomputeResult: RecomputeResult): string
 function truncateSummaryText(value: string, maxCharacters: number): string {
   const characters = Array.from(value.trim());
   if (characters.length <= maxCharacters) return characters.join('');
-  return `${characters.slice(0, maxCharacters - 1).join('')}…`;
+
+  const cutIndex = maxCharacters - 1;
+  const slice = characters.slice(0, cutIndex).join('');
+  const nextCharacter = characters[cutIndex] ?? '';
+  return `${trimToSafeBoundary(slice, nextCharacter)}…`;
+}
+
+/**
+ * 避免截斷點落在英文單字中間，或落在未閉合的括號內
+ *（例如 "(MRT express skip-sto"）——回退到最後一個安全邊界。
+ */
+function trimToSafeBoundary(slice: string, nextCharacter: string): string {
+  const lastOpenParen = Math.max(slice.lastIndexOf('('), slice.lastIndexOf('（'));
+  const lastCloseParen = Math.max(slice.lastIndexOf(')'), slice.lastIndexOf('）'));
+  if (lastOpenParen > lastCloseParen) {
+    return slice.slice(0, lastOpenParen).trimEnd();
+  }
+
+  const asciiWordPattern = /[A-Za-z0-9-]/;
+  const endsMidAsciiWord =
+    asciiWordPattern.test(slice.charAt(slice.length - 1)) && asciiWordPattern.test(nextCharacter);
+  if (endsMidAsciiWord) {
+    const wordStart = /[A-Za-z0-9-]+$/.exec(slice)?.index ?? slice.length;
+    return slice.slice(0, wordStart).trimEnd();
+  }
+
+  return slice;
 }
 
 // ─── Citation set builder ─────────────────────────────────────────────────────
