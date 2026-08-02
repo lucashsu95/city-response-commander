@@ -39,8 +39,7 @@ export const DEMO_INCIDENT_PRESETS: readonly DemoIncidentPreset[] = [
       affected_road: 'RD_TPE_001',
       status: 'Restricted',
       severity: 'High',
-      description:
-        '2026-05-20 22:20 散場人群推擠受傷，救護車佔用單向車道，人流進站動線中斷',
+      description: '2026-05-20 22:20 散場人群推擠受傷，救護車佔用單向車道，人流進站動線中斷',
       timestamp: '2026-05-20 22:20',
     },
   },
@@ -54,8 +53,7 @@ export const DEMO_INCIDENT_PRESETS: readonly DemoIncidentPreset[] = [
       affected_segment: 'RD_TPE_007',
       status: 'Caution',
       severity: 'Medium',
-      description:
-        '2026-05-20 22:30 信義區部分路段號誌失效，需改由人工交通指揮',
+      description: '2026-05-20 22:30 信義區部分路段號誌失效，需改由人工交通指揮',
       timestamp: '2026-05-20 22:30',
     },
   },
