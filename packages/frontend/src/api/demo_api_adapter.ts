@@ -90,13 +90,36 @@ function httpError(status: number, statusText: string): HttpError {
 
 // ─── Raw demo Timeseries Response ─────────────────────────────
 
+/** A single timeseries snapshot for one timeline timestamp. */
+export interface DemoSnapshotEntry {
+  readonly timestamp_display: string;
+  readonly traffic: readonly RawTrafficEntry[];
+  readonly crowd: readonly RawCrowdEntry[];
+}
+
 /** Slice shape actually returned by `GET /demo/timeseries`. Mirrors the
  * backend's `DemoTimeseries` projection; field names are kept verbatim so the
- * adapter never has to rename a field the demo stack owns. */
+ * adapter never has to rename a field the demo stack owns.
+ *
+ * The `traffic` and `crowd` fields are derived from `snapshots[timelineIndex]`
+ * when a timeline index is available; they are set to the first snapshot's data
+ * when used without an index (e.g., for the production API bridge).
+ *
+ * `snapshots` provides all timestamps' data for timeline playback. */
 export interface DemoTimeseriesResponse {
   readonly data_status: string;
   readonly timeline: string[];
+  /** All available timeseries snapshots ordered by timeline. */
+  readonly snapshots: readonly DemoSnapshotEntry[];
+  /**
+   * Traffic records for the first snapshot (backward-compatible placeholder;
+   * prefer `snapshots[index]?.traffic` with an active timeline index).
+   */
   readonly traffic: RawTrafficEntry[];
+  /**
+   * Crowd records for the first snapshot (backward-compatible placeholder;
+   * prefer `snapshots[index]?.crowd` with an active timeline index).
+   */
   readonly crowd: RawCrowdEntry[];
   readonly stations: string[];
   /** Anomalies detected in this timeseries snapshot. */
@@ -150,6 +173,7 @@ interface DemoIncidentsResponseBody {
   readonly primary_evacuation: string;
   readonly secondary_evacuation: readonly string[];
   readonly excluded_routes?: readonly { segment_id: string; reason: string }[];
+  readonly exclusion_reasons?: readonly { segment_id: string; reason: string; source_article: number }[];
   readonly ete: {
     readonly ete_minutes: number;
     readonly severity: string;
@@ -164,6 +188,9 @@ interface DemoIncidentsResponseBody {
   readonly model_id?: string;
   readonly retriever_type?: string;
   readonly rag_trace?: Readonly<Record<string, unknown>>;
+  readonly route_reasoning_trace?: Readonly<Record<string, unknown>>;
+  readonly ete_calculation?: Readonly<Record<string, unknown>> | null;
+  readonly elapsed_ms?: number;
   readonly recommendation?: {
     readonly title?: string;
     readonly incident_summary?: string;
@@ -178,6 +205,7 @@ interface DemoIncidentsResponseBody {
       readonly time_window?: string;
       readonly rationale?: string;
       readonly source_article?: number;
+      readonly parameter_status?: string;
     }>;
     readonly route_actions?: {
       readonly primary_route?: string;
@@ -236,6 +264,9 @@ export interface DemoDecisionView {
   readonly modelId: string | null;
   readonly retrieverType: string | null;
   readonly ragTrace: Readonly<Record<string, unknown>> | null;
+  readonly routeReasoningTrace: Readonly<Record<string, unknown>> | null;
+  readonly eteCalculation: Readonly<Record<string, unknown>> | null;
+  readonly elapsedMs: number | null;
   readonly multilingualRequired: boolean;
   readonly publicAlerts: DemoPublicAlertsData | null;
   readonly recommendation: DemoRecommendationData | null;
@@ -293,6 +324,7 @@ export interface DemoTechnicalActionData {
   readonly time_window: string | null;
   readonly rationale: string | null;
   readonly source_article: number | null;
+  readonly parameter_status: string | null;
 }
 
 // ─── Timeseries Cache ────────────────────────────────────────
@@ -404,8 +436,38 @@ export function createDemoApiClient(config: DemoApiClientConfig): DemoApiClient 
       const raw = (await fetchJson(resolveUrl('demo/timeseries'), {
         signal,
       })) as DemoTimeseriesResponse;
+
+      // Normalize the response: ensure snapshots[], traffic[], crowd[] are present.
+      // If the deployed backend hasn't been updated yet, fall back to the legacy
+      // flat shape so the frontend stays functional.
+      const hasSnapshots = Array.isArray((raw as unknown as Record<string, unknown>).snapshots);
+      let normalized: DemoTimeseriesResponse;
+      if (hasSnapshots && raw.snapshots.length > 0) {
+        // New format: fill backward-compatible traffic/crowd from the first snapshot
+        normalized = {
+          ...raw,
+          traffic: (raw.snapshots[0]?.traffic ?? raw.traffic ?? []) as RawTrafficEntry[],
+          crowd: (raw.snapshots[0]?.crowd ?? raw.crowd ?? []) as RawCrowdEntry[],
+        };
+      } else {
+        // Legacy format (no snapshots): wrap flat traffic/crowd into a single snapshot
+        const traffic = raw.traffic ?? [];
+        const crowd = raw.crowd ?? [];
+        const timeline = raw.timeline ?? [];
+        normalized = {
+          ...raw,
+          snapshots: [
+            {
+              timestamp_display: timeline[0] ?? '',
+              traffic: traffic as readonly RawTrafficEntry[],
+              crowd: crowd as readonly RawCrowdEntry[],
+            },
+          ],
+        };
+      }
+
       return {
-        response: raw,
+        response: normalized,
         traceId: `demo-timeseries-${Date.now()}`,
       };
     })();
@@ -664,6 +726,7 @@ export function createDemoApiClient(config: DemoApiClientConfig): DemoApiClient 
         time_window: a.time_window ?? null,
         rationale: a.rationale ?? null,
         source_article: a.source_article ?? null,
+        parameter_status: a.parameter_status ?? null,
       })),
       route_actions: rec.route_actions !== undefined ? {
         primary_route: rec.route_actions.primary_route ?? null,
@@ -727,6 +790,9 @@ export function createDemoApiClient(config: DemoApiClientConfig): DemoApiClient 
       modelId: raw.model_id ?? null,
       retrieverType: raw.retriever_type ?? null,
       ragTrace: raw.rag_trace ?? null,
+      routeReasoningTrace: raw.route_reasoning_trace ?? null,
+      eteCalculation: raw.ete_calculation ?? null,
+      elapsedMs: raw.elapsed_ms ?? null,
       multilingualRequired: raw.multilingual_required ?? raw.severity === 'Critical',
       publicAlerts,
       recommendation,

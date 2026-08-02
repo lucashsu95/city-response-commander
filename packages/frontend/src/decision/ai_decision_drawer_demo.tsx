@@ -25,6 +25,7 @@ export interface AiDecisionDrawerDemoProps {
   readonly evidenceTrace: Readonly<Record<string, unknown>>;
   readonly acceptedRoutes: readonly string[];
   readonly rejectedRoutes: readonly { id: string; reason: string }[];
+  readonly onClose?: () => void;
 }
 
 type DrawerSection = 'rag' | 'routes' | 'sop';

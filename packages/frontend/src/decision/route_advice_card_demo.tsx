@@ -12,7 +12,7 @@
  */
 
 import type { ReactNode } from 'react';
-import type { DemoDecisionView } from '../../api/demo_api_adapter.js';
+import type { DemoDecisionView } from '../api/demo_api_adapter.js';
 
 export interface RouteAdviceCardDemoProps {
   readonly decision: DemoDecisionView | null;

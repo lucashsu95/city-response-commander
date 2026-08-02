@@ -29,7 +29,7 @@ import { useAnomalyPopup } from '../alerts/use_anomaly_popup.js';
 import { useDemoAnomalyPopup } from '../alerts/use_anomaly_popup_demo.js';
 import { createApiClient } from '../api/client.js';
 import { createDemoApiClient } from '../api/demo_api_adapter.js';
-import type { DemoApiClient, DemoDecisionView } from '../api/demo_api_adapter.js';
+import type { DemoApiClient, DemoDecisionView, DemoTimeseriesResponse } from '../api/demo_api_adapter.js';
 import { AdminSessionControl } from '../auth/admin_session_control.js';
 import type { AdminToken } from '../auth/admin_session.js';
 import { useCrowdSnapshot } from '../crowd/use_crowd_snapshot.js';
@@ -44,6 +44,7 @@ import { ControlCenterRecommendationPanel } from '../decision/control_center_rec
 import { AiDecisionCardDemo } from '../decision/ai_decision_card_demo.js';
 import { RouteAdviceCardDemo } from '../decision/route_advice_card_demo.js';
 import { MultilingualCardDemo } from '../decision/multilingual_card_demo.js';
+import { ReasoningChainPanel } from '../decision/reasoning_chain_panel.js';
 import { ReportPanel } from '../decision/report_panel.js';
 import { RoutePanel } from '../decision/route_panel.js';
 import { useDecisionReadModel } from '../decision/use_decision_read_model.js';
@@ -148,22 +149,28 @@ function DemoCommandCenterPage({
     transport: adapter,
   });
 
+  // ── Single timeseries state: snapshots + timeline index ──────────────────────
+  const allSnapshots = demoTimeseries.snapshot?.snapshots ?? [];
   const timestamps = demoTimeseries.snapshot?.timeline ?? [];
   const isLoading = demoTimeseries.state === 'loading';
 
-  // Derive the authoritative timeline position for the map's currentTimestamp prop.
-  const currentTimestamp: string | null =
-    timelineIndex !== null && timelineIndex >= 0 && timelineIndex < timestamps.length
-      ? timestamps[timelineIndex]
-      : timestamps.length > 0
-        ? timestamps[timestamps.length - 1]
+  // Derive the active snapshot from the current timeline index.
+  // This is the ONE source of truth for all displayed data.
+  const activeSnapshot =
+    timelineIndex !== null && timelineIndex >= 0 && timelineIndex < allSnapshots.length
+      ? allSnapshots[timelineIndex]
+      : allSnapshots.length > 0
+        ? allSnapshots[allSnapshots.length - 1]
         : null;
 
-  // Timeline controls
-  const handleTimelineSelect = useCallback((ts: string) => {
-    const idx = timestamps.indexOf(ts);
-    if (idx >= 0) setTimelineIndex(idx);
-  }, [timestamps]);
+  // ── Timeline controls ────────────────────────────────────────────────────────
+  const handleTimelineSelect = useCallback(
+    (ts: string) => {
+      const idx = timestamps.indexOf(ts);
+      if (idx >= 0) setTimelineIndex(idx);
+    },
+    [timestamps],
+  );
 
   const handleTimelinePrevious = useCallback(() => {
     setTimelineIndex((prev) => {
@@ -181,22 +188,27 @@ function DemoCommandCenterPage({
 
   const handleTimelinePlay = useCallback(() => {
     if (timestamps.length === 0) return;
+    // If already at the last index, restart from the beginning
+    if (timelineIndex === null || timelineIndex >= timestamps.length - 1) {
+      setTimelineIndex(0);
+    }
     setTimelinePlaying(true);
-  }, [timestamps.length]);
+  }, [timestamps.length, timelineIndex]);
 
   const handleTimelinePause = useCallback(() => {
     setTimelinePlaying(false);
   }, []);
 
-  // Auto-advance when playing
+  // ── Auto-advance timer (StrictMode-safe, single interval) ───────────────────
   useEffect(() => {
     if (!timelinePlaying) {
-      if (playbackRef.current) {
+      if (playbackRef.current !== null) {
         clearInterval(playbackRef.current);
         playbackRef.current = null;
       }
       return;
     }
+    // Functional update avoids stale closure
     playbackRef.current = setInterval(() => {
       setTimelineIndex((prev) => {
         if (prev === null) return 0;
@@ -206,15 +218,22 @@ function DemoCommandCenterPage({
         }
         return prev + 1;
       });
-    }, 2000);
+    }, 1000);
     return () => {
-      if (playbackRef.current) clearInterval(playbackRef.current);
+      if (playbackRef.current !== null) {
+        clearInterval(playbackRef.current);
+        playbackRef.current = null;
+      }
     };
+    // Intentionally include timestamps.length — the stop condition depends on it.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [timelinePlaying, timestamps.length]);
 
-  // Road metrics from /demo/timeseries traffic rows
+  // ── Metrics derived from activeSnapshot ───────────────────────────────────────
+
+  // Road metrics from the active snapshot's traffic rows
   const roadMetrics = useMemo<readonly RoadMetricData[]>(() => {
-    const traffic = demoTimeseries.snapshot?.traffic ?? [];
+    const traffic = activeSnapshot?.traffic ?? [];
     return traffic.map((t) => {
       const sat = t.Saturation_Score;
       const level = sat >= 0.85 ? 'blocked' : sat >= 0.60 ? 'caution' : 'clear';
@@ -225,28 +244,39 @@ function DemoCommandCenterPage({
         status: level as 'clear' | 'caution' | 'blocked' | 'unknown',
       };
     });
-  }, [demoTimeseries.snapshot]);
+  }, [activeSnapshot]);
 
-  // Crowd metrics from /demo/timeseries crowd rows
+  // Crowd metrics from the active snapshot's crowd rows
   const crowdMetrics = useMemo<readonly CrowdMetricData[]>(() => {
-    return (demoTimeseries.snapshot?.crowd ?? []).map((c) => ({
+    return (activeSnapshot?.crowd ?? []).map((c) => ({
       stationId: c.BS_ID,
       locationName: c.Location_Name,
       userCount: c.User_Count,
       roamingPct: c.roaming_pct_value,
     }));
-  }, [demoTimeseries.snapshot]);
+  }, [activeSnapshot]);
 
-  // Roaming metrics
+  // Roaming metrics from the active snapshot
   const roamingMetrics = useMemo<readonly RoamingMetricData[]>(() => {
-    return (demoTimeseries.snapshot?.crowd ?? [])
+    return (activeSnapshot?.crowd ?? [])
       .filter((c) => c.roaming_pct_value > 0)
       .map((c) => ({
         stationId: c.BS_ID,
         roamingPct: c.roaming_pct_value,
       }))
       .sort((a, b) => (b.roamingPct ?? 0) - (a.roamingPct ?? 0));
-  }, [demoTimeseries.snapshot]);
+  }, [activeSnapshot]);
+
+  // ── GeographicMap data ─────────────────────────────────────────────────────────
+  // Build a partial snapshot for GeographicMap: traffic/crowd from active snapshot,
+  // metadata from the full response. GeographicMap reads only .traffic/.crowd.
+  const mapSnapshot = demoTimeseries.snapshot
+    ? ({
+        ...demoTimeseries.snapshot,
+        traffic: activeSnapshot?.traffic ?? [],
+        crowd: activeSnapshot?.crowd ?? [],
+      } as DemoTimeseriesResponse)
+    : null;
 
   // AI decision card — reads all fields from DemoDecisionView (ETE, recovery_at, SOP, RAG, etc.)
   const aiDecisionContent = <AiDecisionCardDemo decision={lastDecision} />;
@@ -258,6 +288,9 @@ function DemoCommandCenterPage({
   const recommendationContent = lastDecision?.recommendation
     ? <ControlCenterRecommendationPanel recommendation={lastDecision.recommendation} />
     : null;
+
+  // Reasoning chain panel (RAG trace + route reasoning + ETE calc)
+  const reasoningContent = <ReasoningChainPanel decision={lastDecision} />;
 
   // Multilingual card with two-stage publish flow
   const multilingualContent = (
@@ -303,7 +336,7 @@ function DemoCommandCenterPage({
       onTimelinePause={handleTimelinePause}
       mapContent={
         <GeographicMap
-          snapshot={demoTimeseries.snapshot}
+          snapshot={mapSnapshot}
           decision={lastDecision}
           loading={isLoading}
           errorMessage={demoTimeseries.errorMessage}
@@ -317,6 +350,7 @@ function DemoCommandCenterPage({
       aiDecisionContent={aiDecisionContent}
       routeAdviceContent={routeAdviceContent}
       recommendationContent={recommendationContent}
+      reasoningContent={reasoningContent}
       multilingualContent={multilingualContent}
       whatifContent={whatifContent}
       injectionContent={injectionContent}

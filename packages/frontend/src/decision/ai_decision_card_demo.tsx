@@ -16,7 +16,7 @@
 
 import * as React from 'react';
 import type { ReactNode } from 'react';
-import type { DemoDecisionView } from '../../api/demo_api_adapter.js';
+import type { DemoDecisionView } from '../api/demo_api_adapter.js';
 import { AiDecisionDrawerDemo } from './ai_decision_drawer_demo.js';
 
 export interface AiDecisionCardDemoProps {
@@ -104,7 +104,13 @@ export function AiDecisionCardDemo({ decision }: AiDecisionCardDemoProps): React
 
       {drawerOpen && (
         <AiDecisionDrawerDemo
-          decision={decision}
+          retrieverType={decision.retrieverType}
+          modelId={decision.modelId}
+          textSource={decision.textSource}
+          ragTrace={decision.ragTrace}
+          evidenceTrace={decision.evidenceTrace}
+          acceptedRoutes={[]}
+          rejectedRoutes={decision.excludedRoutes.map((r: { segment_id: string; reason: string }) => ({ id: r.segment_id, reason: r.reason }))}
           onClose={() => setDrawerOpen(false)}
         />
       )}

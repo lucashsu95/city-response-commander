@@ -85,6 +85,18 @@ function TechnicalActionRow({
           </dd>
         </div>
         <div className="ccr-technical-action__field">
+          <dt>參數狀態</dt>
+          <dd>
+            {action.parameter_status === 'sop_specific' ? (
+              <span className="ccr-tag ccr-tag--ok">SOP 已提供精確值</span>
+            ) : action.parameter_status === 'sop_not_specific' ? (
+              <span className="ccr-tag ccr-tag--warn">SOP 未提供精確秒數，建議依現場流量動態調整</span>
+            ) : (
+              '後端未提供'
+            )}
+          </dd>
+        </div>
+        <div className="ccr-technical-action__field">
           <dt>時間窗口</dt>
           <dd>{action.time_window ?? '後端未提供'}</dd>
         </div>

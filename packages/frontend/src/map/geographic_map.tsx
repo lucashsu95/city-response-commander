@@ -34,6 +34,7 @@ import {
 } from './road_geometry_adapter.js';
 import type { DemoDecisionView } from '../api/demo_api_adapter.js';
 import type { DemoTimeseriesResponse } from '../api/demo_api_adapter.js';
+import { formatRatioAsPercent, calculateAverageRatio } from '../utils/percentage.js';
 
 // ─── Constants ───────────────────────────────────────────────
 
@@ -143,7 +144,7 @@ function CrowdStatsSummary({ crowd }: CrowdStatsProps): ReactNode {
   if (crowd.length === 0) return null;
 
   const totalUsers = crowd.reduce((sum, c) => sum + (c.User_Count ?? 0), 0);
-  const avgRoaming = crowd.reduce((sum, c) => sum + (c.roaming_pct_value ?? 0), 0) / crowd.length;
+  const avgRoaming = calculateAverageRatio(crowd.map((c) => c.roaming_pct_value));
 
   return (
     <div className="geo-map__crowd-stats" role="status" aria-label="基地台統計">
@@ -155,7 +156,7 @@ function CrowdStatsSummary({ crowd }: CrowdStatsProps): ReactNode {
         <span>總用戶</span><span>{totalUsers.toLocaleString()} 人</span>
       </div>
       <div className="geo-map__crowd-stats__row">
-        <span>均漫遊</span><span>{avgRoaming.toFixed(1)}%</span>
+        <span>均漫遊</span><span>{formatRatioAsPercent(avgRoaming, 1)}</span>
       </div>
     </div>
   );
@@ -183,6 +184,10 @@ function ErrorOverlay({ msg }: { msg: string }): ReactNode {
 // ─── Main Component ──────────────────────────────────────────
 
 export interface GeographicMapProps {
+  /**
+   * Full timeseries response. The parent ensures `traffic` and `crowd` fields
+   * reflect the active snapshot for the current timeline index.
+   */
   readonly snapshot: DemoTimeseriesResponse | null;
   readonly decision: DemoDecisionView | null;
   readonly loading: boolean;

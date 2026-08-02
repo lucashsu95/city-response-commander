@@ -9,7 +9,7 @@
  *   Art.1  — B級門檻 0.85, A級門檻 0.95
  *   Art.3  — BL17 Growth_Rate > 0.30 或 User_Count > 25,000
  *   Art.4  — DOME User_Count 历史峰值 >= 30,000 且 Growth_Rate <= -0.20
- *   Art.6  — Roaming_User_Pct >= 0.30
+ *   Art.6  — Roaming_User_Pct >= 0.30  (ratio in [0, 1])
  *   Art.7  — ETE = base_clearance + congestion_penalty
  *            base_clearance: Critical=60, High=40, Medium=20 (分鐘)
  *            congestion_penalty = (avg_saturation - 0.5) * 60, min 0
@@ -18,6 +18,47 @@
  */
 
 import type { Language } from './enums.js';
+
+/**
+ * A single traffic record within a timeseries snapshot.
+ * `Saturation_Score` is a ratio in [0, 1].
+ */
+export interface DemoTrafficEntry {
+  readonly timestamp_raw: string;
+  readonly Segment_ID: string;
+  readonly Road_Name: string;
+  readonly Avg_Speed: number;
+  readonly Vehicle_Count: number;
+  /** Ratio in [0, 1]. 0.85 = 85% saturation. */
+  readonly Saturation_Score: number;
+  readonly Lane_Status: string;
+}
+
+/**
+ * A single crowd/base-station record within a timeseries snapshot.
+ * `roaming_pct_value` is a ratio in [0, 1]; parsed from CSV "30%" → 0.30.
+ */
+export interface DemoCrowdEntry {
+  readonly timestamp_raw: string;
+  readonly BS_ID: string;
+  readonly Location_Name: string;
+  readonly User_Count: number;
+  readonly Stay_Time_Avg: number;
+  readonly Growth_Rate: number;
+  readonly Roaming_User_Pct: string;
+  /** Ratio in [0, 1]. 0.30 = 30%. */
+  readonly roaming_pct_value: number;
+}
+
+/**
+ * A timeseries snapshot keyed to one timeline timestamp.
+ * The frontend uses `timelineIndex` to select which snapshot to display.
+ */
+export interface DemoTimeseriesSnapshot {
+  readonly timestamp_display: string;
+  readonly traffic: readonly DemoTrafficEntry[];
+  readonly crowd: readonly DemoCrowdEntry[];
+}
 
 // ─── Anomaly (GET /demo/timeseries) ──────────────────────────────────────────
 
@@ -77,6 +118,8 @@ export interface DemoTechnicalAction {
   readonly rationale: string;
   /** SOP article that mandates this action */
   readonly source_article: number;
+  /** Whether SOP provides exact parameter value; 'sop_not_specific' means SOP gives direction only */
+  readonly parameter_status: 'sop_specific' | 'sop_not_specific';
 }
 
 /** Control-center recommendation for a processed incident. */

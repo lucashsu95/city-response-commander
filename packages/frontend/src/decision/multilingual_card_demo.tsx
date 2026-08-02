@@ -16,7 +16,7 @@
 
 import * as React from 'react';
 import type { ReactNode } from 'react';
-import type { DemoDecisionView, DemoApiClient } from '../../api/demo_api_adapter.js';
+import type { DemoDecisionView, DemoApiClient } from '../api/demo_api_adapter.js';
 
 export interface MultilingualCardDemoProps {
   readonly decision: DemoDecisionView | null;
@@ -43,11 +43,12 @@ function getAlertContent(
 ): string {
   const alerts = decision.publicAlerts;
   if (!alerts) return '後端未提供';
+  const msgs = alerts.messages;
   const map: Record<Language, string | null> = {
-    中文: alerts.zh ?? null,
-    English: alerts.en ?? null,
-    日本語: alerts.ja ?? null,
-    한국어: alerts.ko ?? null,
+    中文: msgs.zh ?? null,
+    English: msgs.en ?? null,
+    日本語: msgs.ja ?? null,
+    한국어: msgs.ko ?? null,
   };
   return map[lang] ?? '後端未提供';
 }
@@ -55,9 +56,10 @@ function getAlertContent(
 function getAvailableLanguages(decision: DemoDecisionView): Language[] {
   const alerts = decision.publicAlerts;
   if (!alerts) return ['中文', 'English'];
+  const msgs = alerts.messages;
   return LANGUAGE_LABELS.filter((l) => {
     if (l === '中文' || l === 'English') return true;
-    return alerts[l] != null && alerts[l] !== '';
+    return msgs[l] != null && msgs[l] !== '';
   });
 }
 
@@ -86,6 +88,12 @@ export function MultilingualCardDemo({ decision, adapter }: MultilingualCardDemo
   const hasContent = alerts !== null;
   const isHighlighted = decision.multilingualRequired;
   const availableLanguages = getAvailableLanguages(decision);
+  // SOP Article 6 threshold: roaming ≥ 30% triggers multilingual alerts
+  const sopTriggerEvidence = {
+    threshold_ratio: 0.30,
+    threshold_percent: '30%',
+    source_article: 'SOP 第 6 條',
+  };
 
   const handlePublishClick = () => {
     setPublishStage('preview');
@@ -150,6 +158,29 @@ export function MultilingualCardDemo({ decision, adapter }: MultilingualCardDemo
         )}
       </div>
       <div className="ai-card__body">
+        {/* 30% threshold evidence — visible when multilingualRequired=true */}
+        {isHighlighted && (
+          <div className="ai-multilingual-evidence">
+            <p className="ai-multilingual-evidence__title">30% 門檻觸發證據</p>
+            <dl className="ai-multilingual-evidence__list">
+              <div>
+                <dt>來源 SOP</dt>
+                <dd>{sopTriggerEvidence.source_article}</dd>
+              </div>
+              <div>
+                <dt>漫遊率門檻</dt>
+                <dd>≥ {sopTriggerEvidence.threshold_percent}</dd>
+              </div>
+              <div>
+                <dt>觸發條件</dt>
+                <dd>任一站點 Roaming_User_Pct ≥ {sopTriggerEvidence.threshold_percent}</dd>
+              </div>
+            </dl>
+            <p className="ai-multilingual-evidence__note">
+              站點與實際漫遊率詳見下方地圖人流卡片；本卡顯示由 {sopTriggerEvidence.source_article} 自動觸發的多語文案。
+            </p>
+          </div>
+        )}
         {/* Publish Stage: idle / preview / confirming / success / error */}
         {publishStage === 'idle' && (
           <>

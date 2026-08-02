@@ -478,6 +478,7 @@ function buildControlCenterRecommendation(params: {
     time_window: string;
     rationale: string;
     source_article: number;
+    parameter_status: 'sop_specific' | 'sop_not_specific';
   }> = [];
 
   // Art.1: Signal control
@@ -497,6 +498,7 @@ function buildControlCenterRecommendation(params: {
         time_window: '持續至事件解除',
         rationale: `SOP第1條：A級癱瘠（飽和度${params.satScore}>=${SOP_ART1_A_THRESHOLD}），啟動長綠燈時制，並將替代道路綠燈配時+25%。`,
         source_article: 1,
+        parameter_status: 'sop_specific',
       });
       // Alternative road green +25%
       if (params.primaryEvacuation) {
@@ -512,6 +514,7 @@ function buildControlCenterRecommendation(params: {
             time_window: '持續至事件解除',
             rationale: `SOP第1條：替代道路 ${altSeg.name} 同步增加綠燈配時25%以容納分流車流。`,
             source_article: 1,
+            parameter_status: 'sop_specific',
           });
         }
       }
@@ -527,6 +530,7 @@ function buildControlCenterRecommendation(params: {
         time_window: '持續至事件解除',
         rationale: `SOP第1條：B級壅擠（飽和度${params.satScore}>=${SOP_ART1_B_THRESHOLD}），啟動長綠燈時制。`,
         source_article: 1,
+        parameter_status: 'sop_not_specific',
       });
     }
   }
@@ -543,6 +547,7 @@ function buildControlCenterRecommendation(params: {
       time_window: '事件期間',
       rationale: `SOP第2條：${inc.location ?? inc.affected_segment}（${inc.severity}）事故，主疏散路徑 ${primaryName} 容量足夠，已列為第一優先。`,
       source_article: 2,
+      parameter_status: 'sop_specific',
     });
     for (const sr of params.secondaryEvacuation.slice(0, 2)) {
       const srSeg = params.roadNetwork.getAllSegments().find((s) => s.segment_id === sr);
@@ -557,6 +562,7 @@ function buildControlCenterRecommendation(params: {
           time_window: '主路徑失效時啟用',
           rationale: `SOP第2條：${srSeg.name} 列為次要疏散路徑（下游相交道路）。`,
           source_article: 2,
+          parameter_status: 'sop_specific',
         });
       }
     }
@@ -574,6 +580,7 @@ function buildControlCenterRecommendation(params: {
       time_window: '人流緩解前',
       rationale: 'SOP第3條：BL17 Growth_Rate或User_Count超標，建議捷運過站不停以加速疏解。',
       source_article: 3,
+      parameter_status: 'sop_not_specific',
     });
     technicalActions.push({
       system: '接駁調度',
@@ -585,6 +592,7 @@ function buildControlCenterRecommendation(params: {
       time_window: '散場期間',
       rationale: 'SOP第3條：引導群眾步行至相鄰站點，並通知公車處調度接駁專車。',
       source_article: 3,
+      parameter_status: 'sop_not_specific',
     });
   }
 
@@ -602,6 +610,7 @@ function buildControlCenterRecommendation(params: {
       time_window: '號誌修復前',
       rationale: 'SOP第5條：號誌故障，派遣警力至受影響路口，每路口2人指揮。',
       source_article: 5,
+      parameter_status: 'sop_specific',
     });
   }
 
@@ -867,13 +876,45 @@ function handleTimeSeries(): APIGatewayProxyResult {
 
   const anomalies = analyzeAnomalies(data.traffic, data.crowd);
 
+  // Group traffic and crowd records by timestamp into up to 10 snapshots.
+  // Each snapshot contains only the records for that specific timestamp.
+  // This allows the frontend to derive the active snapshot from timelineIndex.
+  const timestampMap = new Map<string, { traffic: RawTrafficRecord[]; crowd: RawCrowdRecord[] }>();
+
+  for (const rec of data.traffic) {
+    const ts = rec.timestamp_raw;
+    if (!timestampMap.has(ts)) {
+      timestampMap.set(ts, { traffic: [], crowd: [] });
+    }
+    timestampMap.get(ts)!.traffic.push(rec);
+  }
+
+  for (const rec of data.crowd) {
+    const ts = rec.timestamp_raw;
+    if (!timestampMap.has(ts)) {
+      timestampMap.set(ts, { traffic: [], crowd: [] });
+    }
+    timestampMap.get(ts)!.crowd.push(rec);
+  }
+
+  // Build ordered snapshot list matching the timeline order (first 10 timestamps)
+  const orderedTimestamps = data.trafficTimestamps.slice(0, 10);
+  const snapshots = orderedTimestamps.map((ts) => {
+    const entry = timestampMap.get(ts.timestamp_raw);
+    return {
+      timestamp_display: ts.timestamp_display,
+      traffic: (entry?.traffic ?? []).slice(0, 15),
+      crowd: (entry?.crowd ?? []).slice(0, 15),
+    };
+  });
+
   return jsonResponse(200, {
     data_status: 'ready',
-    timeline: data.trafficTimestamps.slice(0, 10).map((ts) => ts.timestamp_display),
-    traffic: data.traffic.slice(0, 5),
-    crowd: data.crowd.slice(0, 5),
+    timeline: orderedTimestamps.map((ts) => ts.timestamp_display),
     stations: [...new Set(data.crowd.map((r) => r.BS_ID))].slice(0, 10),
     anomalies,
+    // snapshots are ordered by timeline; frontend uses timelineIndex to select
+    snapshots,
   });
 }
 
@@ -914,6 +955,7 @@ function findIncident(incidents: readonly Incident[], eventId: string): Incident
 }
 
 function handleIncident(body: string | null | undefined): APIGatewayProxyResult {
+  const startedAt = Date.now();
   const data = _data;
   if (!data) return jsonResponse(500, { error: 'Data not loaded' });
 
@@ -1261,6 +1303,12 @@ function handleIncident(body: string | null | undefined): APIGatewayProxyResult 
     invoked_procedures: core.invoked_procedures,
     primary_evacuation: core.primary_evacuation,
     secondary_evacuation: core.secondary_evacuation,
+    excluded_routes: evacuation.excluded_candidates.map((c) => c.segment_id) as readonly string[],
+    exclusion_reasons: evacuation.excluded_candidates.map((c) => ({
+      segment_id: c.segment_id,
+      reason: c.exclusion_reason ?? '後端未提供排除原因',
+      source_article: 2,
+    })) as readonly { segment_id: string; reason: string; source_article: number }[],
     ete: eteMinutes !== undefined ? { ete_minutes: eteMinutes, severity: (ete?.severity ?? incident.severity) as Severity } : null,
     evidence_trace: evidence,
     cms_core_text: core.cms_core_text,
@@ -1269,6 +1317,7 @@ function handleIncident(body: string | null | undefined): APIGatewayProxyResult 
     rag_trace: ragTrace,
     route_reasoning_trace: routeReasoningTrace,
     ...(eteCalculationTrace !== null && { ete_calculation: eteCalculationTrace }),
+    elapsed_ms: Date.now() - startedAt,
     data_status: 'ready',
     text_source: 'deterministic',
   });

@@ -80,7 +80,7 @@
   /* Layout */
   --header-height: 64px;
   --nav-width: 56px;
-  --ai-column-width: 340px;
+  --ai-column-width: 460px;
   --panel-gap: 12px;
   --panel-radius: 6px;
 
@@ -453,6 +453,187 @@ a:hover {
   flex-direction: column;
   gap: var(--panel-gap);
   padding: var(--panel-gap);
+}
+
+.cmd-ai-column__tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 6px 12px 0 12px;
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--bg-header);
+  position: sticky;
+  top: 0;
+  z-index: 5;
+}
+
+.cmd-ai-column__tab-btn {
+  flex: 1 1 auto;
+  min-width: 64px;
+  padding: 6px 8px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-bottom: 2px solid transparent;
+  color: var(--text-secondary, #ccc);
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
+}
+
+.cmd-ai-column__tab-btn:hover {
+  background: var(--bg-card-hover, rgba(255, 255, 255, 0.06));
+  color: var(--text-primary, #fff);
+}
+
+.cmd-ai-column__tab-btn--active {
+  color: var(--text-primary, #fff);
+  border-bottom-color: var(--accent, #4cc2ff);
+  background: rgba(76, 194, 255, 0.08);
+}
+
+.cmd-ai-column__empty {
+  font-size: 12px;
+  color: var(--text-secondary, #888);
+  padding: 12px;
+  text-align: center;
+}
+
+/* ─── Reasoning Chain Panel ──────────────────────────────── */
+.rcp-panel {
+  background: var(--bg-card);
+  border-radius: var(--panel-radius);
+  padding: 12px;
+  border: 1px solid var(--border-subtle);
+}
+
+.rcp-panel__heading {
+  margin: 0 0 8px 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary, #fff);
+}
+
+.rcp-section {
+  margin-top: 12px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.rcp-section__heading {
+  margin: 0 0 6px 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent, #4cc2ff);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.rcp-fields {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.rcp-field {
+  display: grid;
+  grid-template-columns: minmax(80px, 35%) 1fr;
+  gap: 6px;
+  font-size: 12px;
+  padding: 2px 0;
+}
+
+.rcp-field dt {
+  color: var(--text-secondary, #aaa);
+}
+
+.rcp-field dd {
+  margin: 0;
+  color: var(--text-primary, #fff);
+  word-break: break-word;
+}
+
+.rcp-empty {
+  color: var(--text-secondary, #888);
+  font-size: 12px;
+  padding: 8px 0;
+}
+
+.rcp-details {
+  margin-top: 6px;
+  font-size: 12px;
+}
+
+.rcp-details summary {
+  cursor: pointer;
+  color: var(--accent, #4cc2ff);
+  font-weight: 500;
+}
+
+.rcp-chunks {
+  list-style: decimal;
+  padding-left: 18px;
+  margin: 6px 0 0 0;
+}
+
+.rcp-chunk {
+  margin-bottom: 6px;
+}
+
+.rcp-chunk__excerpt {
+  font-style: italic;
+  color: var(--text-secondary, #ccc);
+  margin: 2px 0;
+}
+
+.rcp-chunk__source {
+  font-size: 11px;
+  color: var(--text-secondary, #888);
+}
+
+.rcp-excluded {
+  margin: 0;
+  padding-left: 18px;
+  list-style: disc;
+}
+
+.rcp-candidates {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+  margin-top: 4px;
+}
+
+.rcp-candidates th,
+.rcp-candidates td {
+  padding: 3px 4px;
+  border: 1px solid var(--border-subtle);
+  text-align: left;
+}
+
+.rcp-candidates th {
+  background: var(--bg-header);
+  color: var(--text-primary, #fff);
+}
+
+/* ─── Control Center Recommendation Panel tags ───────────── */
+.ccr-tag {
+  display: inline-block;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 11px;
+}
+
+.ccr-tag--ok {
+  background: rgba(46, 125, 50, 0.2);
+  color: #81c784;
+  border: 1px solid rgba(46, 125, 50, 0.5);
+}
+
+.ccr-tag--warn {
+  background: rgba(245, 124, 0, 0.2);
+  color: #ffb74d;
+  border: 1px solid rgba(245, 124, 0, 0.5);
 }
 
 .cmd-ai-column__section {

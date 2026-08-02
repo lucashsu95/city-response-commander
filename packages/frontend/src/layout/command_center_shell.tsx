@@ -22,6 +22,7 @@ import {
 import { createPortal } from 'react-dom';
 import type { ConnectionMode } from '../state/app_state.js';
 import { OperationalStatusBar } from '../components/system/operational_status.js';
+import { formatRatioAsPercent, roamingBarWidth } from '../utils/percentage.js';
 
 // ─── Clock ────────────────────────────────────────────────
 
@@ -432,6 +433,7 @@ function MetricCharts({ roads, crowd, roaming }: MetricChartsProps): ReactNode {
             <div className="metric-card__ranked">
               {roaming.slice(0, 5).map((r, i) => {
                 const pct = r.roamingPct ?? 0;
+                const barWidth = roamingBarWidth(pct);
                 return (
                   <div key={r.stationId} className="metric-ranked">
                     <span className="metric-ranked__rank">{i + 1}</span>
@@ -439,10 +441,10 @@ function MetricCharts({ roads, crowd, roaming }: MetricChartsProps): ReactNode {
                     <span className="metric-ranked__bar">
                       <span
                         className="metric-ranked__fill"
-                        style={{ width: `${Math.min(100, pct)}%` }}
+                        style={{ width: `${barWidth}%` }}
                       />
                     </span>
-                    <span className="metric-ranked__value">{pct > 0 ? `${pct.toFixed(1)}%` : '—'}</span>
+                    <span className="metric-ranked__value">{formatRatioAsPercent(pct)}</span>
                   </div>
                 );
               })}
@@ -786,6 +788,8 @@ export interface CommandCenterShellProps {
   readonly injectionContent: ReactNode;
   /** Control Center Recommendation panel (optional, shown after injection) */
   readonly recommendationContent?: ReactNode;
+  /** Reasoning chain panel (optional) */
+  readonly reasoningContent?: ReactNode;
   /** Anomaly demo popup overlay (optional) */
   readonly overlayContent?: ReactNode;
 }
@@ -815,10 +819,14 @@ export function CommandCenterShell({
   whatifContent,
   injectionContent,
   recommendationContent,
+  reasoningContent,
   overlayContent,
 }: CommandCenterShellProps): ReactNode {
   const [activeNav, setActiveNav] = useState('dashboard');
   const [injectionOpen, setInjectionOpen] = useState(false);
+  const [activeModuleTab, setActiveModuleTab] = useState<
+    'judgment' | 'routes' | 'reasoning' | 'recommendation' | 'multilingual'
+  >('judgment');
 
   const handleNavigate = useCallback((id: string) => {
     setActiveNav(id);
@@ -884,21 +892,86 @@ export function CommandCenterShell({
 
         {/* Right: AI Decision Column */}
         <aside className="cmd-ai-column" aria-label="AI 決策面板">
+          {/* AI Decision Column with tabs for first-screen visibility */}
+          <div className="cmd-ai-column__tabs" role="tablist" aria-label="五大模組切換">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activeModuleTab === 'judgment'}
+              className={`cmd-ai-column__tab-btn ${activeModuleTab === 'judgment' ? 'cmd-ai-column__tab-btn--active' : ''}`}
+              onClick={() => setActiveModuleTab('judgment')}
+            >
+              即時判定
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activeModuleTab === 'routes'}
+              className={`cmd-ai-column__tab-btn ${activeModuleTab === 'routes' ? 'cmd-ai-column__tab-btn--active' : ''}`}
+              onClick={() => setActiveModuleTab('routes')}
+            >
+              路線決策
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activeModuleTab === 'reasoning'}
+              className={`cmd-ai-column__tab-btn ${activeModuleTab === 'reasoning' ? 'cmd-ai-column__tab-btn--active' : ''}`}
+              onClick={() => setActiveModuleTab('reasoning')}
+            >
+              推理 ETE
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activeModuleTab === 'recommendation'}
+              className={`cmd-ai-column__tab-btn ${activeModuleTab === 'recommendation' ? 'cmd-ai-column__tab-btn--active' : ''}`}
+              onClick={() => setActiveModuleTab('recommendation')}
+            >
+              建議書
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activeModuleTab === 'multilingual'}
+              className={`cmd-ai-column__tab-btn ${activeModuleTab === 'multilingual' ? 'cmd-ai-column__tab-btn--active' : ''}`}
+              onClick={() => setActiveModuleTab('multilingual')}
+            >
+              多語通報
+            </button>
+          </div>
           <div className="cmd-ai-column__content">
-            <div id="section-ai" className="cmd-ai-column__section">
-              {aiDecisionContent}
-            </div>
-            <div className="cmd-ai-column__section">
-              {routeAdviceContent}
-            </div>
-            {recommendationContent && (
-              <div className="cmd-ai-column__section">
-                {recommendationContent}
+            {activeModuleTab === 'judgment' && (
+              <div id="section-ai" className="cmd-ai-column__section">
+                {aiDecisionContent}
               </div>
             )}
-            <div className="cmd-ai-column__section">
-              {multilingualContent}
-            </div>
+            {activeModuleTab === 'routes' && (
+              <div className="cmd-ai-column__section">
+                {routeAdviceContent}
+              </div>
+            )}
+            {activeModuleTab === 'reasoning' && (
+              reasoningContent ? (
+                <div className="cmd-ai-column__section">{reasoningContent}</div>
+              ) : recommendationContent ? (
+                <div className="cmd-ai-column__section">{recommendationContent}</div>
+              ) : (
+                <p className="cmd-ai-column__empty">尚無推理資料，請注入突發事件</p>
+              )
+            )}
+            {activeModuleTab === 'recommendation' && (
+              recommendationContent ? (
+                <div className="cmd-ai-column__section">{recommendationContent}</div>
+              ) : (
+                <p className="cmd-ai-column__empty">尚無建議書資料，請注入突發事件</p>
+              )
+            )}
+            {activeModuleTab === 'multilingual' && (
+              <div className="cmd-ai-column__section">
+                {multilingualContent}
+              </div>
+            )}
             <div id="section-whatif" className="cmd-ai-column__section">
               <WhatIfCard content={whatifContent} />
             </div>
