@@ -42,7 +42,7 @@ function getAlertContent(
   lang: Language,
 ): string {
   const alerts = decision.publicAlerts;
-  if (!alerts) return '後端未提供';
+  if (!alerts) return '[系統監控中] 廣播內容準備中…';
   const msgs = alerts.messages;
   const map: Record<Language, string | null> = {
     中文: msgs.zh ?? null,
@@ -50,7 +50,7 @@ function getAlertContent(
     日本語: msgs.ja ?? null,
     한국어: msgs.ko ?? null,
   };
-  return map[lang] ?? '後端未提供';
+  return map[lang] ?? '[系統監控中] 此語言廣播內容準備中…';
 }
 
 function getAvailableLanguages(decision: DemoDecisionView): Language[] {
@@ -78,7 +78,9 @@ export function MultilingualCardDemo({ decision, adapter }: MultilingualCardDemo
           <h3 className="ai-card__title">多語通報</h3>
         </div>
         <div className="ai-card__body">
-          <p className="ai-card__empty-text">後端未提供多語通報內容</p>
+          <p className="ai-card__empty-text">
+            [系統監控中] 尚無緊急多語廣播需求
+          </p>
         </div>
       </div>
     );
@@ -211,7 +213,7 @@ export function MultilingualCardDemo({ decision, adapter }: MultilingualCardDemo
                 </div>
               </>
             ) : (
-              <p className="ai-card__empty-text">後端未提供多語通報內容</p>
+              <p className="ai-card__empty-text">[系統監控中] 尚無緊急多語廣播需求</p>
             )}
             <button
               type="button"
