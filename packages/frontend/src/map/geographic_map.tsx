@@ -1,14 +1,8 @@
 /**
- * Geographic Operations Map (React Leaflet)
+ * Geographic Operations Map — TrafficMap wiring + demo pitch controls.
  *
- * Renders a real OSM street map centred on Taipei's Xinyi/Daan district.
- * Traffic data from /demo/timeseries is displayed as a scrollable summary
- * overlay beside the map.
- *
- * NOTE: `road_network_geometry.json` contains NO geographic coordinates or
- * GeoJSON geometry.  Road polylines cannot be rendered until the backend
- * provides a geometry source.  The map displays the real OSM base layer and
- * traffic status as an overlay card.
+ * Track A: live data from `/demo/timeseries` or production `GET /roads`.
+ * Track B: manual demo preset buttons for pitch scenarios.
  *
  * @module frontend/map/geographic_map
  */
@@ -20,10 +14,18 @@ import {
   useMemo,
   useState,
 } from 'react';
+import { TrafficMap, type TrafficDataItem } from '../components/TrafficMap.js';
+import '../styles/mapAnimation.css';
+import type { DemoDecisionView, DemoTimeseriesResponse } from '../api/demo_api_adapter.js';
+import type { RoadReadModel } from '../roads/road_model.js';
 import {
-  MapContainer,
-  TileLayer,
-} from 'react-leaflet';
+  adaptDemoTrafficToTrafficData,
+  adaptRoadReadModelToTrafficData,
+  TRAFFIC_MAP_DEMO_PRESET_LABELS,
+  TRAFFIC_MAP_DEMO_PRESETS,
+  withDictionaryFallback,
+  type TrafficMapDemoPreset,
+} from './traffic_map_adapter.js';
 import {
   enrichRoadsWithTraffic,
   fetchRoadSegments,
@@ -32,33 +34,20 @@ import {
   type EnrichedRoad,
   type RoadSegment,
 } from './road_geometry_adapter.js';
-import type { DemoDecisionView } from '../api/demo_api_adapter.js';
-import type { DemoTimeseriesResponse } from '../api/demo_api_adapter.js';
-import { formatRatioAsPercent, calculateAverageRatio } from '../utils/percentage.js';
 
-// ─── Constants ───────────────────────────────────────────────
+// ─── Props ───────────────────────────────────────────────────
 
-const TAIPEI_CENTER: [number, number] = [25.0400, 121.5570];
-
-const OSM_TILE_URL = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
-const OSM_ATTRIBUTION =
-  '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
-
-const MAX_ZOOM = 17;
-const MIN_ZOOM = 13;
-
-// ─── No-coordinates notice ──────────────────────────────────
-
-function NoGeometryNotice(): ReactNode {
-  return (
-    <div className="geo-map__no-geometry" role="status">
-      <span className="geo-map__no-geometry-icon">⚠</span>
-      <p className="geo-map__no-geometry-text">
-        後端尚未提供路段地理座標，暫以 OSM 底圖顯示。<br />
-        交通狀態請見右側 summary 面板。
-      </p>
-    </div>
-  );
+export interface GeographicMapProps {
+  readonly snapshot: DemoTimeseriesResponse | null;
+  readonly decision: DemoDecisionView | null;
+  readonly loading: boolean;
+  readonly errorMessage: string | null;
+  readonly selectedSegmentId: string | null;
+  readonly onSegmentClick: (id: string) => void;
+  /** Replay position — filters demo traffic rows by `timestamp_raw`. */
+  readonly currentTimestamp?: string | null;
+  /** Production Track A: decoded `GET /roads` read model. */
+  readonly roadReadModel?: RoadReadModel | null;
 }
 
 // ─── Traffic Summary Row ─────────────────────────────────────
@@ -116,7 +105,9 @@ function RouteBanner({ decision }: RouteBannerProps): ReactNode {
 
   return (
     <div className="geo-map__route-banner" role="status" aria-label="疏散路線">
-      <span className="geo-map__route-banner__icon">🚨</span>
+      <span className="geo-map__route-banner__icon" aria-hidden="true">
+        🚨
+      </span>
       <div className="geo-map__route-banner__content">
         <strong>事故：{decision.location}</strong>
         <span>主疏散：{decision.primaryEvacuation}</span>
@@ -129,40 +120,40 @@ function RouteBanner({ decision }: RouteBannerProps): ReactNode {
   );
 }
 
-// ─── Crowd Stats ─────────────────────────────────────────────
+// ─── Demo Preset Controls ─────────────────────────────────────
 
-interface CrowdStatsProps {
-  readonly crowd: ReadonlyArray<{
-    readonly BS_ID: string;
-    readonly Location_Name: string;
-    readonly User_Count: number;
-    readonly roaming_pct_value: number;
-  }>;
+interface DemoTriggerBarProps {
+  readonly activePreset: TrafficMapDemoPreset | null;
+  readonly onSelectPreset: (preset: TrafficMapDemoPreset | null) => void;
 }
 
-function CrowdStatsSummary({ crowd }: CrowdStatsProps): ReactNode {
-  if (crowd.length === 0) return null;
-
-  const totalUsers = crowd.reduce((sum, c) => sum + (c.User_Count ?? 0), 0);
-  const avgRoaming = calculateAverageRatio(crowd.map((c) => c.roaming_pct_value));
+function DemoTriggerBar({ activePreset, onSelectPreset }: DemoTriggerBarProps): ReactNode {
+  const presets = Object.keys(TRAFFIC_MAP_DEMO_PRESETS) as TrafficMapDemoPreset[];
 
   return (
-    <div className="geo-map__crowd-stats" role="status" aria-label="基地台統計">
-      <h4 className="geo-map__crowd-stats__title">基地台</h4>
-      <div className="geo-map__crowd-stats__row">
-        <span>基站數</span><span>{crowd.length} 站</span>
-      </div>
-      <div className="geo-map__crowd-stats__row">
-        <span>總用戶</span><span>{totalUsers.toLocaleString()} 人</span>
-      </div>
-      <div className="geo-map__crowd-stats__row">
-        <span>均漫遊</span><span>{formatRatioAsPercent(avgRoaming, 1)}</span>
-      </div>
+    <div className="geo-map__demo-triggers" role="toolbar" aria-label="地圖情境快捷">
+      <button
+        type="button"
+        className={`geo-map__demo-trigger${activePreset === null ? ' geo-map__demo-trigger--active' : ''}`}
+        onClick={() => onSelectPreset(null)}
+      >
+        即時資料
+      </button>
+      {presets.map((preset) => (
+        <button
+          key={preset}
+          type="button"
+          className={`geo-map__demo-trigger${activePreset === preset ? ' geo-map__demo-trigger--active' : ''}`}
+          onClick={() => onSelectPreset(preset)}
+        >
+          {TRAFFIC_MAP_DEMO_PRESET_LABELS[preset]}
+        </button>
+      ))}
     </div>
   );
 }
 
-// ─── Loading / Error overlays ────────────────────────────────
+// ─── Overlays ────────────────────────────────────────────────
 
 function LoadingOverlay(): ReactNode {
   return (
@@ -173,7 +164,7 @@ function LoadingOverlay(): ReactNode {
   );
 }
 
-function ErrorOverlay({ msg }: { msg: string }): ReactNode {
+function ErrorOverlay({ msg }: { readonly msg: string }): ReactNode {
   return (
     <div className="geo-map__overlay geo-map__overlay--error" role="alert">
       <span>⚠ {msg}</span>
@@ -183,19 +174,6 @@ function ErrorOverlay({ msg }: { msg: string }): ReactNode {
 
 // ─── Main Component ──────────────────────────────────────────
 
-export interface GeographicMapProps {
-  /**
-   * Full timeseries response. The parent ensures `traffic` and `crowd` fields
-   * reflect the active snapshot for the current timeline index.
-   */
-  readonly snapshot: DemoTimeseriesResponse | null;
-  readonly decision: DemoDecisionView | null;
-  readonly loading: boolean;
-  readonly errorMessage: string | null;
-  readonly selectedSegmentId: string | null;
-  readonly onSegmentClick: (id: string) => void;
-}
-
 export function GeographicMap({
   snapshot,
   decision,
@@ -203,11 +181,13 @@ export function GeographicMap({
   errorMessage,
   selectedSegmentId,
   onSegmentClick,
+  currentTimestamp = null,
+  roadReadModel = null,
 }: GeographicMapProps): ReactNode {
   const [segments, setSegments] = useState<readonly RoadSegment[]>([]);
   const [metadataError, setMetadataError] = useState<string | null>(null);
+  const [demoPreset, setDemoPreset] = useState<TrafficMapDemoPreset | null>(null);
 
-  // Load road segment metadata once
   useEffect(() => {
     fetchRoadSegments()
       .then(setSegments)
@@ -217,28 +197,48 @@ export function GeographicMap({
       });
   }, []);
 
-  // Merge traffic data
+  useEffect(() => {
+    if (decision !== null) {
+      setDemoPreset('incident');
+    }
+  }, [decision?.decisionId]);
+
   const enrichedRoads = useMemo<EnrichedRoad[]>(
     () => enrichRoadsWithTraffic(segments, snapshot?.traffic ?? []),
     [segments, snapshot],
   );
 
-  // Show error overlay for metadata failure
+  const liveTrafficData = useMemo<readonly TrafficDataItem[]>(() => {
+    const fromRoads = adaptRoadReadModelToTrafficData(roadReadModel);
+    if (fromRoads.length > 0) {
+      return withDictionaryFallback(fromRoads);
+    }
+
+    const fromDemo = adaptDemoTrafficToTrafficData(snapshot?.traffic ?? [], currentTimestamp);
+    return withDictionaryFallback(fromDemo);
+  }, [roadReadModel, snapshot?.traffic, currentTimestamp]);
+
+  const trafficData = useMemo<readonly TrafficDataItem[]>(() => {
+    if (demoPreset !== null) {
+      return TRAFFIC_MAP_DEMO_PRESETS[demoPreset];
+    }
+    if (liveTrafficData.length > 0) {
+      return liveTrafficData;
+    }
+    return TRAFFIC_MAP_DEMO_PRESETS.baseline;
+  }, [demoPreset, liveTrafficData]);
+
+  const handleSelectPreset = useCallback((preset: TrafficMapDemoPreset | null) => {
+    setDemoPreset(preset);
+  }, []);
+
   if (metadataError) {
     return (
       <div className="geo-map">
         <div className="geo-map__map-area geo-map__map-area--error">
-          <MapContainer
-            center={TAIPEI_CENTER}
-            zoom={14}
-            minZoom={MIN_ZOOM}
-            maxZoom={MAX_ZOOM}
-            className="geo-map__container"
-            zoomControl={false}
-            attributionControl={false}
-          >
-            <TileLayer url={OSM_TILE_URL} attribution={OSM_ATTRIBUTION} />
-          </MapContainer>
+          <div className="geo-map__traffic-stage geo-map__traffic-stage--glass">
+            <TrafficMap trafficData={TRAFFIC_MAP_DEMO_PRESETS.baseline} />
+          </div>
           <ErrorOverlay msg={`路段資料載入失敗：${metadataError}`} />
         </div>
       </div>
@@ -248,64 +248,44 @@ export function GeographicMap({
   return (
     <div className="geo-map">
       <div className="geo-map__map-area">
-        {/* OSM base map */}
-        <MapContainer
-          center={TAIPEI_CENTER}
-          zoom={14}
-          minZoom={MIN_ZOOM}
-          maxZoom={MAX_ZOOM}
-          className="geo-map__container"
-          zoomControl={false}
-          attributionControl={false}
-        >
-          <TileLayer
-            url={OSM_TILE_URL}
-            attribution={OSM_ATTRIBUTION}
-          />
-        </MapContainer>
-
-        {/* Attribution */}
-        <div className="geo-map__attribution" aria-label="地圖版權">
-          <span dangerouslySetInnerHTML={{ __html: OSM_ATTRIBUTION }} />
+        <div className="geo-map__traffic-stage geo-map__traffic-stage--glass">
+          <TrafficMap trafficData={trafficData} />
         </div>
 
-        {/* Legend */}
+        <DemoTriggerBar activePreset={demoPreset} onSelectPreset={handleSelectPreset} />
+
         <div className="geo-map__legend" role="group" aria-label="交通狀態圖例">
-          <h4 className="geo-map__legend-title">交通視覺分級</h4>
+          <h4 className="geo-map__legend-title">地圖警戒</h4>
           <ul className="geo-map__legend-list">
             <li className="geo-map__legend-item">
-              <span className="geo-map__legend-dot" style={{ background: ROAD_COLORS.critical }} />
-              <span>封閉/高度壅塞</span>
+              <span
+                className="geo-map__legend-line"
+                style={{ height: '4px', background: '#FF3B30' }}
+              />
+              <span>RED — A 級 / 事故路段</span>
             </li>
             <li className="geo-map__legend-item">
-              <span className="geo-map__legend-dot" style={{ background: ROAD_COLORS.warning }} />
-              <span>注意/中度壅塞</span>
+              <span
+                className="geo-map__legend-line"
+                style={{ height: '4px', background: '#FFCC00' }}
+              />
+              <span>YELLOW — B 級注意</span>
             </li>
             <li className="geo-map__legend-item">
-              <span className="geo-map__legend-dot" style={{ background: ROAD_COLORS.normal }} />
-              <span>暢通</span>
-            </li>
-            <li className="geo-map__legend-item">
-              <span className="geo-map__legend-dot" style={{ background: ROAD_COLORS.unknown }} />
-              <span>未知/無資料</span>
+              <span
+                className="geo-map__legend-line"
+                style={{ height: '4px', background: '#34C759' }}
+              />
+              <span>GREEN — 暢通 / 疏散路線</span>
             </li>
           </ul>
         </div>
 
-        {/* No-geometry notice */}
-        <NoGeometryNotice />
-
-        {/* Loading */}
         {loading && <LoadingOverlay />}
-
-        {/* API error */}
         {errorMessage && !loading && <ErrorOverlay msg={errorMessage} />}
-
-        {/* Incident route banner */}
         <RouteBanner decision={decision} />
       </div>
 
-      {/* Traffic summary sidebar */}
       <aside className="geo-map__sidebar" aria-label="路段交通狀態">
         <div className="geo-map__sidebar-header">
           <h3 className="geo-map__sidebar-title">路段狀態</h3>
@@ -325,8 +305,6 @@ export function GeographicMap({
             />
           ))}
         </div>
-
-        <CrowdStatsSummary crowd={snapshot?.crowd ?? []} />
       </aside>
     </div>
   );

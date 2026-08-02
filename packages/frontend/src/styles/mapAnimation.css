@@ -1,0 +1,44 @@
+/**
+ * Neon pulse animation for high-alert (RED) road segments on Leaflet SVG paths.
+ *
+ * Applied via Polyline `pathOptions.className = 'pulsing-red-road'`.
+ */
+
+@keyframes leaflet-red-pulse {
+  0% {
+    opacity: 0.3;
+  }
+
+  50% {
+    opacity: 0.9;
+  }
+
+  100% {
+    opacity: 0.3;
+  }
+}
+
+.pulsing-red-road {
+  animation: leaflet-red-pulse 1.5s ease-in-out infinite;
+}
+
+.traffic-map {
+  width: 100%;
+  height: 100%;
+  min-height: inherit;
+}
+
+.traffic-map__container {
+  width: 100%;
+  height: 100%;
+  min-height: inherit;
+  border-radius: inherit;
+  background: #0a1628;
+}
+
+.traffic-map__popup {
+  display: grid;
+  gap: 0.35rem;
+  font-size: 0.875rem;
+  line-height: 1.4;
+}

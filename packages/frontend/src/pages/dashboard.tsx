@@ -328,6 +328,7 @@ function DemoDashboardPage(): ReactNode {
           errorMessage={demoTimeseries.error}
           selectedSegmentId={selectedSegmentId}
           onSegmentClick={setSelectedSegmentId}
+          currentTimestamp={currentTimestamp}
         />
       }
       roadMetrics={roadMetrics}
