@@ -21,7 +21,7 @@
  * @module frontend/demo/demo_decision_panel
  */
 
-import { useCallback, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { AdminToken } from '../auth/admin_session.js';
 import type { DemoApiClient, DemoDecisionView } from '../api/demo_api_adapter.js';
 
@@ -60,6 +60,15 @@ export function DemoDecisionPanel({
   const [publishStage, setPublishStage] = useState<PublishStage>('idle');
   const [publishResult, setPublishResult] = useState<PublishResult | null>(null);
   const [publishError, setPublishError] = useState<string | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
+
+  // M3: Abort in-flight publish request on unmount to prevent state
+  // updates on unmounted component and wasted network traffic.
+  useEffect(() => {
+    return () => {
+      abortRef.current?.abort();
+    };
+  }, []);
 
   const onInject = useCallback(async () => {
     const trimmed = eventIdInput.trim();
@@ -104,6 +113,18 @@ export function DemoDecisionPanel({
     [lastView],
   );
 
+  // M2: Reset publish flow when the active decision changes to prevent
+  // stale preview — the user was reviewing event A's preview, but a new
+  // inject silently switched lastView to event B.
+  const lastDecisionId = lastView?.decisionId ?? null;
+  useEffect(() => {
+    if (publishStage !== 'idle') {
+      setPublishStage('idle');
+      setPublishResult(null);
+      setPublishError(null);
+    }
+  }, [lastDecisionId]);
+
   const handlePublishClick = useCallback(() => {
     setPublishStage('preview');
     setPublishError(null);
@@ -111,6 +132,11 @@ export function DemoDecisionPanel({
 
   const handleConfirmPublish = useCallback(async () => {
     if (lastView === null) return;
+
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+
     setPublishStage('confirming');
     setPublishError(null);
 
@@ -119,7 +145,10 @@ export function DemoDecisionPanel({
       ['sms', 'cms'],
       'demo-commander',
       publishLanguages,
+      { signal: controller.signal },
     );
+
+    if (controller.signal.aborted) return;
 
     if (!result.ok) {
       setPublishError(result.error.message);
@@ -147,6 +176,7 @@ export function DemoDecisionPanel({
   }, [adapter, lastView, publishLanguages]);
 
   const handleDismissPublish = useCallback(() => {
+    abortRef.current?.abort();
     setPublishStage('idle');
     setPublishResult(null);
     setPublishError(null);
