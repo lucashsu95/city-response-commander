@@ -121,7 +121,7 @@ describe('WhatIfDialog — explicit confirmation gate', () => {
 });
 
 describe('WhatIfDialog — answered outcome', () => {
-  it('renders the concise strategy summary first and the detailed AI explanation last', async () => {
+  it('renders the detailed AI explanation section last, leading with the concise summary then the triggered SOP articles', async () => {
     const postWhatIf = vi.fn(() =>
       Promise.resolve(
         okResult(200, {
@@ -141,15 +141,28 @@ describe('WhatIfDialog — answered outcome', () => {
     await submitQuery(createFakeClient({ postWhatIf }));
     await confirmSubmission();
 
-    expect(screen.getByTestId('whatif-summary').textContent).toContain('首要動作');
-    expect(screen.getByTestId('whatif-explanation').textContent).toContain('完整理由');
-
     const headings = Array.from(
       screen.getByTestId('whatif-answered').querySelectorAll('h4'),
       (heading) => heading.textContent,
     );
-    expect(headings[0]).toBe('策略摘要');
     expect(headings.at(-1)).toBe('詳細 AI 解釋');
+
+    // Within the detailed-explanation section, the short summary comes
+    // first, then the triggered SOP articles, then the full explanation —
+    // compare actual DOM element order, not substring offsets (the summary
+    // text itself legitimately contains "第 3 條").
+    const summaryEl = screen.getByTestId('whatif-summary');
+    const triggeredEl = screen.getByTestId('whatif-triggered-articles');
+    const explanationEl = screen.getByTestId('whatif-explanation');
+    const summaryPosition = summaryEl.compareDocumentPosition(triggeredEl);
+    const triggeredPosition = triggeredEl.compareDocumentPosition(explanationEl);
+    // eslint-disable-next-line no-bitwise -- DOM Node.compareDocumentPosition bitmask check
+    expect(summaryPosition & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    // eslint-disable-next-line no-bitwise -- DOM Node.compareDocumentPosition bitmask check
+    expect(triggeredPosition & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+
+    expect(screen.getByTestId('whatif-summary').textContent).toContain('首要動作');
+    expect(screen.getByTestId('whatif-explanation').textContent).toContain('完整理由');
   });
 
   it('renders triggered articles, applied formula articles, and expected actions verbatim', async () => {

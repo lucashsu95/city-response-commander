@@ -275,23 +275,6 @@ export function WhatIfDialog({ client }: WhatIfDialogProps): ReactNode {
 
       {phase === 'answered' && result !== null ? (
         <div data-testid="whatif-answered">
-          {result.summary_text !== undefined ? (
-            <section
-              className="whatif-dialog__section whatif-dialog__summary"
-              data-testid="whatif-summary-section"
-            >
-              <h4 className="whatif-dialog__subheading">策略摘要</h4>
-              <p data-testid="whatif-summary">{result.summary_text}</p>
-            </section>
-          ) : null}
-
-          <section className="whatif-dialog__section">
-            <h4 className="whatif-dialog__subheading">觸發的 SOP 條款</h4>
-            <p data-testid="whatif-triggered-articles">
-              {articleListText(result.triggered_articles)}
-            </p>
-          </section>
-
           <section className="whatif-dialog__section">
             <h4 className="whatif-dialog__subheading">套用的公式條款</h4>
             <p data-testid="whatif-applied-articles">
@@ -333,12 +316,20 @@ export function WhatIfDialog({ client }: WhatIfDialogProps): ReactNode {
             </section>
           ) : null}
 
-          {result.explanation_text !== undefined ? (
-            <section className="whatif-dialog__section">
-              <h4 className="whatif-dialog__subheading">詳細 AI 解釋</h4>
+          <section className="whatif-dialog__section">
+            <h4 className="whatif-dialog__subheading">詳細 AI 解釋</h4>
+            {result.summary_text !== undefined ? (
+              <p data-testid="whatif-summary" className="whatif-dialog__summary">
+                {result.summary_text}
+              </p>
+            ) : null}
+            <p data-testid="whatif-triggered-articles">
+              觸發的 SOP 條款：{articleListText(result.triggered_articles)}
+            </p>
+            {result.explanation_text !== undefined ? (
               <p data-testid="whatif-explanation">{result.explanation_text}</p>
-            </section>
-          ) : null}
+            ) : null}
+          </section>
 
           <FieldList>
             <FieldRow label="trace_id">
