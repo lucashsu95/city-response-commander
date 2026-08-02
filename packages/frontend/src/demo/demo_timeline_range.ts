@@ -54,11 +54,7 @@ function minutesToLabel(minutes: number): string {
   return `2026-05-20 ${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
 }
 
-function generatePlaybackSlots(
-  start: string,
-  end: string,
-  stepMinutes: number,
-): readonly string[] {
+function generatePlaybackSlots(start: string, end: string, stepMinutes: number): readonly string[] {
   const startMinutes = parseToMinutes(start);
   const endMinutes = parseToMinutes(end);
   if (startMinutes === null || endMinutes === null || endMinutes < startMinutes) {
