@@ -13,8 +13,10 @@
  * adapter has no cached decision it renders an explicit empty state instead
  * of fabricating one.
  *
- * Publish is intentionally not wired: `Module 5` is disabled in the demo path
- * because the deployment stack has no `POST /decisions/{id}/publish` route.
+ * Module 5 publish (§10.11d, R11.6): the "發布警示" button is wired to
+ * `DemoApiClient.publishDecision()`, which calls `POST /decisions/{id}/publish`
+ * on the demo backend. The two-stage confirmation flow (preview → confirm) mirrors
+ * the pattern in `multilingual_card_demo.tsx`.
  *
  * @module frontend/demo/demo_decision_panel
  */
@@ -30,14 +32,22 @@ export interface DemoDecisionPanelProps {
   readonly onDecisionInjected: (decision: DemoDecisionView) => void;
 }
 
-const PUBLISH_DISABLED_REASON =
-  '發布功能尚未接線：demo 後端沒有 POST /decisions/{id}/publish';
-
 type InjectOutcome =
   | { readonly kind: 'idle' }
   | { readonly kind: 'in_flight' }
   | { readonly kind: 'ok'; readonly view: DemoDecisionView }
   | { readonly kind: 'error'; readonly message: string };
+
+type PublishStage = 'idle' | 'preview' | 'confirming' | 'success' | 'error';
+
+interface PublishResult {
+  readonly publishState: string;
+  readonly channels: readonly string[];
+  readonly languages: readonly string[];
+  readonly publishedAt: string;
+  readonly approvedBy: string;
+  readonly deliveryMode: string;
+}
 
 export function DemoDecisionPanel({
   adapter,
@@ -47,6 +57,9 @@ export function DemoDecisionPanel({
 }: DemoDecisionPanelProps): ReactNode {
   const [eventIdInput, setEventIdInput] = useState<string>(injectedEventId ?? 'TPE_2026_ACC_001');
   const [outcome, setOutcome] = useState<InjectOutcome>({ kind: 'idle' });
+  const [publishStage, setPublishStage] = useState<PublishStage>('idle');
+  const [publishResult, setPublishResult] = useState<PublishResult | null>(null);
+  const [publishError, setPublishError] = useState<string | null>(null);
 
   const onInject = useCallback(async () => {
     const trimmed = eventIdInput.trim();
@@ -54,11 +67,6 @@ export function DemoDecisionPanel({
       setOutcome({ kind: 'error', message: '請輸入事件 ID' });
       return;
     }
-    // Demo mode never requires an admin JWT: the deploy's `/demo/incidents`
-    // is the documented public test surface (per demo-mode strict
-    // limitations). The token is still wired through unchanged so a
-    // production deployment of this same adapter sets it later, but the
-    // header is only attached when the token is non-blank.
     const header =
       adminToken !== null && adminToken.trim() !== ''
         ? `Bearer ${adminToken.trim()}`
@@ -88,12 +96,70 @@ export function DemoDecisionPanel({
     return null;
   }, [adapter, injectedEventId, outcome]);
 
+  const publishLanguages = useMemo(
+    () =>
+      lastView?.publicAlerts?.languages !== undefined && lastView.publicAlerts.languages.length > 0
+        ? lastView.publicAlerts.languages
+        : ['zh', 'en'],
+    [lastView],
+  );
+
+  const handlePublishClick = useCallback(() => {
+    setPublishStage('preview');
+    setPublishError(null);
+  }, []);
+
+  const handleConfirmPublish = useCallback(async () => {
+    if (lastView === null) return;
+    setPublishStage('confirming');
+    setPublishError(null);
+
+    const result = await adapter.publishDecision(
+      lastView.decisionId,
+      ['sms', 'cms'],
+      'demo-commander',
+      publishLanguages,
+    );
+
+    if (!result.ok) {
+      setPublishError(result.error.message);
+      setPublishStage('error');
+      return;
+    }
+
+    const body = result.data.body;
+    if (typeof body !== 'object' || body === null) {
+      setPublishError('後端回傳格式異常');
+      setPublishStage('error');
+      return;
+    }
+
+    const record = body as Record<string, unknown>;
+    setPublishResult({
+      publishState: String(record.publish_state ?? 'unknown'),
+      channels: Array.isArray(record.channels) ? (record.channels as readonly string[]) : [],
+      languages: Array.isArray(record.languages) ? (record.languages as readonly string[]) : [],
+      publishedAt: String(record.published_at ?? new Date().toISOString()),
+      approvedBy: String(record.approved_by ?? 'demo-commander'),
+      deliveryMode: String(record.delivery_mode ?? 'unknown'),
+    });
+    setPublishStage('success');
+  }, [adapter, lastView, publishLanguages]);
+
+  const handleDismissPublish = useCallback(() => {
+    setPublishStage('idle');
+    setPublishResult(null);
+    setPublishError(null);
+  }, []);
+
+  const publishDisabled = lastView === null;
+
   return (
     <div className="demo-decision-panel" data-testid="demo-decision-panel">
       <h3 className="demo-decision-panel__title">事件注入（Demo Mode）</h3>
       <p className="demo-decision-panel__hint">
-        POST /demo/incidents：demo 後端不要求管理員 JWT，下方「發布」按鈕刻意停用，直到
-        production stack 接線。
+        POST /demo/incidents：demo 後端不要求管理員 JWT。注入事件後，可透過下方「發布警示」按鈕執行
+        模組 5 一鍵發布（POST /decisions/{'{id}'}/publish）。
       </p>
 
       <div className="demo-decision-panel__form">
@@ -123,19 +189,123 @@ export function DemoDecisionPanel({
         <p className="demo-decision-panel__empty">尚未注入事件。</p>
       )}
 
-      <fieldset className="demo-decision-panel__publish" disabled>
-        <legend>模組 5 發布（刻意停用）</legend>
-        <button
-          type="button"
-          disabled
-          aria-disabled="true"
-          title={PUBLISH_DISABLED_REASON}
-          data-testid="demo-publish-button"
-        >
-          發布警示
-        </button>
-        <p className="demo-decision-panel__publish-reason">{PUBLISH_DISABLED_REASON}</p>
-      </fieldset>
+      <div className="demo-decision-panel__publish" data-testid="demo-publish-section">
+        <h4 className="demo-decision-panel__publish-heading">
+          模組 5：數位通報與多語化
+        </h4>
+
+        {publishStage === 'idle' && (
+          <>
+            <button
+              type="button"
+              className="demo-decision-panel__publish-btn"
+              disabled={publishDisabled}
+              title={publishDisabled ? '請先注入事件再執行發布' : '發布警示'}
+              onClick={handlePublishClick}
+              data-testid="demo-publish-button"
+            >
+              發布警示
+            </button>
+            {publishDisabled && (
+              <p className="demo-decision-panel__publish-reason">
+                請先注入事件再執行發布
+              </p>
+            )}
+          </>
+        )}
+
+        {publishStage === 'preview' && lastView !== null && (
+          <div className="demo-decision-panel__publish-preview" data-testid="demo-publish-preview">
+            <p className="demo-decision-panel__publish-preview-title">待發布內容確認</p>
+            <dl className="demo-decision-panel__publish-preview-list">
+              <dt>決策 ID</dt>
+              <dd><code>{lastView.decisionId}</code></dd>
+              <dt>發布頻道</dt>
+              <dd>SMS、CMS</dd>
+              <dt>發布語言</dt>
+              <dd>{publishLanguages.join('、')}</dd>
+              <dt>核准人</dt>
+              <dd>demo-commander</dd>
+            </dl>
+            <div className="demo-decision-panel__publish-actions">
+              <button
+                type="button"
+                className="demo-decision-panel__publish-confirm"
+                onClick={handleConfirmPublish}
+              >
+                確認發布
+              </button>
+              <button
+                type="button"
+                className="demo-decision-panel__publish-cancel"
+                onClick={handleDismissPublish}
+              >
+                取消
+              </button>
+            </div>
+          </div>
+        )}
+
+        {publishStage === 'confirming' && (
+          <div className="demo-decision-panel__publish-confirming" data-testid="demo-publish-confirming">
+            <p>發布中…</p>
+          </div>
+        )}
+
+        {publishStage === 'success' && publishResult !== null && (
+          <div className="demo-decision-panel__publish-success" data-testid="demo-publish-success">
+            <p className="demo-decision-panel__publish-success-title">發布成功</p>
+            <dl className="demo-decision-panel__publish-success-list">
+              <dt>發布狀態</dt>
+              <dd>{publishResult.publishState}</dd>
+              <dt>頻道</dt>
+              <dd>{publishResult.channels.join('、')}</dd>
+              <dt>語言</dt>
+              <dd>{publishResult.languages.join('、')}</dd>
+              <dt>發布時間</dt>
+              <dd>{publishResult.publishedAt}</dd>
+              <dt>核准人</dt>
+              <dd>{publishResult.approvedBy}</dd>
+              <dt>派送模式</dt>
+              <dd>{publishResult.deliveryMode}</dd>
+            </dl>
+            {publishResult.deliveryMode === 'competition_demo_dispatch' && (
+              <p className="demo-decision-panel__publish-disclaimer">
+                競賽展示派送，未連接真實電信簡訊閘道
+              </p>
+            )}
+            <button
+              type="button"
+              className="demo-decision-panel__publish-close"
+              onClick={handleDismissPublish}
+            >
+              關閉
+            </button>
+          </div>
+        )}
+
+        {publishStage === 'error' && (
+          <div className="demo-decision-panel__publish-error" data-testid="demo-publish-error">
+            <p role="alert">發布失敗：{publishError}</p>
+            <div className="demo-decision-panel__publish-actions">
+              <button
+                type="button"
+                className="demo-decision-panel__publish-retry"
+                onClick={handlePublishClick}
+              >
+                重試
+              </button>
+              <button
+                type="button"
+                className="demo-decision-panel__publish-cancel"
+                onClick={handleDismissPublish}
+              >
+                取消
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
