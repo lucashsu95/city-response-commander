@@ -17,14 +17,7 @@
  * @module frontend/pages/dashboard
  */
 
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type ReactNode,
-} from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { AnomalyPopup } from '../alerts/anomaly_popup.js';
 import { AnomalyDemoPopup } from '../alerts/anomaly_demo_popup.js';
 import { RoamingAlertModal, type RoamingAlertContent } from '../alerts/roaming_alert_modal.js';
@@ -32,7 +25,11 @@ import { useAnomalyPopup } from '../alerts/use_anomaly_popup.js';
 import { useDemoAnomalyPopup } from '../alerts/use_anomaly_popup_demo.js';
 import { createApiClient } from '../api/client.js';
 import { createDemoApiClient } from '../api/demo_api_adapter.js';
-import type { DemoApiClient, DemoDecisionView, DemoTimeseriesResponse } from '../api/demo_api_adapter.js';
+import type {
+  DemoApiClient,
+  DemoDecisionView,
+  DemoTimeseriesResponse,
+} from '../api/demo_api_adapter.js';
 import { AdminSessionControl } from '../auth/admin_session_control.js';
 import type { AdminToken } from '../auth/admin_session.js';
 import { useCrowdSnapshot } from '../crowd/use_crowd_snapshot.js';
@@ -66,7 +63,11 @@ import {
 } from '../demo/demo_timeline_range.js';
 import { DEMO_ART6_ALERT_TIMESTAMP } from '../alerts/use_anomaly_popup_demo.js';
 import { CommandCenterShell } from '../layout/command_center_shell.js';
-import type { RoadMetricData, CrowdMetricData, RoamingMetricData } from '../layout/command_center_shell.js';
+import type {
+  RoadMetricData,
+  CrowdMetricData,
+  RoamingMetricData,
+} from '../layout/command_center_shell.js';
 import { GeographicMap } from '../map/geographic_map.js';
 import { useRealtimeConnection } from '../realtime/use_realtime.js';
 import type { PollingCycleResult } from '../realtime/polling_fallback.js';
@@ -148,30 +149,29 @@ function DemoDashboardPage(): ReactNode {
 
   // ── Timeline state: extended 17:00–23:30 playback frames ─────────────────
   const snapshots = demoTimeseries.snapshots;
-  const playbackFrames = useMemo(
-    () => buildDemoPlaybackFrames(snapshots),
-    [snapshots],
-  );
+  const playbackFrames = useMemo(() => buildDemoPlaybackFrames(snapshots), [snapshots]);
   const timestamps = useMemo(
     () => playbackFrames.map((frame) => frame.timestamp),
     [playbackFrames],
   );
   const isLoading = demoTimeseries.state === 'loading';
 
+  // Default to the first playback frame so metrics reflect a concrete time slot.
+  useEffect(() => {
+    if (timestamps.length === 0 || timelineIndex !== null) return;
+    setTimelineIndex(0);
+  }, [timestamps.length, timelineIndex]);
+
   const activePlaybackFrame =
-    timelineIndex !== null &&
-    timelineIndex >= 0 &&
-    timelineIndex < playbackFrames.length
-      ? playbackFrames[timelineIndex] ?? null
+    timelineIndex !== null && timelineIndex >= 0 && timelineIndex < playbackFrames.length
+      ? (playbackFrames[timelineIndex] ?? null)
       : null;
 
   const activeSnapshot = resolveSnapshotForPlaybackFrame(snapshots, activePlaybackFrame);
 
   const currentTimestamp =
     activePlaybackFrame?.timestamp ??
-    (timelineIndex !== null &&
-    timelineIndex >= 0 &&
-    timelineIndex < timestamps.length
+    (timelineIndex !== null && timelineIndex >= 0 && timelineIndex < timestamps.length
       ? timestamps[timelineIndex]
       : null);
 
@@ -238,7 +238,7 @@ function DemoDashboardPage(): ReactNode {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [timelinePlaying, timestamps.length]);
 
-  const ROAMING_ALERT_THRESHOLD = 0.30;
+  const ROAMING_ALERT_THRESHOLD = 0.3;
 
   const buildRoamingAlertContent = useCallback(
     (stationId: string, locationName: string, roamingPct: number): RoamingAlertContent => {
@@ -316,8 +316,7 @@ function DemoDashboardPage(): ReactNode {
         const threshold = row.threshold ?? ROAMING_ALERT_THRESHOLD;
         if (!isArticle6 || observed < threshold) continue;
         stationId = row.station_id ?? null;
-        locationName =
-          row.summary_zh?.match(/】(.+?)（/)?.[1]?.trim() ?? row.station_id ?? '';
+        locationName = row.summary_zh?.match(/】(.+?)（/)?.[1]?.trim() ?? row.station_id ?? '';
         roamingPct = observed;
         break;
       }
@@ -350,12 +349,12 @@ function DemoDashboardPage(): ReactNode {
     }
     setRoamingPublishing(true);
     try {
-      await adapter.publishDecision(
-        lastDecision.decisionId,
-        ['sms', 'cms'],
-        'demo-commander',
-        ['zh', 'en', 'ja', 'ko'],
-      );
+      await adapter.publishDecision(lastDecision.decisionId, ['sms', 'cms'], 'demo-commander', [
+        'zh',
+        'en',
+        'ja',
+        'ko',
+      ]);
     } finally {
       setRoamingPublishing(false);
       setRoamingAlertOpen(false);
@@ -368,7 +367,7 @@ function DemoDashboardPage(): ReactNode {
     const traffic = activeSnapshot?.traffic ?? [];
     return traffic.map((t) => {
       const sat = t.Saturation_Score;
-      const level = sat >= 0.85 ? 'blocked' : sat >= 0.60 ? 'caution' : 'clear';
+      const level = sat >= 0.85 ? 'blocked' : sat >= 0.6 ? 'caution' : 'clear';
       return {
         roadName: t.Road_Name,
         avgSpeed: t.Avg_Speed,
@@ -409,13 +408,11 @@ function DemoDashboardPage(): ReactNode {
 
   const aiDecisionContent = <AiDecisionCardDemo decision={lastDecision} />;
   const routeAdviceContent = <RouteAdviceCardDemo decision={lastDecision} />;
-  const recommendationContent = lastDecision?.recommendation
-    ? <ControlCenterRecommendationPanel recommendation={lastDecision.recommendation} />
-    : null;
+  const recommendationContent = lastDecision?.recommendation ? (
+    <ControlCenterRecommendationPanel recommendation={lastDecision.recommendation} />
+  ) : null;
   const reasoningContent = <ReasoningChainPanel decision={lastDecision} />;
-  const multilingualContent = (
-    <MultilingualCardDemo decision={lastDecision} adapter={adapter} />
-  );
+  const multilingualContent = <MultilingualCardDemo decision={lastDecision} adapter={adapter} />;
 
   const whatifContent = useMemo(() => <WhatIfDialog client={adapter} />, [adapter]);
 
@@ -470,6 +467,7 @@ function DemoDashboardPage(): ReactNode {
       mapContent={
         <GeographicMap
           snapshot={mapSnapshot}
+          allSnapshots={snapshots}
           decision={lastDecision}
           loading={isLoading}
           errorMessage={demoTimeseries.error}
@@ -563,7 +561,9 @@ function ProductionDashboardPage(): ReactNode {
         setLastFailureEvent(decodeProcessingFailed(envelope.payload));
       }
       if (envelope.decisionId === null) return;
-      setDecisionId((previous) => (previous === envelope.decisionId ? previous : envelope.decisionId));
+      setDecisionId((previous) =>
+        previous === envelope.decisionId ? previous : envelope.decisionId,
+      );
       refreshDecision();
     },
     [refreshDecision, refreshTimeline, ingestAnomalyEvent],
@@ -642,11 +642,7 @@ function ProductionDashboardPage(): ReactNode {
             roleEvidence={eteRoleEvidence}
             onRetry={decision.refresh}
           />
-          <ExplanationChain
-            decision={decision}
-            evidence={evidence}
-            onRetry={decision.refresh}
-          />
+          <ExplanationChain decision={decision} evidence={evidence} onRetry={decision.refresh} />
           <ExecutionStatusPanel
             decision={decision}
             execution={executionStatus}

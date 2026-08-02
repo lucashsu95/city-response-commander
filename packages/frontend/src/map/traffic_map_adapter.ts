@@ -9,44 +9,27 @@
 
 import { lookupRoadCoordinates, ROAD_DICTIONARY_KEYS } from '../constants/roadDictionary.js';
 import type { TrafficAlertLevel, TrafficDataItem } from '../components/TrafficMap.js';
+import type { DemoDecisionView } from '../api/demo_api_adapter.js';
 import type { RoadReadModel, RoadSegmentView } from '../roads/road_model.js';
+import { DEMO_PLAYBACK_START, parseDemoToMinutes } from '../demo/demo_timeline_range.js';
 
-// ─── Demo presets (Pitch / manual override) ──────────────────
+/** Pitch controls select a time anchor or decision overlay — never static rows. */
+export type TrafficMapViewMode = 'baseline' | 'incident' | 'arbitration';
 
-export type TrafficMapDemoPreset = 'baseline' | 'incident' | 'arbitration';
+/** Official incident anchor from `demo-data-source/live_incidents.json` (TPE_2026_ACC_001). */
+export const DEMO_INCIDENT_MAP_TIMESTAMP = '2026-05-20 22:10';
 
-export const TRAFFIC_MAP_DEMO_PRESETS: Readonly<
-  Record<TrafficMapDemoPreset, readonly TrafficDataItem[]>
-> = Object.freeze({
-  // Explicit type argument on each `Object.freeze` call so `alert_level`'s
-  // string literals ('RED'/'YELLOW'/'GREEN') are checked directly against
-  // `TrafficAlertLevel` instead of widening to `string` — generic inference
-  // for a function-call argument does not inherit the outer `Record<...>`
-  // contextual type the way a plain object-literal property does.
-  baseline: Object.freeze<TrafficDataItem[]>([
-    { road_name: '光復南路', alert_level: 'GREEN', saturation: 0.35 },
-    { road_name: '市民大道四段', alert_level: 'YELLOW', saturation: 0.55 },
-    { road_name: '仁愛路四段', alert_level: 'GREEN', saturation: 0.3 },
-    { road_name: '逸仙路', alert_level: 'GREEN', saturation: 0.25 },
-  ]),
-  incident: Object.freeze<TrafficDataItem[]>([
-    { road_name: '光復南路', alert_level: 'RED', saturation: 0.97 },
-    { road_name: '市民大道四段', alert_level: 'YELLOW', saturation: 0.72 },
-    { road_name: '仁愛路四段', alert_level: 'GREEN', saturation: 0.35 },
-  ]),
-  arbitration: Object.freeze<TrafficDataItem[]>([
-    { road_name: '光復南路', alert_level: 'RED', saturation: 0.97 },
-    { road_name: '市民大道四段', alert_level: 'YELLOW', saturation: 0.72 },
-    { road_name: '仁愛路四段', alert_level: 'GREEN', saturation: 0.25 },
-  ]),
+export const TRAFFIC_MAP_VIEW_LABELS: Readonly<Record<TrafficMapViewMode, string>> = Object.freeze({
+  baseline: '預設狀態',
+  incident: '光復南路突發事故',
+  arbitration: 'AI 仲裁完成',
 });
 
-export const TRAFFIC_MAP_DEMO_PRESET_LABELS: Readonly<Record<TrafficMapDemoPreset, string>> =
-  Object.freeze({
-    baseline: '預設狀態',
-    incident: '光復南路突發事故',
-    arbitration: 'AI 仲裁完成',
-  });
+/** @deprecated use {@link TrafficMapViewMode} */
+export type TrafficMapDemoPreset = TrafficMapViewMode;
+
+/** @deprecated use {@link TRAFFIC_MAP_VIEW_LABELS} */
+export const TRAFFIC_MAP_DEMO_PRESET_LABELS = TRAFFIC_MAP_VIEW_LABELS;
 
 // ─── Level mapping (display only — backend `level` is authoritative) ──
 
@@ -129,41 +112,63 @@ export function adaptRoadSegmentToTrafficData(
 
 export interface DemoTrafficRow {
   readonly timestamp_raw?: string;
+  readonly Segment_ID?: string;
   readonly Road_Name: string;
   readonly Saturation_Score?: number;
   readonly Lane_Status?: string;
   readonly level?: string | null;
 }
 
+export interface DemoTrafficSnapshotSlice {
+  readonly traffic: readonly DemoTrafficRow[];
+}
+
+export function flattenSnapshotTraffic(
+  snapshots: readonly DemoTrafficSnapshotSlice[],
+): readonly DemoTrafficRow[] {
+  const rows: DemoTrafficRow[] = [];
+  for (const snapshot of snapshots) {
+    rows.push(...snapshot.traffic);
+  }
+  return rows;
+}
+
 /**
  * Converts demo timeseries traffic rows into map-ready data.
- * Filters to {@link currentTimestamp} when provided; otherwise keeps the
- * latest row per mapped road name.
+ * When `anchorTimestamp` is set, keeps the latest row per road at or before that time.
  */
 export function adaptDemoTrafficToTrafficData(
   traffic: readonly DemoTrafficRow[],
-  currentTimestamp: string | null = null,
+  anchorTimestamp: string | null = null,
 ): readonly TrafficDataItem[] {
   if (!Array.isArray(traffic) || traffic.length === 0) {
     return [];
   }
 
-  const scoped =
-    currentTimestamp !== null && currentTimestamp.trim().length > 0
-      ? traffic.filter((row) => row.timestamp_raw === currentTimestamp)
-      : traffic;
+  const anchorMinutes =
+    anchorTimestamp !== null && anchorTimestamp.trim().length > 0
+      ? parseDemoToMinutes(anchorTimestamp)
+      : null;
 
-  const source = scoped.length > 0 ? scoped : traffic;
-  const latestByRoad = new Map<string, DemoTrafficRow>();
+  const latestByRoad = new Map<string, { row: DemoTrafficRow; minutes: number }>();
 
-  for (const row of source) {
+  for (const row of traffic) {
     const name = row.Road_Name?.trim() ?? '';
     if (name.length === 0) continue;
-    latestByRoad.set(name, row);
+
+    const rawTs = row.timestamp_raw ?? '';
+    const rowMinutes = parseDemoToMinutes(rawTs);
+    if (rowMinutes === null) continue;
+    if (anchorMinutes !== null && rowMinutes > anchorMinutes) continue;
+
+    const existing = latestByRoad.get(name);
+    if (existing === undefined || rowMinutes > existing.minutes) {
+      latestByRoad.set(name, { row, minutes: rowMinutes });
+    }
   }
 
   const rows: TrafficDataItem[] = [];
-  for (const row of latestByRoad.values()) {
+  for (const { row } of latestByRoad.values()) {
     const level = typeof row.level === 'string' || row.level === null ? row.level : null;
     const saturation =
       typeof row.Saturation_Score === 'number' && Number.isFinite(row.Saturation_Score)
@@ -175,6 +180,57 @@ export function adaptDemoTrafficToTrafficData(
   }
 
   return rows;
+}
+
+function buildSegmentRoadMap(traffic: readonly DemoTrafficRow[]): ReadonlyMap<string, string> {
+  const map = new Map<string, string>();
+  for (const row of traffic) {
+    const segmentId = row.Segment_ID?.trim();
+    const roadName = row.Road_Name?.trim();
+    if (
+      segmentId !== undefined &&
+      segmentId.length > 0 &&
+      roadName !== undefined &&
+      roadName.length > 0
+    ) {
+      map.set(segmentId, roadName);
+    }
+  }
+  return map;
+}
+
+/** Applies decision-engine route exclusions and evacuation highlights on top of live traffic rows. */
+export function applyDecisionArbitrationOverlay(
+  rows: readonly TrafficDataItem[],
+  traffic: readonly DemoTrafficRow[],
+  decision: DemoDecisionView,
+): readonly TrafficDataItem[] {
+  const segmentRoads = buildSegmentRoadMap(traffic);
+  const excludedRoads = new Set<string>();
+  for (const excluded of decision.excludedRoutes) {
+    const roadName = segmentRoads.get(excluded.segment_id);
+    if (roadName !== undefined) excludedRoads.add(roadName);
+  }
+
+  const primaryRoute = decision.primaryEvacuation.trim();
+  const secondaryRoutes = new Set(decision.secondaryEvacuation.map((name) => name.trim()));
+
+  return rows.map((row) => {
+    if (excludedRoads.has(row.road_name)) {
+      return {
+        ...row,
+        alert_level: 'RED' as const,
+        saturation: Math.max(row.saturation, 0.9),
+      };
+    }
+    if (row.road_name === primaryRoute || secondaryRoutes.has(row.road_name)) {
+      return {
+        ...row,
+        alert_level: 'GREEN' as const,
+      };
+    }
+    return row;
+  });
 }
 
 /** Ensures every dictionary road appears once (fills gaps as GREEN). */
@@ -195,4 +251,38 @@ export function withDictionaryFallback(
   }
 
   return merged;
+}
+
+export function resolveTrafficForViewMode(params: {
+  readonly mode: TrafficMapViewMode | null;
+  readonly snapshots: readonly DemoTrafficSnapshotSlice[];
+  readonly currentTimestamp: string | null;
+  readonly decision: DemoDecisionView | null;
+  readonly roadReadModel: RoadReadModel | null | undefined;
+}): readonly TrafficDataItem[] {
+  const fromRoads = adaptRoadReadModelToTrafficData(params.roadReadModel);
+  if (fromRoads.length > 0) {
+    return withDictionaryFallback(fromRoads);
+  }
+
+  const allTraffic = flattenSnapshotTraffic(params.snapshots);
+  if (allTraffic.length === 0) {
+    return withDictionaryFallback([]);
+  }
+
+  let anchorTimestamp = params.currentTimestamp;
+  if (params.mode === 'baseline') {
+    anchorTimestamp = DEMO_PLAYBACK_START;
+  } else if (params.mode === 'incident' || params.mode === 'arbitration') {
+    anchorTimestamp = DEMO_INCIDENT_MAP_TIMESTAMP;
+  }
+
+  let rows = adaptDemoTrafficToTrafficData(allTraffic, anchorTimestamp);
+  rows = withDictionaryFallback(rows);
+
+  if (params.mode === 'arbitration' && params.decision !== null) {
+    rows = applyDecisionArbitrationOverlay(rows, allTraffic, params.decision);
+  }
+
+  return rows;
 }

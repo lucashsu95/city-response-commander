@@ -7,24 +7,17 @@
  * @module frontend/map/geographic_map
  */
 
-import {
-  type ReactNode,
-  useCallback,
-  useEffect,
-  useMemo,
-  useState,
-} from 'react';
+import { type ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
 import { TrafficMap, type TrafficDataItem } from '../components/TrafficMap.js';
 import '../styles/mapAnimation.css';
 import type { DemoDecisionView, DemoTimeseriesResponse } from '../api/demo_api_adapter.js';
 import type { RoadReadModel } from '../roads/road_model.js';
 import {
-  adaptDemoTrafficToTrafficData,
-  adaptRoadReadModelToTrafficData,
-  TRAFFIC_MAP_DEMO_PRESET_LABELS,
-  TRAFFIC_MAP_DEMO_PRESETS,
+  DEMO_INCIDENT_MAP_TIMESTAMP,
+  resolveTrafficForViewMode,
+  TRAFFIC_MAP_VIEW_LABELS,
   withDictionaryFallback,
-  type TrafficMapDemoPreset,
+  type TrafficMapViewMode,
 } from './traffic_map_adapter.js';
 import {
   enrichRoadsWithTraffic,
@@ -39,6 +32,8 @@ import {
 
 export interface GeographicMapProps {
   readonly snapshot: DemoTimeseriesResponse | null;
+  /** All demo snapshots — used to derive map traffic for each view mode. */
+  readonly allSnapshots?: readonly DemoTimeseriesResponse['snapshots'][number][];
   readonly decision: DemoDecisionView | null;
   readonly loading: boolean;
   readonly errorMessage: string | null;
@@ -123,30 +118,43 @@ function RouteBanner({ decision }: RouteBannerProps): ReactNode {
 // ─── Demo Preset Controls ─────────────────────────────────────
 
 interface DemoTriggerBarProps {
-  readonly activePreset: TrafficMapDemoPreset | null;
-  readonly onSelectPreset: (preset: TrafficMapDemoPreset | null) => void;
+  readonly activeMode: TrafficMapViewMode | null;
+  readonly onSelectMode: (mode: TrafficMapViewMode | null) => void;
+  readonly arbitrationDisabled: boolean;
 }
 
-function DemoTriggerBar({ activePreset, onSelectPreset }: DemoTriggerBarProps): ReactNode {
-  const presets = Object.keys(TRAFFIC_MAP_DEMO_PRESETS) as TrafficMapDemoPreset[];
+function DemoTriggerBar({
+  activeMode,
+  onSelectMode,
+  arbitrationDisabled,
+}: DemoTriggerBarProps): ReactNode {
+  const modes = Object.keys(TRAFFIC_MAP_VIEW_LABELS) as TrafficMapViewMode[];
 
   return (
     <div className="geo-map__demo-triggers" role="toolbar" aria-label="地圖情境快捷">
       <button
         type="button"
-        className={`geo-map__demo-trigger${activePreset === null ? ' geo-map__demo-trigger--active' : ''}`}
-        onClick={() => onSelectPreset(null)}
+        className={`geo-map__demo-trigger${activeMode === null ? ' geo-map__demo-trigger--active' : ''}`}
+        onClick={() => onSelectMode(null)}
       >
         即時資料
       </button>
-      {presets.map((preset) => (
+      {modes.map((mode) => (
         <button
-          key={preset}
+          key={mode}
           type="button"
-          className={`geo-map__demo-trigger${activePreset === preset ? ' geo-map__demo-trigger--active' : ''}`}
-          onClick={() => onSelectPreset(preset)}
+          className={`geo-map__demo-trigger${activeMode === mode ? ' geo-map__demo-trigger--active' : ''}`}
+          onClick={() => onSelectMode(mode)}
+          disabled={mode === 'arbitration' && arbitrationDisabled}
+          title={
+            mode === 'arbitration' && arbitrationDisabled
+              ? '請先注入突發事件以取得 AI 仲裁結果'
+              : mode === 'incident'
+                ? `顯示 ${DEMO_INCIDENT_MAP_TIMESTAMP} 官方事故時間點車流`
+                : undefined
+          }
         >
-          {TRAFFIC_MAP_DEMO_PRESET_LABELS[preset]}
+          {TRAFFIC_MAP_VIEW_LABELS[mode]}
         </button>
       ))}
     </div>
@@ -176,6 +184,7 @@ function ErrorOverlay({ msg }: { readonly msg: string }): ReactNode {
 
 export function GeographicMap({
   snapshot,
+  allSnapshots = [],
   decision,
   loading,
   errorMessage,
@@ -186,7 +195,9 @@ export function GeographicMap({
 }: GeographicMapProps): ReactNode {
   const [segments, setSegments] = useState<readonly RoadSegment[]>([]);
   const [metadataError, setMetadataError] = useState<string | null>(null);
-  const [demoPreset, setDemoPreset] = useState<TrafficMapDemoPreset | null>(null);
+  const [viewMode, setViewMode] = useState<TrafficMapViewMode | null>(null);
+
+  const snapshotSources = allSnapshots.length > 0 ? allSnapshots : (snapshot?.snapshots ?? []);
 
   useEffect(() => {
     fetchRoadSegments()
@@ -197,39 +208,25 @@ export function GeographicMap({
       });
   }, []);
 
-  useEffect(() => {
-    if (decision !== null) {
-      setDemoPreset('incident');
-    }
-  }, [decision?.decisionId]);
-
   const enrichedRoads = useMemo<EnrichedRoad[]>(
     () => enrichRoadsWithTraffic(segments, snapshot?.traffic ?? []),
     [segments, snapshot],
   );
 
-  const liveTrafficData = useMemo<readonly TrafficDataItem[]>(() => {
-    const fromRoads = adaptRoadReadModelToTrafficData(roadReadModel);
-    if (fromRoads.length > 0) {
-      return withDictionaryFallback(fromRoads);
-    }
+  const trafficData = useMemo<readonly TrafficDataItem[]>(
+    () =>
+      resolveTrafficForViewMode({
+        mode: viewMode,
+        snapshots: snapshotSources,
+        currentTimestamp,
+        decision,
+        roadReadModel,
+      }),
+    [viewMode, snapshotSources, currentTimestamp, decision, roadReadModel],
+  );
 
-    const fromDemo = adaptDemoTrafficToTrafficData(snapshot?.traffic ?? [], currentTimestamp);
-    return withDictionaryFallback(fromDemo);
-  }, [roadReadModel, snapshot?.traffic, currentTimestamp]);
-
-  const trafficData = useMemo<readonly TrafficDataItem[]>(() => {
-    if (demoPreset !== null) {
-      return TRAFFIC_MAP_DEMO_PRESETS[demoPreset];
-    }
-    if (liveTrafficData.length > 0) {
-      return liveTrafficData;
-    }
-    return TRAFFIC_MAP_DEMO_PRESETS.baseline;
-  }, [demoPreset, liveTrafficData]);
-
-  const handleSelectPreset = useCallback((preset: TrafficMapDemoPreset | null) => {
-    setDemoPreset(preset);
+  const handleSelectMode = useCallback((mode: TrafficMapViewMode | null) => {
+    setViewMode(mode);
   }, []);
 
   if (metadataError) {
@@ -237,7 +234,7 @@ export function GeographicMap({
       <div className="geo-map">
         <div className="geo-map__map-area geo-map__map-area--error">
           <div className="geo-map__traffic-stage geo-map__traffic-stage--glass">
-            <TrafficMap trafficData={TRAFFIC_MAP_DEMO_PRESETS.baseline} />
+            <TrafficMap trafficData={withDictionaryFallback([])} />
           </div>
           <ErrorOverlay msg={`路段資料載入失敗：${metadataError}`} />
         </div>
@@ -252,7 +249,11 @@ export function GeographicMap({
           <TrafficMap trafficData={trafficData} />
         </div>
 
-        <DemoTriggerBar activePreset={demoPreset} onSelectPreset={handleSelectPreset} />
+        <DemoTriggerBar
+          activeMode={viewMode}
+          onSelectMode={handleSelectMode}
+          arbitrationDisabled={decision === null}
+        />
 
         <div className="geo-map__legend" role="group" aria-label="交通狀態圖例">
           <h4 className="geo-map__legend-title">地圖警戒</h4>

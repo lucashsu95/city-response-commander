@@ -79,7 +79,6 @@
 
   /* Layout */
   --header-height: 64px;
-  --nav-width: 64px;
   --ai-column-width: 460px;
   --panel-gap: 12px;
   --panel-radius: 6px;
@@ -302,107 +301,6 @@ a:hover {
   display: flex;
   overflow: hidden;
   height: calc(100vh - var(--header-height));
-}
-
-/* ─── Navigation Sidebar ─────────────────────────── */
-
-.cmd-nav {
-  position: sticky;
-  top: var(--header-height);
-  z-index: 40;
-  flex: 0 0 var(--nav-width);
-  width: var(--nav-width);
-  height: calc(100vh - var(--header-height));
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  padding: var(--space-3) 0;
-  background: var(--bg-header);
-  border-right: 1px solid var(--border-subtle);
-  overflow-y: auto;
-  overflow-x: hidden;
-}
-
-.cmd-nav__logo {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  height: 36px;
-  margin-bottom: var(--space-4);
-}
-
-.cmd-nav__logo-icon {
-  font-size: 1.5rem;
-  color: var(--accent-cyan);
-  text-shadow: 0 0 8px rgba(34, 211, 238, 0.4);
-}
-
-.cmd-nav__list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  width: 100%;
-}
-
-.cmd-nav__item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  padding: 10px 4px 8px;
-  background: transparent;
-  border: none;
-  border-left: 3px solid transparent;
-  color: var(--text-muted);
-  cursor: pointer;
-  gap: 5px;
-  text-align: center;
-  transition:
-    color 0.15s ease,
-    background-color 0.15s ease,
-    border-left-color 0.15s ease;
-}
-
-.cmd-nav__item:hover {
-  color: var(--text-primary);
-  background: rgba(255, 255, 255, 0.04);
-  border-left-color: rgba(34, 211, 238, 0.3);
-}
-
-.cmd-nav__item--active {
-  color: var(--accent-cyan);
-  border-left-color: var(--accent-cyan);
-  background: rgba(34, 211, 238, 0.1);
-  box-shadow: inset -1px 0 0 rgba(34, 211, 238, 0.08);
-}
-
-.cmd-nav__item--active .cmd-nav__icon {
-  text-shadow: 0 0 10px rgba(34, 211, 238, 0.55);
-}
-
-.cmd-nav__icon {
-  font-size: 1.125rem;
-  line-height: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-}
-
-.cmd-nav__label {
-  font-size: 9.5px;
-  letter-spacing: 0.02em;
-  line-height: 1.2;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 100%;
-  padding: 0 2px;
 }
 
 /* ─── Main Area ──────────────────────────────────── */
@@ -3586,53 +3484,12 @@ a:hover {
 @media (max-width: 1023px) {
   :root {
     --header-height: 56px;
-    --nav-width: 52px;
     --ai-column-width: 100%;
   }
 
   .cmd-body {
     flex-direction: column;
     height: auto;
-  }
-
-  .cmd-nav {
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    width: 100%;
-    height: 56px;
-    flex-direction: row;
-    justify-content: space-around;
-    border-right: none;
-    border-top: 1px solid var(--border-subtle);
-    padding: 0;
-    z-index: 60;
-  }
-
-  .cmd-nav__logo {
-    display: none;
-  }
-
-  .cmd-nav__list {
-    flex-direction: row;
-    width: 100%;
-    justify-content: space-around;
-  }
-
-  .cmd-nav__item {
-    border-left: none;
-    border-top: 2px solid transparent;
-    padding: var(--space-2);
-  }
-
-  .cmd-nav__item--active {
-    border-left-color: transparent;
-    border-top-color: var(--accent-cyan);
-  }
-
-  .cmd-main {
-    padding-bottom: 64px;
   }
 
   .cmd-section--map {

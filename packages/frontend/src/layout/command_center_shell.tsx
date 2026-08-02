@@ -2,7 +2,7 @@
  * Command Center Shell Layout
  *
  * Redesigned dashboard shell for the City Traffic AI Command Center.
- * Three-column layout: Nav | Main Map+Timeline+Charts | AI Decision Panel
+ * Two-column layout: Main Map+Timeline+Charts | AI Decision Panel
  *
  * Design principles:
  * - Map is the hero element (largest area on screen)
@@ -13,12 +13,7 @@
  * @module frontend/layout/command_center_shell
  */
 
-import {
-  useCallback,
-  useEffect,
-  useState,
-  type ReactNode,
-} from 'react';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import type { ConnectionMode } from '../state/app_state.js';
 import { OperationalStatusBar } from '../components/system/operational_status.js';
@@ -45,55 +40,6 @@ function formatClock(date: Date): string {
   const mi = String(date.getMinutes()).padStart(2, '0');
   const s = String(date.getSeconds()).padStart(2, '0');
   return `${y}-${mo}-${d} ${h}:${mi}:${s}`;
-}
-
-// ─── Navigation Item ──────────────────────────────────────
-
-interface NavItem {
-  readonly id: string;
-  readonly label: string;
-  readonly icon: string;
-  readonly sectionId: string;
-  readonly moduleTab?: 'judgment' | 'routes' | 'reasoning' | 'recommendation' | 'multilingual';
-}
-
-/** Demo-focused nav — only sections that scroll or switch a live panel. */
-const NAV_ITEMS: NavItem[] = [
-  { id: 'dashboard', label: '儀表板', icon: '⬡', sectionId: 'dashboard' },
-  { id: 'traffic', label: '交通監控', icon: '⬢', sectionId: 'traffic' },
-  { id: 'incident', label: '事件決策', icon: '◈', sectionId: 'ai', moduleTab: 'judgment' },
-  { id: 'whatif', label: 'What-If', icon: '◎', sectionId: 'whatif' },
-];
-
-interface NavSidebarProps {
-  readonly activeId: string;
-  readonly onNavigate: (id: string) => void;
-}
-
-function NavSidebar({ activeId, onNavigate }: NavSidebarProps): ReactNode {
-  return (
-    <nav className="cmd-nav" aria-label="主導覽">
-      <div className="cmd-nav__logo" aria-hidden="true">
-        <span className="cmd-nav__logo-icon">⬡</span>
-      </div>
-      <ul className="cmd-nav__list" role="list">
-        {NAV_ITEMS.map((item) => (
-          <li key={item.id}>
-            <button
-              type="button"
-              className={`cmd-nav__item${activeId === item.id ? ' cmd-nav__item--active' : ''}`}
-              onClick={() => onNavigate(item.id)}
-              aria-current={activeId === item.id ? 'page' : undefined}
-              title={item.label}
-            >
-              <span className="cmd-nav__icon" aria-hidden="true">{item.icon}</span>
-              <span className="cmd-nav__label">{item.label}</span>
-            </button>
-          </li>
-        ))}
-      </ul>
-    </nav>
-  );
 }
 
 // ─── Command Header ───────────────────────────────────────
@@ -134,14 +80,18 @@ function CommandHeader({
       {/* Center: Branding */}
       <div className="cmd-header__center">
         <span className="cmd-header__brand">中華電信</span>
-        <span className="cmd-header__brand-divider" aria-hidden="true">|</span>
+        <span className="cmd-header__brand-divider" aria-hidden="true">
+          |
+        </span>
         <span className="cmd-header__brand-name">城市應變分析 AI Agent</span>
       </div>
 
       {/* Right: Status + Inject */}
       <div className="cmd-header__right">
         <div className="cmd-header__clock" aria-live="polite" aria-label="系統時間">
-          <span className="cmd-header__clock-icon" aria-hidden="true">◷</span>
+          <span className="cmd-header__clock-icon" aria-hidden="true">
+            ◷
+          </span>
           <span className="cmd-header__clock-value">{clock}</span>
         </div>
 
@@ -159,7 +109,9 @@ function CommandHeader({
           onClick={onInjectClick}
           aria-label="突發事件注入"
         >
-          <span className="cmd-header__inject-icon" aria-hidden="true">⚡</span>
+          <span className="cmd-header__inject-icon" aria-hidden="true">
+            ⚡
+          </span>
           <span>突發事件注入</span>
         </button>
       </div>
@@ -217,9 +169,10 @@ function TimelineBar({
   const hasTimestamps = timestamps.length > 0;
   const atStart = currentIndex === null || currentIndex <= 0;
   const atEnd = currentIndex === null || currentIndex >= timestamps.length - 1;
-  const currentTs = currentIndex !== null && currentIndex >= 0 && currentIndex < timestamps.length
-    ? timestamps[currentIndex]
-    : null;
+  const currentTs =
+    currentIndex !== null && currentIndex >= 0 && currentIndex < timestamps.length
+      ? timestamps[currentIndex]
+      : null;
 
   return (
     <div className="timeline-bar" role="region" aria-label="時間軸播放控制">
@@ -279,8 +232,10 @@ function TimelineBar({
                 <div
                   className="timeline-bar__cursor"
                   style={{
-                    left: currentIndex === 0 ? `${(1 / timestamps.length) * 100}%`
-                      : `${((currentIndex + 0.5) / timestamps.length) * 100}%`,
+                    left:
+                      currentIndex === 0
+                        ? `${(1 / timestamps.length) * 100}%`
+                        : `${((currentIndex + 0.5) / timestamps.length) * 100}%`,
                   }}
                   aria-hidden="true"
                 />
@@ -298,9 +253,7 @@ function TimelineBar({
             />
           </>
         ) : (
-          <span className="timeline-bar__empty">
-            {loading ? '載入中…' : '尚無時間軸資料'}
-          </span>
+          <span className="timeline-bar__empty">{loading ? '載入中…' : '尚無時間軸資料'}</span>
         )}
       </div>
 
@@ -361,7 +314,9 @@ function MetricCharts({ roads, crowd, roaming }: MetricChartsProps): ReactNode {
       {/* Chart 1: Road Speed */}
       <div className="metric-card metric-card--road">
         <div className="metric-card__header">
-          <span className="metric-card__icon" aria-hidden="true">⬢</span>
+          <span className="metric-card__icon" aria-hidden="true">
+            ⬢
+          </span>
           <h3 className="metric-card__title">核心路段車速</h3>
         </div>
         <div className="metric-card__body">
@@ -396,7 +351,9 @@ function MetricCharts({ roads, crowd, roaming }: MetricChartsProps): ReactNode {
       {/* Chart 2: MRT Crowd */}
       <div className="metric-card metric-card--crowd">
         <div className="metric-card__header">
-          <span className="metric-card__icon" aria-hidden="true">◈</span>
+          <span className="metric-card__icon" aria-hidden="true">
+            ◈
+          </span>
           <h3 className="metric-card__title">捷運站人流</h3>
         </div>
         <div className="metric-card__body">
@@ -434,7 +391,9 @@ function MetricCharts({ roads, crowd, roaming }: MetricChartsProps): ReactNode {
       {/* Chart 3: Roaming */}
       <div className="metric-card metric-card--roaming">
         <div className="metric-card__header">
-          <span className="metric-card__icon" aria-hidden="true">◎</span>
+          <span className="metric-card__icon" aria-hidden="true">
+            ◎
+          </span>
           <h3 className="metric-card__title">基地台漫遊比例</h3>
         </div>
         <div className="metric-card__body">
@@ -446,14 +405,11 @@ function MetricCharts({ roads, crowd, roaming }: MetricChartsProps): ReactNode {
                 const pct = r.roamingPct ?? 0;
                 const barWidth = roamingBarWidth(pct);
                 return (
-                  <div key={r.stationId} className="metric-ranked">
+                  <div key={`${r.stationId}-${i}`} className="metric-ranked">
                     <span className="metric-ranked__rank">{i + 1}</span>
                     <span className="metric-ranked__name">{r.stationId.replace('BS_', '')}</span>
                     <span className="metric-ranked__bar">
-                      <span
-                        className="metric-ranked__fill"
-                        style={{ width: `${barWidth}%` }}
-                      />
+                      <span className="metric-ranked__fill" style={{ width: `${barWidth}%` }} />
                     </span>
                     <span className="metric-ranked__value">{formatRatioAsPercent(pct)}</span>
                   </div>
@@ -488,27 +444,28 @@ function AIDecisionCard({
   textSource,
   isProvisional,
 }: AIDecisionCardProps): ReactNode {
-  const severityColor = severity === 'Critical' ? '#dc2626'
-    : severity === 'High' ? '#f97316'
-    : severity === 'Medium' ? '#eab308'
-    : '#64748b';
+  const severityColor =
+    severity === 'Critical'
+      ? '#dc2626'
+      : severity === 'High'
+        ? '#f97316'
+        : severity === 'Medium'
+          ? '#eab308'
+          : '#64748b';
 
   return (
     <div className="ai-card ai-card--decision">
       <div className="ai-card__header">
-        <span className="ai-card__icon" aria-hidden="true">◈</span>
+        <span className="ai-card__icon" aria-hidden="true">
+          ◈
+        </span>
         <h3 className="ai-card__title">AI 決策推理</h3>
-        {isProvisional && (
-          <span className="ai-card__badge ai-card__badge--provisional">暫定</span>
-        )}
+        {isProvisional && <span className="ai-card__badge ai-card__badge--provisional">暫定</span>}
       </div>
       <div className="ai-card__body">
         <div className="ai-card__field">
           <span className="ai-card__field-label">事故等級</span>
-          <span
-            className="ai-card__field-value ai-card__severity"
-            style={{ color: severityColor }}
-          >
+          <span className="ai-card__field-value ai-card__severity" style={{ color: severityColor }}>
             {severity ?? '後端未提供'}
           </span>
         </div>
@@ -555,15 +512,13 @@ interface RouteAdviceCardProps {
   readonly excluded: readonly { id: string; reason: string }[];
 }
 
-function RouteAdviceCard({
-  primary,
-  secondary,
-  excluded,
-}: RouteAdviceCardProps): ReactNode {
+function RouteAdviceCard({ primary, secondary, excluded }: RouteAdviceCardProps): ReactNode {
   return (
     <div className="ai-card ai-card--routes">
       <div className="ai-card__header">
-        <span className="ai-card__icon" aria-hidden="true">⬢</span>
+        <span className="ai-card__icon" aria-hidden="true">
+          ⬢
+        </span>
         <h3 className="ai-card__title">推薦疏散路線</h3>
       </div>
       <div className="ai-card__body">
@@ -624,7 +579,9 @@ function MultilingualCard({ texts, publishDisabled = true }: MultilingualCardPro
   return (
     <div className="ai-card ai-card--multilingual">
       <div className="ai-card__header">
-        <span className="ai-card__icon" aria-hidden="true">◎</span>
+        <span className="ai-card__icon" aria-hidden="true">
+          ◎
+        </span>
         <h3 className="ai-card__title">多語通報</h3>
       </div>
       <div className="ai-card__body">
@@ -642,11 +599,7 @@ function MultilingualCard({ texts, publishDisabled = true }: MultilingualCardPro
             </button>
           ))}
         </div>
-        <div
-          className="ai-card__lang-content"
-          role="tabpanel"
-          aria-label={activeLang}
-        >
+        <div className="ai-card__lang-content" role="tabpanel" aria-label={activeLang}>
           {currentText ? (
             <p className="ai-card__multilingual-text">{currentText}</p>
           ) : (
@@ -661,9 +614,7 @@ function MultilingualCard({ texts, publishDisabled = true }: MultilingualCardPro
         >
           發布警示
         </button>
-        {publishDisabled && (
-          <p className="ai-card__publish-note">發布功能尚未接線</p>
-        )}
+        {publishDisabled && <p className="ai-card__publish-note">發布功能尚未接線</p>}
       </div>
     </div>
   );
@@ -679,12 +630,12 @@ function WhatIfCard({ content }: WhatIfCardProps): ReactNode {
   return (
     <div className="ai-card ai-card--whatif">
       <div className="ai-card__header">
-        <span className="ai-card__icon" aria-hidden="true">◎</span>
+        <span className="ai-card__icon" aria-hidden="true">
+          ◎
+        </span>
         <h3 className="ai-card__title">What-if 策略諮詢</h3>
       </div>
-      <div className="ai-card__body">
-        {content}
-      </div>
+      <div className="ai-card__body">{content}</div>
     </div>
   );
 }
@@ -728,11 +679,7 @@ function InjectionModal({ isOpen, onClose, content }: InjectionModalProps): Reac
       aria-label="突發事件注入"
     >
       {/* Backdrop — clicking it closes; clicking the panel does not */}
-      <div
-        className="injection-modal__backdrop"
-        aria-hidden="true"
-        onClick={onClose}
-      />
+      <div className="injection-modal__backdrop" aria-hidden="true" onClick={onClose} />
 
       {/* Panel */}
       <section className="injection-modal">
@@ -747,9 +694,7 @@ function InjectionModal({ isOpen, onClose, content }: InjectionModalProps): Reac
             ✕
           </button>
         </div>
-        <div className="injection-modal__body">
-          {content}
-        </div>
+        <div className="injection-modal__body">{content}</div>
       </section>
     </div>,
     document.body,
@@ -838,24 +783,10 @@ export function CommandCenterShell({
   timelineRangeStart,
   timelineRangeEnd,
 }: CommandCenterShellProps): ReactNode {
-  const [activeNav, setActiveNav] = useState('dashboard');
   const [injectionOpen, setInjectionOpen] = useState(false);
   const [activeModuleTab, setActiveModuleTab] = useState<
     'judgment' | 'routes' | 'reasoning' | 'recommendation' | 'multilingual'
   >('judgment');
-
-  const handleNavigate = useCallback((id: string) => {
-    const item = NAV_ITEMS.find((entry) => entry.id === id);
-    if (item === undefined) return;
-    setActiveNav(id);
-    if (item.moduleTab !== undefined) {
-      setActiveModuleTab(item.moduleTab);
-    }
-    const el = document.getElementById(`section-${item.sectionId}`);
-    if (el) {
-      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
-  }, []);
 
   const handleInjectClick = useCallback(() => {
     setInjectionOpen(true);
@@ -875,18 +806,22 @@ export function CommandCenterShell({
       />
 
       <div className="cmd-body">
-        <NavSidebar activeId={activeNav} onNavigate={handleNavigate} />
-
         <main className="cmd-main" role="main">
           {/* Section: Dashboard */}
-          <section id="section-dashboard" className="cmd-section cmd-section--map" aria-label="交通地圖">
-            <div className="cmd-section__map-area">
-              {mapContent}
-            </div>
+          <section
+            id="section-dashboard"
+            className="cmd-section cmd-section--map"
+            aria-label="交通地圖"
+          >
+            <div className="cmd-section__map-area">{mapContent}</div>
           </section>
 
           {/* Section: Timeline */}
-          <section id="section-timeline" className="cmd-section cmd-section--timeline" aria-label="時間軸">
+          <section
+            id="section-timeline"
+            className="cmd-section cmd-section--timeline"
+            aria-label="時間軸"
+          >
             <TimelineBar
               timestamps={timelineTimestamps}
               currentIndex={timelineIndex}
@@ -903,12 +838,12 @@ export function CommandCenterShell({
           </section>
 
           {/* Section: Metrics */}
-          <section id="section-traffic" className="cmd-section cmd-section--metrics" aria-label="交通指標">
-            <MetricCharts
-              roads={roadMetrics}
-              crowd={crowdMetrics}
-              roaming={roamingMetrics}
-            />
+          <section
+            id="section-traffic"
+            className="cmd-section cmd-section--metrics"
+            aria-label="交通指標"
+          >
+            <MetricCharts roads={roadMetrics} crowd={crowdMetrics} roaming={roamingMetrics} />
           </section>
         </main>
 
@@ -969,30 +904,24 @@ export function CommandCenterShell({
               </div>
             )}
             {activeModuleTab === 'routes' && (
-              <div className="cmd-ai-column__section">
-                {routeAdviceContent}
-              </div>
+              <div className="cmd-ai-column__section">{routeAdviceContent}</div>
             )}
-            {activeModuleTab === 'reasoning' && (
-              reasoningContent ? (
+            {activeModuleTab === 'reasoning' &&
+              (reasoningContent ? (
                 <div className="cmd-ai-column__section">{reasoningContent}</div>
               ) : recommendationContent ? (
                 <div className="cmd-ai-column__section">{recommendationContent}</div>
               ) : (
                 <p className="cmd-ai-column__empty">尚無推理資料，請注入突發事件</p>
-              )
-            )}
-            {activeModuleTab === 'recommendation' && (
-              recommendationContent ? (
+              ))}
+            {activeModuleTab === 'recommendation' &&
+              (recommendationContent ? (
                 <div className="cmd-ai-column__section">{recommendationContent}</div>
               ) : (
                 <p className="cmd-ai-column__empty">尚無建議書資料，請注入突發事件</p>
-              )
-            )}
+              ))}
             {activeModuleTab === 'multilingual' && (
-              <div className="cmd-ai-column__section">
-                {multilingualContent}
-              </div>
+              <div className="cmd-ai-column__section">{multilingualContent}</div>
             )}
             <div id="section-whatif" className="cmd-ai-column__section">
               <WhatIfCard content={whatifContent} />

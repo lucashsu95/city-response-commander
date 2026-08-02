@@ -927,15 +927,29 @@ function handleHealth(): APIGatewayProxyResult {
 
 // ─── Route: GET /demo/timeseries ─────────────────────────────────────────────
 
+function mergeDemoTimestamps(
+  trafficTimestamps: readonly NormalizedTimestamp[],
+  crowdTimestamps: readonly NormalizedTimestamp[],
+): readonly NormalizedTimestamp[] {
+  const byRaw = new Map<string, NormalizedTimestamp>();
+  for (const ts of [...trafficTimestamps, ...crowdTimestamps]) {
+    if (!byRaw.has(ts.timestamp_raw)) {
+      byRaw.set(ts.timestamp_raw, ts);
+    }
+  }
+  return [...byRaw.values()].sort(
+    (a, b) => a.timestamp_normalized.getTime() - b.timestamp_normalized.getTime(),
+  );
+}
+
 function handleTimeSeries(): APIGatewayProxyResult {
   const data = _data;
   if (!data) return jsonResponse(500, { error: 'Data not loaded' });
 
   const anomalies = analyzeAnomalies(data.traffic, data.crowd);
 
-  // Group traffic and crowd records by timestamp into up to 10 snapshots.
+  // Group traffic and crowd records by timestamp into snapshots.
   // Each snapshot contains only the records for that specific timestamp.
-  // This allows the frontend to derive the active snapshot from timelineIndex.
   const timestampMap = new Map<string, { traffic: RawTrafficRecord[]; crowd: RawCrowdRecord[] }>();
 
   for (const rec of data.traffic) {
@@ -954,8 +968,8 @@ function handleTimeSeries(): APIGatewayProxyResult {
     timestampMap.get(ts)!.crowd.push(rec);
   }
 
-  // Build ordered snapshot list matching the timeline order (first 10 timestamps)
-  const orderedTimestamps = data.trafficTimestamps.slice(0, 10);
+  // Merge traffic + crowd timestamps so roaming rows at 21:15 / 22:45 etc. are included.
+  const orderedTimestamps = mergeDemoTimestamps(data.trafficTimestamps, data.crowdTimestamps);
   const snapshots = orderedTimestamps.map((ts) => {
     const entry = timestampMap.get(ts.timestamp_raw);
     return {

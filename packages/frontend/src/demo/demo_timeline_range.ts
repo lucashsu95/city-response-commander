@@ -19,8 +19,6 @@ export interface DemoPlaybackFrame {
 }
 
 type DemoSnapshotEntry = DemoTimeseriesResponse['snapshots'][number];
-type DemoTrafficRow = DemoSnapshotEntry['traffic'][number];
-type DemoCrowdRow = DemoSnapshotEntry['crowd'][number];
 
 /** Normalizes demo timestamps so `2026/5/20 23:30` matches `2026-05-20 23:30`. */
 export function normalizeDemoTimestamp(value: string): string | null {
@@ -48,6 +46,11 @@ function parseToMinutes(value: string): number | null {
   return Number(match[4]) * 60 + Number(match[5]);
 }
 
+/** Parses a demo timestamp label to minutes-from-midnight for comparisons. */
+export function parseDemoToMinutes(value: string): number | null {
+  return parseToMinutes(value);
+}
+
 function minutesToLabel(minutes: number): string {
   const h = Math.floor(minutes / 60);
   const m = minutes % 60;
@@ -67,28 +70,37 @@ function generatePlaybackSlots(start: string, end: string, stepMinutes: number):
   return slots;
 }
 
-function collectRowsForTimestamp<T extends { readonly timestamp_raw: string }>(
+function collectRowsLatestPrior<T extends { readonly timestamp_raw: string }>(
   snapshots: readonly DemoSnapshotEntry[],
   pick: (snapshot: DemoSnapshotEntry) => readonly T[],
-  timestamp: string,
+  entityKey: (row: T) => string,
+  frameTimestamp: string,
 ): readonly T[] {
-  const target = normalizeDemoTimestamp(timestamp);
-  if (target === null) return [];
+  const slotMinutes = parseToMinutes(frameTimestamp);
+  if (slotMinutes === null) return [];
 
-  const rows: T[] = [];
+  const bestByEntity = new Map<string, { row: T; minutes: number }>();
+
   for (const snapshot of snapshots) {
     for (const row of pick(snapshot)) {
-      if (normalizeDemoTimestamp(row.timestamp_raw) === target) {
-        rows.push(row);
+      const rowMinutes = parseToMinutes(row.timestamp_raw);
+      if (rowMinutes === null || rowMinutes > slotMinutes) continue;
+
+      const key = entityKey(row);
+      const existing = bestByEntity.get(key);
+      if (existing === undefined || rowMinutes > existing.minutes) {
+        bestByEntity.set(key, { row, minutes: rowMinutes });
       }
     }
   }
-  return rows;
+
+  return [...bestByEntity.values()].sort((a, b) => b.minutes - a.minutes).map((entry) => entry.row);
 }
 
 /**
- * Returns crowd/traffic rows for the active 15-minute playback frame.
- * Falls back to the nearest snapshot when no exact rows exist for that slot.
+ * Returns crowd/traffic rows aligned to the active playback frame.
+ * Uses latest-prior-per-entity selection so metrics evolve as the timeline advances,
+ * even when demo CSV timestamps fall between 15-minute grid slots.
  */
 export function resolveSnapshotForPlaybackFrame(
   snapshots: readonly DemoSnapshotEntry[],
@@ -96,18 +108,28 @@ export function resolveSnapshotForPlaybackFrame(
 ): DemoSnapshotEntry | null {
   if (frame === null || snapshots.length === 0) return null;
 
-  const traffic = collectRowsForTimestamp(snapshots, (s) => s.traffic, frame.timestamp);
-  const crowd = collectRowsForTimestamp(snapshots, (s) => s.crowd, frame.timestamp);
+  const traffic = collectRowsLatestPrior(
+    snapshots,
+    (s) => s.traffic,
+    (row) => row.Segment_ID,
+    frame.timestamp,
+  );
+  const crowd = collectRowsLatestPrior(
+    snapshots,
+    (s) => s.crowd,
+    (row) => row.BS_ID,
+    frame.timestamp,
+  );
 
-  if (traffic.length > 0 || crowd.length > 0) {
-    return {
-      timestamp_display: frame.timestamp,
-      traffic,
-      crowd,
-    };
+  if (traffic.length === 0 && crowd.length === 0) {
+    return snapshots[frame.snapshotIndex] ?? snapshots[snapshots.length - 1] ?? null;
   }
 
-  return snapshots[frame.snapshotIndex] ?? snapshots[snapshots.length - 1] ?? null;
+  return {
+    timestamp_display: frame.timestamp,
+    traffic,
+    crowd,
+  };
 }
 
 /**
