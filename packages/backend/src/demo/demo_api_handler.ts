@@ -1460,15 +1460,12 @@ function handleIncident(body: string | null | undefined): APIGatewayProxyResult 
     rag_trace: ragTrace,
     route_reasoning_trace: routeReasoningTrace,
     ...(eteCalculationTrace !== null && { ete_calculation: eteCalculationTrace }),
-<<<<<<< HEAD
     elapsed_ms: Date.now() - startedAt,
-=======
     pre_warning_segments: core.pre_warning_segments ?? [],
     crowd_pre_warnings: core.crowd_pre_warnings ?? [],
     signal_conflicts: core.signal_conflicts ?? [],
     cascading_risk: core.cascading_risk ?? null,
     self_blocked_exclusions: core.self_blocked_exclusions ?? [],
->>>>>>> 7323faf6c1d42bacb8c471e400a92c9db42ab1cc
     data_status: 'ready',
     text_source: 'deterministic',
   });
