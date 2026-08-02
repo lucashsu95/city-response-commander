@@ -62,6 +62,7 @@ export function buildDecisionCore(input: DecisionCoreBuildInput): DecisionCore {
     // annotations derived from already-hashed facts, not new decision-identity
     // facts.
     pre_warning_segments: input.pre_warning_segments,
+    crowd_pre_warnings: input.crowd_pre_warnings,
     signal_conflicts: input.signal_conflicts,
     cascading_risk: input.cascading_risk,
     self_blocked_exclusions: input.self_blocked_exclusions,

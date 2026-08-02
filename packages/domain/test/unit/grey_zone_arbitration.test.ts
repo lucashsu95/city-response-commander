@@ -19,6 +19,15 @@ import {
   detectSignalConflicts,
   buildAdjacencyGraph,
   detectCascadingRisk,
+  detectGreyZonePreWarning,
+  detectSop3UserCountPreWarning,
+  detectSop3GrowthRatePreWarning,
+  detectSop4GrowthRatePreWarning,
+  detectSop6RoamingPreWarning,
+  SOP3_USER_COUNT_GREY_ZONE,
+  SOP3_GROWTH_RATE_GREY_ZONE,
+  SOP4_GROWTH_RATE_GREY_ZONE,
+  SOP6_ROAMING_GREY_ZONE,
 } from '../../src/rule_engine/grey_zone_arbitration.js';
 
 // ─── Test Helpers ──────────────────────────────────────────
@@ -191,6 +200,171 @@ describe('GZAE R2 — detectPreWarning', () => {
   it('is deterministic: same input twice yields same output (AC8)', () => {
     const history = [{ saturation_score: 0.78 }, { saturation_score: 0.8 }, { saturation_score: 0.82 }];
     expect(detectPreWarning(0.83, history)).toBe(detectPreWarning(0.83, history));
+  });
+});
+
+// ─── R2 extension: detectGreyZonePreWarning + SOP-3/4/6 wrappers ───────────
+
+describe('GZAE R2 extension — detectGreyZonePreWarning (generic)', () => {
+  it('rising direction: true when in band with strictly increasing history', () => {
+    expect(
+      detectGreyZonePreWarning(
+        24_000,
+        [{ value: 23_800 }, { value: 23_900 }, { value: 24_000 }],
+        SOP3_USER_COUNT_GREY_ZONE,
+      ),
+    ).toBe(true);
+  });
+
+  it('rising direction: false when history is not strictly increasing', () => {
+    expect(
+      detectGreyZonePreWarning(
+        24_000,
+        [{ value: 24_100 }, { value: 23_900 }, { value: 24_000 }],
+        SOP3_USER_COUNT_GREY_ZONE,
+      ),
+    ).toBe(false);
+  });
+
+  it('rising direction: false once at/above threshold (already triggered)', () => {
+    expect(
+      detectGreyZonePreWarning(
+        25_000,
+        [{ value: 24_000 }, { value: 24_500 }, { value: 25_000 }],
+        SOP3_USER_COUNT_GREY_ZONE,
+      ),
+    ).toBe(false);
+  });
+
+  it('rising direction: false below the band lower bound', () => {
+    expect(
+      detectGreyZonePreWarning(
+        20_000,
+        [{ value: 19_000 }, { value: 19_500 }, { value: 20_000 }],
+        SOP3_USER_COUNT_GREY_ZONE,
+      ),
+    ).toBe(false);
+  });
+
+  it('falling direction: true when in band with strictly decreasing history (SOP-4)', () => {
+    expect(
+      detectGreyZonePreWarning(
+        -0.18,
+        [{ value: -0.14 }, { value: -0.16 }, { value: -0.18 }],
+        SOP4_GROWTH_RATE_GREY_ZONE,
+      ),
+    ).toBe(true);
+  });
+
+  it('falling direction: false once at/below threshold (already triggered)', () => {
+    expect(
+      detectGreyZonePreWarning(
+        -0.2,
+        [{ value: -0.16 }, { value: -0.18 }, { value: -0.2 }],
+        SOP4_GROWTH_RATE_GREY_ZONE,
+      ),
+    ).toBe(false);
+  });
+
+  it('falling direction: false when history is not strictly decreasing', () => {
+    expect(
+      detectGreyZonePreWarning(
+        -0.18,
+        [{ value: -0.16 }, { value: -0.19 }, { value: -0.18 }],
+        SOP4_GROWTH_RATE_GREY_ZONE,
+      ),
+    ).toBe(false);
+  });
+
+  it('flags false with insufficient history, without interpolating', () => {
+    expect(detectGreyZonePreWarning(24_000, [], SOP3_USER_COUNT_GREY_ZONE)).toBe(false);
+    expect(detectGreyZonePreWarning(24_000, [{ value: 24_000 }], SOP3_USER_COUNT_GREY_ZONE)).toBe(
+      false,
+    );
+  });
+
+  it('is deterministic: same input twice yields same output', () => {
+    const history = [{ value: 0.26 }, { value: 0.27 }, { value: 0.28 }];
+    expect(detectGreyZonePreWarning(0.28, history, SOP3_GROWTH_RATE_GREY_ZONE)).toBe(
+      detectGreyZonePreWarning(0.28, history, SOP3_GROWTH_RATE_GREY_ZONE),
+    );
+  });
+});
+
+describe('GZAE R2 extension — SOP-3/4/6 wrapper functions', () => {
+  it('detectSop3UserCountPreWarning returns a CrowdPreWarning for BL17 (art.3, User_Count)', () => {
+    const result = detectSop3UserCountPreWarning(
+      'BS_MRT_BL17',
+      24_000,
+      [{ value: 23_800 }, { value: 23_900 }, { value: 24_000 }],
+    );
+    expect(result).toEqual({
+      bs_id: 'BS_MRT_BL17',
+      article: 3,
+      field: 'User_Count',
+      advisory_text: expect.stringContaining('SOP 第 3 條門檻（25,000 人）'),
+    });
+  });
+
+  it('detectSop3UserCountPreWarning returns null outside the grey zone', () => {
+    expect(detectSop3UserCountPreWarning('BS_MRT_BL17', 10_000, [])).toBeNull();
+  });
+
+  it('detectSop3GrowthRatePreWarning returns a CrowdPreWarning for BL17 (art.3, Growth_Rate)', () => {
+    const result = detectSop3GrowthRatePreWarning(
+      'BS_MRT_BL17',
+      0.28,
+      [{ value: 0.26 }, { value: 0.27 }, { value: 0.28 }],
+    );
+    expect(result).toEqual({
+      bs_id: 'BS_MRT_BL17',
+      article: 3,
+      field: 'Growth_Rate',
+      advisory_text: expect.stringContaining('SOP 第 3 條門檻（0.30）'),
+    });
+  });
+
+  it('detectSop4GrowthRatePreWarning returns null when the historical-peak precondition is not met', () => {
+    const result = detectSop4GrowthRatePreWarning(
+      'BS_TPE_DOME',
+      false,
+      -0.18,
+      [{ value: -0.14 }, { value: -0.16 }, { value: -0.18 }],
+    );
+    expect(result).toBeNull();
+  });
+
+  it('detectSop4GrowthRatePreWarning returns a CrowdPreWarning once the peak precondition is met', () => {
+    const result = detectSop4GrowthRatePreWarning(
+      'BS_TPE_DOME',
+      true,
+      -0.18,
+      [{ value: -0.14 }, { value: -0.16 }, { value: -0.18 }],
+    );
+    expect(result).toEqual({
+      bs_id: 'BS_TPE_DOME',
+      article: 4,
+      field: 'Growth_Rate',
+      advisory_text: expect.stringContaining('SOP 第 4 條疏散門檻（-0.20）'),
+    });
+  });
+
+  it('detectSop6RoamingPreWarning returns a CrowdPreWarning for an in-scope station (art.6, Roaming_User_Pct)', () => {
+    const result = detectSop6RoamingPreWarning(
+      'BS_MRT_BL18',
+      0.28,
+      [{ value: 0.26 }, { value: 0.27 }, { value: 0.28 }],
+    );
+    expect(result).toEqual({
+      bs_id: 'BS_MRT_BL18',
+      article: 6,
+      field: 'Roaming_User_Pct',
+      advisory_text: expect.stringContaining('SOP 第 6 條門檻（30%）'),
+    });
+  });
+
+  it('detectSop6RoamingPreWarning returns null outside the grey zone', () => {
+    expect(detectSop6RoamingPreWarning('BS_MRT_BL18', 0.1, [])).toBeNull();
   });
 });
 
