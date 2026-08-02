@@ -41,19 +41,23 @@ export interface ValidatedSourceEntry extends OfficialSourceEntry {
  * These are placeholder values from the design doc §10.0b.
  * In LOCAL_MOCK, these can be overridden via config.
  *
- * NOTE: Updated to match actual demo-data-source/ file hashes
- * (road_network_geometry.json, emergency_traffic_sop.txt, live_incidents.json).
+ * NOTE: Hashes are computed from the LF-normalized git blob content of
+ * demo-data-source/ (i.e. `git show HEAD:demo-data-source/<file> | sha256sum`),
+ * not from a Windows working-copy checkout. `core.autocrlf=true` rewrites
+ * these files to CRLF on Windows checkout, which produces a different hash
+ * than the LF content Linux CI actually reads — always regenerate expected
+ * hashes from the git blob, never from a local working-copy file.
  */
 export const DEFAULT_EXPECTED_HASHES: Record<string, string> = {
   '(中華電信) 命題文件 - 2026 雲湧智生：臺灣生成式 AI 應用黑客松競賽.pdf':
     '706B44C94313AAE751434E29EE3CFF6BE1351DAA76077933C5D6DBE5171C15D7',
   '(中華電信) 命題解說 - 2026 雲湧智生：臺灣生成式 AI 應用黑客松競賽.docx':
     '0BC38CA8B655308F0DB36E3CF02FAC1289E9509AD61C59C9673CF5A7505FF065',
-  'city_traffic_flow.csv': 'B31436B5280B95325DA7715E7F1D3059AE343CF6E69FB2C063A9C95A541D5F2A',
-  'signaling_crowd_density.csv': 'BD9BC159083A6304C68FEF2DFC52E1C23251523882F9953A10928C26E9564073',
-  'road_network_geometry.json': 'A539DE9A2CD6B349B67A013A054894A5651ACFDF0759B4DE455B71FA4C9F95B8',
-  'emergency_traffic_sop.txt': '9DAAE6217F2751E7E91CF5D459B2EDE4C00B983AB6E995DC8F22F7996394BAF4',
-  'live_incidents.json': 'E2BD5360F3C216DB7856FF8057647FC92DEFE71ADD6E60873FB57F010F0547A3',
+  'city_traffic_flow.csv': '94B3B78FB7CE4C11D89A611BA613F263F562FACFFC861F1E94EAC058AF30173D',
+  'signaling_crowd_density.csv': 'FDCEA7BE34CBD69536393D85E5DBFA2B230616CFBB40E072D1600D11AA6CACAD',
+  'road_network_geometry.json': '741D253538AAF2BB25C60DEC9D4A8E8DEFECC27112FA09C7A9F1512ADB286B18',
+  'emergency_traffic_sop.txt': '0C84F2F6F30E2EC18F56E9675AA1C1C6062EBEFAF14920D8CCAC732D41BCAF1D',
+  'live_incidents.json': 'E90C8AE46AFD02A76C233F39CB0628254BE53555B9E48067C4EA3A48E41C0A63',
 };
 
 /**

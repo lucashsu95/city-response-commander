@@ -915,8 +915,8 @@ The affected-intersection count and total police remain unresolved under OQ-010.
 | --- | --- | --- | --- | --- |
 | 1 | `(中華電信) 命題文件 - 2026 雲湧智生：臺灣生成式 AI 應用黑客松競賽.pdf` | official_pdf | 否（僅交付佐證） | `706B44C94313AAE751434E29EE3CFF6BE1351DAA76077933C5D6DBE5171C15D7` |
 | 2 | `(中華電信) 命題解說 - 2026 雲湧智生：臺灣生成式 AI 應用黑客松競賽.docx` | official_docx | 否（僅交付佐證） | `0BC38CA8B655308F0DB36E3CF02FAC1289E9509AD61C59C9673CF5A7505FF065` |
-| 3 | `city_traffic_flow.csv` | official_csv | 是 | `B31436B5280B95325DA7715E7F1D3059AE343CF6E69FB2C063A9C95A541D5F2A` |
-| 4 | `signaling_crowd_density.csv` | official_csv | 是 | `BD9BC159083A6304C68FEF2DFC52E1C23251523882F9953A10928C26E9564073` |
+| 3 | `city_traffic_flow.csv` | official_csv | 是 | `94B3B78FB7CE4C11D89A611BA613F263F562FACFFC861F1E94EAC058AF30173D` |
+| 4 | `signaling_crowd_density.csv` | official_csv | 是 | `FDCEA7BE34CBD69536393D85E5DBFA2B230616CFBB40E072D1600D11AA6CACAD` |
 | 5 | `road_network_geometry.json` | official_json | 是 | `741D253538AAF2BB25C60DEC9D4A8E8DEFECC27112FA09C7A9F1512ADB286B18` |
 | 6 | `emergency_traffic_sop.txt` | official_sop_txt | 是 | `0C84F2F6F30E2EC18F56E9675AA1C1C6062EBEFAF14920D8CCAC732D41BCAF1D` |
 | 7 | `live_incidents.json` | official_json | 是 | `E90C8AE46AFD02A76C233F39CB0628254BE53555B9E48067C4EA3A48E41C0A63` |
