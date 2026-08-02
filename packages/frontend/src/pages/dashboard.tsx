@@ -154,6 +154,16 @@ function DemoDashboardPage(): ReactNode {
         ? snapshots[snapshots.length - 1]
         : null;
 
+  // The timestamp paired with activeSnapshot — same index/fallback logic,
+  // derived locally (this component never calls useTimelinePlayback, so it
+  // has no `timeline.currentTimestamp` to reuse; see file-level doc comment).
+  const currentTimestamp =
+    timelineIndex !== null && timelineIndex >= 0 && timelineIndex < timestamps.length
+      ? timestamps[timelineIndex]
+      : timestamps.length > 0
+        ? timestamps[timestamps.length - 1]
+        : null;
+
   // ── Timeline controls ────────────────────────────────────────────────────────
   const handleTimelineSelect = useCallback(
     (ts: string) => {

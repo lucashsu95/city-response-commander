@@ -18,18 +18,23 @@ export type TrafficMapDemoPreset = 'baseline' | 'incident' | 'arbitration';
 export const TRAFFIC_MAP_DEMO_PRESETS: Readonly<
   Record<TrafficMapDemoPreset, readonly TrafficDataItem[]>
 > = Object.freeze({
-  baseline: Object.freeze([
+  // Explicit type argument on each `Object.freeze` call so `alert_level`'s
+  // string literals ('RED'/'YELLOW'/'GREEN') are checked directly against
+  // `TrafficAlertLevel` instead of widening to `string` — generic inference
+  // for a function-call argument does not inherit the outer `Record<...>`
+  // contextual type the way a plain object-literal property does.
+  baseline: Object.freeze<TrafficDataItem[]>([
     { road_name: '光復南路', alert_level: 'GREEN', saturation: 0.35 },
     { road_name: '市民大道四段', alert_level: 'YELLOW', saturation: 0.55 },
     { road_name: '仁愛路四段', alert_level: 'GREEN', saturation: 0.3 },
     { road_name: '逸仙路', alert_level: 'GREEN', saturation: 0.25 },
   ]),
-  incident: Object.freeze([
+  incident: Object.freeze<TrafficDataItem[]>([
     { road_name: '光復南路', alert_level: 'RED', saturation: 0.97 },
     { road_name: '市民大道四段', alert_level: 'YELLOW', saturation: 0.72 },
     { road_name: '仁愛路四段', alert_level: 'GREEN', saturation: 0.35 },
   ]),
-  arbitration: Object.freeze([
+  arbitration: Object.freeze<TrafficDataItem[]>([
     { road_name: '光復南路', alert_level: 'RED', saturation: 0.97 },
     { road_name: '市民大道四段', alert_level: 'YELLOW', saturation: 0.72 },
     { road_name: '仁愛路四段', alert_level: 'GREEN', saturation: 0.25 },
