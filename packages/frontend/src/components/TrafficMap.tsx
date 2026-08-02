@@ -47,8 +47,7 @@ interface ResolvedRoadSegment {
 const MAP_CENTER: LatLngExpression = [25.038, 121.557];
 const MAP_ZOOM = 15;
 
-const CARTO_DARK_TILE_URL =
-  'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
+const CARTO_DARK_TILE_URL = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
 const CARTO_ATTRIBUTION =
   '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>';
 
@@ -66,12 +65,52 @@ const ALERT_LABELS: Readonly<Record<TrafficAlertLevel, string>> = Object.freeze(
 
 const GLOW_PATH_OPTIONS = Object.freeze({
   color: '#FF3B30',
-  weight: 14,
-  opacity: 0.35,
+  weight: 16,
+  opacity: 0.4,
   lineCap: 'round' as const,
   lineJoin: 'round' as const,
   className: 'pulsing-red-road',
 });
+
+const YELLOW_GLOW_PATH_OPTIONS = Object.freeze({
+  color: '#FFCC00',
+  weight: 12,
+  opacity: 0.28,
+  lineCap: 'round' as const,
+  lineJoin: 'round' as const,
+  className: 'pulsing-yellow-road',
+});
+
+function corePathOptions(alertLevel: TrafficAlertLevel) {
+  const color = ALERT_COLORS[alertLevel];
+  if (alertLevel === 'RED') {
+    return {
+      color,
+      weight: 6,
+      opacity: 1,
+      lineCap: 'round' as const,
+      lineJoin: 'round' as const,
+    };
+  }
+  if (alertLevel === 'YELLOW') {
+    return {
+      color,
+      weight: 5,
+      opacity: 0.95,
+      lineCap: 'round' as const,
+      lineJoin: 'round' as const,
+      className: 'flowing-yellow-road',
+    };
+  }
+  return {
+    color,
+    weight: 5,
+    opacity: 0.9,
+    lineCap: 'round' as const,
+    lineJoin: 'round' as const,
+    className: 'flowing-green-road',
+  };
+}
 
 // ─── Helpers ─────────────────────────────────────────────────
 
@@ -103,29 +142,13 @@ function resolveSegments(trafficData: readonly TrafficDataItem[]): readonly Reso
   return resolved;
 }
 
-function corePathOptions(alertLevel: TrafficAlertLevel) {
-  return {
-    color: ALERT_COLORS[alertLevel],
-    weight: 5,
-    opacity: 1,
-    lineCap: 'round' as const,
-    lineJoin: 'round' as const,
-  };
-}
-
-// ─── Sub-components ──────────────────────────────────────────
-
 interface RoadPopupContentProps {
   readonly roadName: string;
   readonly alertLevel: TrafficAlertLevel;
   readonly saturation: number;
 }
 
-function RoadPopupContent({
-  roadName,
-  alertLevel,
-  saturation,
-}: RoadPopupContentProps): ReactNode {
+function RoadPopupContent({ roadName, alertLevel, saturation }: RoadPopupContentProps): ReactNode {
   return (
     <div className="traffic-map__popup">
       <strong>{roadName}</strong>
@@ -218,11 +241,19 @@ function RoadSegmentLayers({ segment }: RoadSegmentLayersProps): ReactNode {
     );
   }
 
+  if (segment.alertLevel === 'YELLOW') {
+    return (
+      <>
+        <Polyline positions={segment.coordinates} pathOptions={YELLOW_GLOW_PATH_OPTIONS} />
+        <Polyline positions={segment.coordinates} pathOptions={corePathOptions('YELLOW')}>
+          {popup}
+        </Polyline>
+      </>
+    );
+  }
+
   return (
-    <Polyline
-      positions={segment.coordinates}
-      pathOptions={corePathOptions(segment.alertLevel)}
-    >
+    <Polyline positions={segment.coordinates} pathOptions={corePathOptions('GREEN')}>
       {popup}
     </Polyline>
   );
