@@ -12,7 +12,11 @@
 
 import { describe, it, expect, vi } from 'vitest';
 import { FALLBACK_DISCLOSURE } from '@city-commander/shared-schemas';
-import { explainWhatIf, type WhatIfExplanationInput } from '../../src/whatif/explanation.js';
+import {
+  buildWhatIfSummaryText,
+  explainWhatIf,
+  type WhatIfExplanationInput,
+} from '../../src/whatif/explanation.js';
 import type {
   BedrockInvoker,
   BedrockResult,
@@ -116,6 +120,39 @@ function makeBedrockFailure(): BedrockInvoker {
 }
 
 // ─── Tests ─────────────────────────────────────────────────────────────────
+
+describe('buildWhatIfSummaryText', () => {
+  it('summarizes deterministic SOP, first action, and ETE facts in one paragraph', () => {
+    expect(buildWhatIfSummaryText(makeRecomputeResult())).toBe(
+      '觸發 SOP 第 1、2 條；首要動作：SOP-1：封閉事故路段；預估恢復時間 45 分鐘。',
+    );
+  });
+
+  it('states deterministic no-trigger and no-action outcomes without inventing ETE', () => {
+    expect(
+      buildWhatIfSummaryText({
+        triggered_articles: [],
+        applied_formula_articles: [],
+        expected_actions: [],
+        does_not_mutate_state: true,
+      }),
+    ).toBe('未觸發新的 SOP 條款；目前無新增預期動作。');
+  });
+
+  it('caps a long first action so the summary stays concise', () => {
+    const summary = buildWhatIfSummaryText({
+      triggered_articles: [3],
+      applied_formula_articles: [],
+      expected_actions: [
+        '啟動接駁分流並通知所有相關單位持續監看沿線各站人流與道路狀況，直到現場指揮官確認解除應變為止',
+      ],
+      does_not_mutate_state: true,
+    });
+
+    expect(summary).toContain('…');
+    expect(summary.length).toBeLessThan(90);
+  });
+});
 
 describe('explainWhatIf', () => {
   it('Bedrock success + s3_fallback citations WITHOUT disclosure → appends 類比引用 disclosure', async () => {

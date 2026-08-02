@@ -22,11 +22,7 @@
 
 import { useCallback, useState, type FormEvent, type ReactNode } from 'react';
 import type { WhatIfResponse } from '@city-commander/shared-schemas';
-import {
-  EmptyState,
-  ErrorState,
-  LoadingIndicator,
-} from '../components/system/async_state.js';
+import { EmptyState, ErrorState, LoadingIndicator } from '../components/system/async_state.js';
 import {
   DataContractWarning,
   FieldList,
@@ -51,7 +47,10 @@ function normalizeQuery(raw: string): string | null {
 function decodeWhatIfResponse(
   httpStatus: number,
   body: unknown,
-): { kind: 'answered'; data: WhatIfResponse } | { kind: 'clarification'; data: WhatIfResponse } | { kind: 'http_error'; status: number; message: string } {
+):
+  | { kind: 'answered'; data: WhatIfResponse }
+  | { kind: 'clarification'; data: WhatIfResponse }
+  | { kind: 'http_error'; status: number; message: string } {
   if (httpStatus !== 200) {
     return {
       kind: 'http_error',
@@ -65,9 +64,10 @@ function decodeWhatIfResponse(
     schema_version: String(record.schema_version ?? ''),
     trace_id: String(record.trace_id ?? ''),
     request_id: String(record.request_id ?? ''),
-    status: record.status === 'answered' || record.status === 'clarification_required'
-      ? record.status as 'answered' | 'clarification_required'
-      : 'answered',
+    status:
+      record.status === 'answered' || record.status === 'clarification_required'
+        ? (record.status as 'answered' | 'clarification_required')
+        : 'answered',
     triggered_articles: Array.isArray(record.triggered_articles)
       ? (record.triggered_articles as readonly number[])
       : [],
@@ -81,8 +81,11 @@ function decodeWhatIfResponse(
     sop_citations: Array.isArray(record.sop_citations)
       ? (record.sop_citations as WhatIfResponse['sop_citations'])
       : [],
-    explanation_text: typeof record.explanation_text === 'string' ? record.explanation_text : undefined,
-    clarification_prompt: typeof record.clarification_prompt === 'string' ? record.clarification_prompt : undefined,
+    summary_text: typeof record.summary_text === 'string' ? record.summary_text : undefined,
+    explanation_text:
+      typeof record.explanation_text === 'string' ? record.explanation_text : undefined,
+    clarification_prompt:
+      typeof record.clarification_prompt === 'string' ? record.clarification_prompt : undefined,
     does_not_mutate_state: true as const,
     provisional: typeof record.provisional === 'boolean' ? record.provisional : false,
   };
@@ -224,9 +227,7 @@ export function WhatIfDialog({ client }: WhatIfDialogProps): ReactNode {
         </div>
       ) : null}
 
-      {phase === 'submitting' ? (
-        <LoadingIndicator label="What-if 計算中" />
-      ) : null}
+      {phase === 'submitting' ? <LoadingIndicator label="What-if 計算中" /> : null}
 
       {phase === 'error' ? (
         <div data-testid="whatif-error">
@@ -246,7 +247,10 @@ export function WhatIfDialog({ client }: WhatIfDialogProps): ReactNode {
         <div data-testid="whatif-clarification">
           <section className="whatif-dialog__section">
             <h4 className="whatif-dialog__subheading">需要更多資訊</h4>
-            <p className="whatif-dialog__clarification-prompt" data-testid="whatif-clarification-prompt">
+            <p
+              className="whatif-dialog__clarification-prompt"
+              data-testid="whatif-clarification-prompt"
+            >
               {result.clarification_prompt ?? '系統無法唯一判定您的假設情境，請提供更多細節。'}
             </p>
           </section>
@@ -271,6 +275,16 @@ export function WhatIfDialog({ client }: WhatIfDialogProps): ReactNode {
 
       {phase === 'answered' && result !== null ? (
         <div data-testid="whatif-answered">
+          {result.summary_text !== undefined ? (
+            <section
+              className="whatif-dialog__section whatif-dialog__summary"
+              data-testid="whatif-summary-section"
+            >
+              <h4 className="whatif-dialog__subheading">策略摘要</h4>
+              <p data-testid="whatif-summary">{result.summary_text}</p>
+            </section>
+          ) : null}
+
           <section className="whatif-dialog__section">
             <h4 className="whatif-dialog__subheading">觸發的 SOP 條款</h4>
             <p data-testid="whatif-triggered-articles">
@@ -291,9 +305,7 @@ export function WhatIfDialog({ client }: WhatIfDialogProps): ReactNode {
               {result.expected_actions.length === 0 ? (
                 <li>無</li>
               ) : (
-                result.expected_actions.map((action, index) => (
-                  <li key={index}>{action}</li>
-                ))
+                result.expected_actions.map((action, index) => <li key={index}>{action}</li>)
               )}
             </ul>
           </section>
@@ -323,7 +335,7 @@ export function WhatIfDialog({ client }: WhatIfDialogProps): ReactNode {
 
           {result.explanation_text !== undefined ? (
             <section className="whatif-dialog__section">
-              <h4 className="whatif-dialog__subheading">AI 解釋</h4>
+              <h4 className="whatif-dialog__subheading">詳細 AI 解釋</h4>
               <p data-testid="whatif-explanation">{result.explanation_text}</p>
             </section>
           ) : null}
@@ -336,11 +348,16 @@ export function WhatIfDialog({ client }: WhatIfDialogProps): ReactNode {
               <span data-testid="whatif-request-id">{textOrUnavailable(result.request_id)}</span>
             </FieldRow>
             <FieldRow label="does_not_mutate_state">
-              <span data-testid="whatif-no-mutate">{result.does_not_mutate_state ? 'true' : NOT_SUPPLIED}</span>
+              <span data-testid="whatif-no-mutate">
+                {result.does_not_mutate_state ? 'true' : NOT_SUPPLIED}
+              </span>
             </FieldRow>
             {result.provisional ? (
               <FieldRow label="provisional">
-                <span className="decision-badge decision-badge--provisional" data-testid="whatif-provisional-badge">
+                <span
+                  className="decision-badge decision-badge--provisional"
+                  data-testid="whatif-provisional-badge"
+                >
                   暫定政策
                 </span>
               </FieldRow>

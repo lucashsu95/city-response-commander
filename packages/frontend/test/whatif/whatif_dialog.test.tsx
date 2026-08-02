@@ -32,7 +32,10 @@ function okResult(httpStatus: number, body: unknown): PostWhatIfResult {
   return { ok: true, data: { httpStatus, body } };
 }
 
-async function submitQuery(client: ApiClient, query = '若 BS_MRT_BL17 人數增至 40000'): Promise<void> {
+async function submitQuery(
+  client: ApiClient,
+  query = '若 BS_MRT_BL17 人數增至 40000',
+): Promise<void> {
   render(<WhatIfDialog client={client} />);
   fireEvent.change(screen.getByTestId('whatif-query-input'), { target: { value: query } });
   fireEvent.click(screen.getByTestId('whatif-submit-button'));
@@ -118,6 +121,37 @@ describe('WhatIfDialog — explicit confirmation gate', () => {
 });
 
 describe('WhatIfDialog — answered outcome', () => {
+  it('renders the concise strategy summary first and the detailed AI explanation last', async () => {
+    const postWhatIf = vi.fn(() =>
+      Promise.resolve(
+        okResult(200, {
+          schema_version: '1.0',
+          trace_id: 'tr-1',
+          request_id: 'req-1',
+          status: 'answered',
+          triggered_articles: [3],
+          applied_formula_articles: [],
+          expected_actions: ['啟動接駁分流'],
+          sop_citations: [],
+          summary_text: '觸發 SOP 第 3 條；首要動作：啟動接駁分流。',
+          explanation_text: '這是較長的完整理由與依據。',
+        }),
+      ),
+    );
+    await submitQuery(createFakeClient({ postWhatIf }));
+    await confirmSubmission();
+
+    expect(screen.getByTestId('whatif-summary').textContent).toContain('首要動作');
+    expect(screen.getByTestId('whatif-explanation').textContent).toContain('完整理由');
+
+    const headings = Array.from(
+      screen.getByTestId('whatif-answered').querySelectorAll('h4'),
+      (heading) => heading.textContent,
+    );
+    expect(headings[0]).toBe('策略摘要');
+    expect(headings.at(-1)).toBe('詳細 AI 解釋');
+  });
+
   it('renders triggered articles, applied formula articles, and expected actions verbatim', async () => {
     const postWhatIf = vi.fn(() =>
       Promise.resolve(

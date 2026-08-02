@@ -337,7 +337,8 @@ export function createWhatIfHandler(
 
       // ── 組裝最終 WhatIfResponse ──────────────────────────────────────────
       // 所有決定性欄位來自 stage 3（LLM-prohibited）
-      // explanation_text / rag_trace / ete_calculation 來自 stage 4
+      // summary_text 是 stage 3 事實的決定性摘要；explanation_text 是 stage 4 文字
+      // rag_trace / ete_calculation 由 stage 4 組裝，但不含 LLM 決策
       const response: WhatIfResponse = {
         schema_version: SCHEMA_VER,
         trace_id: traceId,
@@ -358,6 +359,8 @@ export function createWhatIfHandler(
           source_location: c.source_location,
           source: c.source,
         })),
+        // LLM-prohibited：只重述 stage 3 已驗證事實
+        summary_text: explanationResult.summary_text,
         // LLM-writable：stage 4 Bedrock 或 template fallback
         explanation_text: explanationResult.explanation_text,
         // rag_trace：SOP retrieval provenance（deterministic, no LLM authorship）
