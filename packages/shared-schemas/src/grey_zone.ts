@@ -25,3 +25,17 @@ export interface CascadingRisk {
   /** Fixed template text (requirements.md R4 AC5) — never LLM-generated. */
   readonly advisory_text: string;
 }
+
+/**
+ * GZAE-R2 extension: threshold-boundary trend pre-warning for a crowd field
+ * (SOP-3 User_Count/Growth_Rate, SOP-4 Growth_Rate, SOP-6 Roaming_User_Pct).
+ * Same additive-only contract as R2's `pre_warning_segments` — never affects
+ * the article's own trigger determination.
+ */
+export interface CrowdPreWarning {
+  readonly bs_id: string;
+  readonly article: 3 | 4 | 6;
+  readonly field: 'User_Count' | 'Growth_Rate' | 'Roaming_User_Pct';
+  /** Fixed template text — never LLM-generated. */
+  readonly advisory_text: string;
+}

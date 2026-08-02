@@ -5,7 +5,7 @@ import type { PolicyMetadata } from './policy_metadata.js';
 import type { ETEResult } from './ete.js';
 import type { RouteCandidate } from './route_candidate.js';
 import type { UniversalPrinciple, GroundingCandidate } from './universal_defense.js';
-import type { SignalConflict, CascadingRisk } from './grey_zone.js';
+import type { SignalConflict, CascadingRisk, CrowdPreWarning } from './grey_zone.js';
 
 export interface SegmentClassification {
   readonly segment_id: string;
@@ -113,6 +113,13 @@ export interface DecisionCore {
    * Optional for backwards-compatible read models built before GZAE wiring.
    */
   readonly pre_warning_segments?: readonly string[];
+  /**
+   * GZAE (§GZAE-R2 extension). Same trend-based grey-zone pre-warning as
+   * `pre_warning_segments`, generalized to SOP-3 (User_Count/Growth_Rate),
+   * SOP-4 (Growth_Rate) and SOP-6 (Roaming_User_Pct). Never affects
+   * `triggered_articles` or any article's own trigger determination.
+   */
+  readonly crowd_pre_warnings?: readonly CrowdPreWarning[];
   /** GZAE (§GZAE-R3). Cross-article traffic/crowd signal contradictions, advisory-only. */
   readonly signal_conflicts?: readonly SignalConflict[];
   /** GZAE (§GZAE-R4). Adjacent, individually-non-escalating incidents, advisory-only; `null` when none detected. */

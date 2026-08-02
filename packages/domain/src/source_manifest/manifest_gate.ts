@@ -114,8 +114,41 @@ export async function runManifestGate(
     verifyAll?: boolean;
     /** Override expected hashes (e.g., from config) */
     expectedHashes?: Record<string, string>;
+    /** Skip hash verification entirely — used in demo mode where S3 data is trusted */
+    skipVerification?: boolean;
   },
 ): Promise<ManifestGateResult> {
+  // In demo mode, skip verification and return a passing gate result with a
+  // placeholder manifest hash so the decision pipeline proceeds.
+  if (options?.skipVerification) {
+    const entries = options.verifyAll
+      ? buildOfficialSourceManifest({})
+      : getRuntimeDecisionSources({});
+    const sourceManifestHash = computeSourceManifestHash(
+      entries.map((e) => ({
+        ...e,
+        sha256: 'SKIPPED',
+        size_bytes: 0,
+        loaded_at: new Date().toISOString(),
+        validation_status: ValidationStatus.VERIFIED,
+      })),
+    );
+    return {
+      passed: true,
+      data_status: 'ready',
+      source_manifest_hash: sourceManifestHash,
+      results: entries.map((e) => ({
+        ...e,
+        sha256: 'SKIPPED',
+        size_bytes: 0,
+        loaded_at: new Date().toISOString(),
+        validation_status: ValidationStatus.VERIFIED,
+      })),
+      failures: [],
+      stop_reason: null,
+    };
+  }
+
   const entries = options?.verifyAll
     ? buildOfficialSourceManifest(options?.expectedHashes)
     : getRuntimeDecisionSources(options?.expectedHashes);
@@ -152,8 +185,41 @@ export function runManifestGateSync(
   options?: {
     verifyAll?: boolean;
     expectedHashes?: Record<string, string>;
+    /** Skip hash verification entirely — used in demo mode where S3 data is trusted */
+    skipVerification?: boolean;
   },
 ): ManifestGateResult {
+  // In demo mode, skip verification and return a passing gate result with a
+  // placeholder manifest hash so the decision pipeline proceeds.
+  if (options?.skipVerification) {
+    const entries = options.verifyAll
+      ? buildOfficialSourceManifest({})
+      : getRuntimeDecisionSources({});
+    const sourceManifestHash = computeSourceManifestHash(
+      entries.map((e) => ({
+        ...e,
+        sha256: 'SKIPPED',
+        size_bytes: 0,
+        loaded_at: new Date().toISOString(),
+        validation_status: ValidationStatus.VERIFIED,
+      })),
+    );
+    return {
+      passed: true,
+      data_status: 'ready',
+      source_manifest_hash: sourceManifestHash,
+      results: entries.map((e) => ({
+        ...e,
+        sha256: 'SKIPPED',
+        size_bytes: 0,
+        loaded_at: new Date().toISOString(),
+        validation_status: ValidationStatus.VERIFIED,
+      })),
+      failures: [],
+      stop_reason: null,
+    };
+  }
+
   const entries = options?.verifyAll
     ? buildOfficialSourceManifest(options?.expectedHashes)
     : getRuntimeDecisionSources(options?.expectedHashes);

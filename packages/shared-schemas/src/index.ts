@@ -70,7 +70,7 @@ export type {
 } from './universal_defense.js';
 
 // ─── Grey-Zone Arbitration Engine (GZAE) ────────────────────
-export type { SignalConflict, CascadingRisk } from './grey_zone.js';
+export type { SignalConflict, CascadingRisk, CrowdPreWarning } from './grey_zone.js';
 
 // ─── Decision Narrative (§10.11b) ──────────────────────────
 export type {
@@ -155,6 +155,24 @@ export {
   type CitationLocationInput,
 } from './citation_formatting.js';
 
+// ─── RAG Trace (§14.x) ──────────────────────────────────────────
+export type {
+  RagTrace,
+  RagTraceChunk,
+} from './rag_trace.js';
+
+// ─── ETE Calculation Trace (§14.x) ──────────────────────────────
+export type {
+  EteCalculationTrace,
+  EteCalculationVariable,
+} from './ete_calculation.js';
+
+// ─── Route Reasoning Trace ───────────────────────────────────────
+export type {
+  RouteReasoningTrace,
+  RouteReasoningEntry,
+} from './route_reasoning_trace.js';
+
 // ─── Discriminated union for API/event payloads (§12/§13) ──
 export type {
   WebSocketEvent,
@@ -167,3 +185,14 @@ export type {
   PublishStatusChangedEvent,
   ProcessingFailedEvent,
 } from './events.js';
+
+// ─── Demo API Types (non-canonical, demo-only) ──────────────────────────────
+export type {
+  DemoTimeseriesAnomaly,
+  DemoControlCenterRecommendation,
+  DemoTechnicalAction,
+  DemoPublicAlerts,
+  DemoPublishRequest,
+  DemoAlertRequest,
+  DemoAlertResponse,
+} from './demo-types.js';

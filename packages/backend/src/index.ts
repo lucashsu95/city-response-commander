@@ -9,6 +9,7 @@ export * from './logging/index.js';
 export * from './metrics/index.js';
 export * from './observability/index.js';
 export * from './read_model/index.js';
+export * from './reasoning/index.js';
 export * from './recovery/index.js';
 export * from './repository/index.js';
 export * from './resilience/index.js';

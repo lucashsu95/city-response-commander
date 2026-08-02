@@ -44,6 +44,7 @@ const PROHIBITED_KEYS: readonly (keyof DecisionCore)[] = [
   'universal_principles',
   'grounding_candidates',
   'pre_warning_segments',
+  'crowd_pre_warnings',
   'signal_conflicts',
   'cascading_risk',
   'self_blocked_exclusions',

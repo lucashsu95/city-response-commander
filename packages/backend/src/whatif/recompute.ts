@@ -22,6 +22,12 @@ export interface RuleEngineWhatIfFacts {
   readonly applied_formula_articles: readonly number[];
   readonly expected_actions: readonly string[];
   readonly ete_minutes?: number;
+  /** Severity for SOP-7 base_clearance lookup */
+  readonly ete_severity?: string;
+  /** Average saturation for SOP-7 congestion_penalty */
+  readonly ete_avg_saturation?: number;
+  /** Event timestamp for recovery_at */
+  readonly ete_base_timestamp?: string;
 }
 
 /**
@@ -59,6 +65,9 @@ export function recompute(input: RecomputeInput): RecomputeResult {
     ...(facts.ete_minutes !== undefined && {
       ete_preview: { ete_minutes: facts.ete_minutes },
     }),
+    ...(facts.ete_severity !== undefined && { ete_severity: facts.ete_severity }),
+    ...(facts.ete_avg_saturation !== undefined && { ete_avg_saturation: facts.ete_avg_saturation }),
+    ...(facts.ete_base_timestamp !== undefined && { ete_base_timestamp: facts.ete_base_timestamp }),
     does_not_mutate_state: true,
   };
 }

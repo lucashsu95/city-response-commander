@@ -88,6 +88,8 @@ function httpError(status: number, statusText: string): HttpError {
 
 // ─── Timeseries Cache ────────────────────────────────────────
 
+// ─── Raw demo Timeseries Response ─────────────────────────────
+
 /** Slice shape actually returned by `GET /demo/timeseries`. Mirrors the
  * backend's `DemoTimeseries` projection; field names are kept verbatim so the
  * adapter never has to rename a field the demo stack owns. */
@@ -97,6 +99,8 @@ export interface DemoTimeseriesResponse {
   readonly traffic: RawTrafficEntry[];
   readonly crowd: RawCrowdEntry[];
   readonly stations: string[];
+  /** Anomalies detected in this timeseries snapshot. */
+  readonly anomalies?: readonly DemoTimeseriesAnomaly[];
 }
 
 interface RawTrafficEntry {
@@ -120,6 +124,21 @@ interface RawCrowdEntry {
   readonly roaming_pct_value: number;
 }
 
+interface DemoTimeseriesAnomaly {
+  readonly id: string;
+  readonly type: string;
+  readonly severity: string;
+  readonly source: string;
+  readonly station_id?: string;
+  readonly segment_id?: string;
+  readonly observed_value: number;
+  readonly threshold: number;
+  readonly unit: string;
+  readonly triggered_article: number;
+  readonly summary_zh: string;
+  readonly detected_at: string;
+}
+
 interface DemoIncidentsResponseBody {
   readonly decision_id: string;
   readonly event_id: string;
@@ -129,12 +148,59 @@ interface DemoIncidentsResponseBody {
   readonly triggered_articles: number[];
   readonly invoked_procedures: string[];
   readonly primary_evacuation: string;
-  readonly secondary_evacuation: string[];
-  readonly ete: { readonly ete_minutes: number; readonly severity: string };
+  readonly secondary_evacuation: readonly string[];
+  readonly excluded_routes?: readonly { segment_id: string; reason: string }[];
+  readonly ete: {
+    readonly ete_minutes: number;
+    readonly severity: string;
+    readonly recovery_at?: string;
+    readonly base_timestamp?: string;
+    readonly timezone?: string;
+  };
   readonly evidence_trace: Readonly<Record<string, unknown>>;
   readonly cms_core_text: string;
   readonly data_status: string;
   readonly text_source: string;
+  readonly model_id?: string;
+  readonly retriever_type?: string;
+  readonly rag_trace?: Readonly<Record<string, unknown>>;
+  readonly recommendation?: {
+    readonly title?: string;
+    readonly incident_summary?: string;
+    readonly classification?: string;
+    readonly technical_actions?: ReadonlyArray<{
+      readonly system?: string;
+      readonly target?: string;
+      readonly action?: string;
+      readonly parameter?: string;
+      readonly value: number | null;
+      readonly unit?: string;
+      readonly time_window?: string;
+      readonly rationale?: string;
+      readonly source_article?: number;
+    }>;
+    readonly route_actions?: {
+      readonly primary_route?: string;
+      readonly primary_route_segment_id?: string;
+      readonly secondary_routes?: readonly string[];
+      readonly excluded_routes?: readonly { segment_id: string; reason: string }[];
+      readonly cms_message_zh?: string;
+      readonly cms_message_en?: string;
+    };
+    readonly coordination_actions?: readonly string[];
+    readonly public_guidance?: {
+      readonly zh?: string;
+      readonly en?: string;
+      readonly ja?: string;
+      readonly ko?: string;
+    };
+  };
+  readonly multilingual_required?: boolean;
+  readonly public_alerts?: {
+    readonly multilingual_required?: boolean;
+    readonly languages?: readonly string[];
+    readonly messages?: Readonly<Record<string, string>>;
+  };
 }
 
 /**
@@ -154,14 +220,25 @@ export interface DemoDecisionView {
   readonly incidentType: string;
   readonly location: string;
   readonly severity: string;
-  readonly triggeredArticles: number[];
-  readonly invokedProcedures: string[];
+  readonly triggeredArticles: readonly number[];
+  readonly invokedProcedures: readonly string[];
   readonly primaryEvacuation: string;
-  readonly secondaryEvacuation: string[];
+  readonly secondaryEvacuation: readonly string[];
+  readonly excludedRoutes: readonly { segment_id: string; reason: string }[];
   readonly eteMinutes: number;
+  readonly eteSeverity: string;
+  readonly recoveryAt: string | null;
+  readonly baseTimestamp: string | null;
+  readonly timezone: string | null;
   readonly cmsCoreText: string;
   readonly dataStatus: string;
   readonly textSource: string;
+  readonly modelId: string | null;
+  readonly retrieverType: string | null;
+  readonly ragTrace: Readonly<Record<string, unknown>> | null;
+  readonly multilingualRequired: boolean;
+  readonly publicAlerts: DemoPublicAlertsData | null;
+  readonly recommendation: DemoRecommendationData | null;
   /** Raw `evidence_trace` as returned by the demo backend. */
   readonly evidenceTrace: Readonly<Record<string, unknown>>;
   /**
@@ -174,6 +251,48 @@ export interface DemoDecisionView {
    * `false`, `'insufficient_data'`).
    */
   readonly canonicalDecisionBody: GetDecisionResponse;
+}
+
+/** Multilingual public alerts data. */
+export interface DemoPublicAlertsData {
+  readonly multilingual_required: boolean;
+  readonly languages: readonly string[];
+  readonly messages: Readonly<Record<string, string>>;
+}
+
+/** Control center recommendation data. */
+export interface DemoRecommendationData {
+  readonly title: string | null;
+  readonly incident_summary: string | null;
+  readonly classification: string | null;
+  readonly technical_actions: ReadonlyArray<DemoTechnicalActionData>;
+  readonly route_actions: {
+    readonly primary_route: string | null;
+    readonly primary_route_segment_id: string | null;
+    readonly secondary_routes: readonly string[];
+    readonly excluded_routes: readonly { segment_id: string; reason: string }[];
+    readonly cms_message_zh: string | null;
+    readonly cms_message_en: string | null;
+  } | null;
+  readonly coordination_actions: readonly string[];
+  readonly public_guidance: {
+    readonly zh: string | null;
+    readonly en: string | null;
+    readonly ja: string | null;
+    readonly ko: string | null;
+  };
+}
+
+export interface DemoTechnicalActionData {
+  readonly system: string | null;
+  readonly target: string | null;
+  readonly action: string | null;
+  readonly parameter: string | null;
+  readonly value: number | null;
+  readonly unit: string | null;
+  readonly time_window: string | null;
+  readonly rationale: string | null;
+  readonly source_article: number | null;
 }
 
 // ─── Timeseries Cache ────────────────────────────────────────
@@ -221,6 +340,17 @@ export interface DemoApiClient {
    * a snapshot.
    */
   getDemoTimeseries(options?: RequestOptions): Promise<ApiResult<DemoTimeseriesResponse>>;
+  /**
+   * POST /decisions/{decision_id}/publish — publishes a decision to SMS/CMS.
+   * Body: { channels, approved_by, languages }
+   */
+  publishDecision(
+    decisionId: string,
+    channels: readonly string[],
+    approvedBy: string,
+    languages: readonly string[],
+    options?: RequestOptions,
+  ): Promise<ApiResult<{ readonly httpStatus: number; readonly body: unknown }>>;
 }
 
 /**
@@ -429,7 +559,7 @@ export function createDemoApiClient(config: DemoApiClientConfig): DemoApiClient 
     const canonicalCore = {
       decision_id: raw.decision_id,
       event_id: raw.event_id,
-      occurred_at: null,
+      occurred_at: raw.ete?.base_timestamp ?? null,
       decision_cutoff_timestamp: null,
       version: 1,
       core_hash: `demo-${raw.decision_id}`,
@@ -441,15 +571,15 @@ export function createDemoApiClient(config: DemoApiClientConfig): DemoApiClient 
       event_facts: {
         type: raw.incident_type,
         location: raw.location,
-        affected_segment: 'RD_TPE_004',
+        affected_segment: raw.recommendation?.route_actions?.primary_route_segment_id ?? null,
         affected_road: null,
         status: 'Active',
         severity: raw.severity,
         description: `Demo /demo/incidents backend projection for ${raw.event_id}`,
-        timestamp: null,
+        timestamp: raw.ete?.base_timestamp ?? null,
       },
       primary_evacuation: raw.primary_evacuation,
-      secondary_evacuation: [...raw.secondary_evacuation],
+      secondary_evacuation: [...(Array.isArray(raw.secondary_evacuation) ? raw.secondary_evacuation : [])],
       ete: {
         ete_minutes: raw.ete.ete_minutes,
         ete_lower_bound_minutes: 60,
@@ -458,7 +588,7 @@ export function createDemoApiClient(config: DemoApiClientConfig): DemoApiClient 
         manual_confirmation_required: true,
       },
       cms_core_text: raw.cms_core_text,
-      multilingual_required: raw.severity === 'Critical',
+      multilingual_required: raw.multilingual_required ?? raw.severity === 'Critical',
       provisional: false,
       policy: {
         classification: 'critical',
@@ -474,8 +604,6 @@ export function createDemoApiClient(config: DemoApiClientConfig): DemoApiClient 
         multilingual_scope_mode: 'strict',
         saturated_vs_congested: 'saturated',
       },
-      // Minimal `evidence` block: the demo backend owns it in `evidence_trace`
-      // so we surface its raw shape verbatim under `fields.evidence_trace`.
       art1_measures: null,
       evidence: raw.evidence_trace,
       excluded_candidates: null,
@@ -492,13 +620,8 @@ export function createDemoApiClient(config: DemoApiClientConfig): DemoApiClient 
       decision_id: raw.decision_id,
       data_status: 'partial',
       core: canonicalCore,
-      // Demo stack does not run the LLM narrative generators (REPORT,
-      // PUBLIC_ALERT, EXPLANATION). Panels consume `cms_core_text` from the
-      // core above and fall back to the §21.3 templates for the rest.
       report: null,
       alert: {
-        // `texts` is required by `decodeNarratives` only when the alert
-        // narrative is present, so `null` is the documented placeholder.
         texts: [],
         core_version_ref: null,
         ready_event_id: null,
@@ -522,7 +645,65 @@ export function createDemoApiClient(config: DemoApiClientConfig): DemoApiClient 
     } as unknown as GetDecisionResponse;
   }
 
+  function toRecommendation(raw: DemoIncidentsResponseBody): DemoRecommendationData | null {
+    const rec = raw.recommendation;
+    if (rec === undefined || rec === null) return null;
+
+    const publicGuidance = rec.public_guidance;
+    return {
+      title: rec.title ?? null,
+      incident_summary: rec.incident_summary ?? null,
+      classification: rec.classification ?? null,
+      technical_actions: (rec.technical_actions ?? []).map((a) => ({
+        system: a.system ?? null,
+        target: a.target ?? null,
+        action: a.action ?? null,
+        parameter: a.parameter ?? null,
+        value: a.value ?? null,
+        unit: a.unit ?? null,
+        time_window: a.time_window ?? null,
+        rationale: a.rationale ?? null,
+        source_article: a.source_article ?? null,
+      })),
+      route_actions: rec.route_actions !== undefined ? {
+        primary_route: rec.route_actions.primary_route ?? null,
+        primary_route_segment_id: rec.route_actions.primary_route_segment_id ?? null,
+        secondary_routes: rec.route_actions.secondary_routes ?? [],
+        excluded_routes: rec.route_actions.excluded_routes ?? [],
+        cms_message_zh: rec.route_actions.cms_message_zh ?? null,
+        cms_message_en: rec.route_actions.cms_message_en ?? null,
+      } : null,
+      coordination_actions: rec.coordination_actions ?? [],
+      public_guidance: {
+        zh: publicGuidance?.zh ?? null,
+        en: publicGuidance?.en ?? null,
+        ja: publicGuidance?.ja ?? null,
+        ko: publicGuidance?.ko ?? null,
+      },
+    };
+  }
+
+  function toPublicAlerts(raw: DemoIncidentsResponseBody): DemoPublicAlertsData | null {
+    if (raw.public_alerts !== undefined && raw.public_alerts !== null) {
+      return {
+        multilingual_required: raw.public_alerts.multilingual_required ?? false,
+        languages: raw.public_alerts.languages ?? [],
+        messages: raw.public_alerts.messages ?? {},
+      };
+    }
+    if (raw.multilingual_required !== undefined) {
+      return {
+        multilingual_required: raw.multilingual_required,
+        languages: ['zh', 'en'],
+        messages: {},
+      };
+    }
+    return null;
+  }
+
   function toDecisionView(raw: DemoIncidentsResponseBody): DemoDecisionView {
+    const recommendation = toRecommendation(raw);
+    const publicAlerts = toPublicAlerts(raw);
     const view: DemoDecisionView = {
       source: 'demo',
       decisionId: raw.decision_id,
@@ -533,11 +714,22 @@ export function createDemoApiClient(config: DemoApiClientConfig): DemoApiClient 
       triggeredArticles: [...raw.triggered_articles],
       invokedProcedures: [...raw.invoked_procedures],
       primaryEvacuation: raw.primary_evacuation,
-      secondaryEvacuation: [...raw.secondary_evacuation],
+      secondaryEvacuation: Array.isArray(raw.secondary_evacuation) ? [...raw.secondary_evacuation] : [],
+      excludedRoutes: raw.excluded_routes ?? [],
       eteMinutes: raw.ete.ete_minutes,
+      eteSeverity: raw.ete.severity,
+      recoveryAt: raw.ete.recovery_at ?? null,
+      baseTimestamp: raw.ete.base_timestamp ?? null,
+      timezone: raw.ete.timezone ?? null,
       cmsCoreText: raw.cms_core_text,
       dataStatus: raw.data_status,
       textSource: raw.text_source,
+      modelId: raw.model_id ?? null,
+      retrieverType: raw.retriever_type ?? null,
+      ragTrace: raw.rag_trace ?? null,
+      multilingualRequired: raw.multilingual_required ?? raw.severity === 'Critical',
+      publicAlerts,
+      recommendation,
       evidenceTrace: raw.evidence_trace,
       canonicalDecisionBody: buildCanonicalDecisionBody(raw),
     };
@@ -733,6 +925,47 @@ export function createDemoApiClient(config: DemoApiClientConfig): DemoApiClient 
       try {
         const entry = await loadTimeseries(options?.signal);
         return { ok: true, data: entry.response };
+      } catch (err) {
+        if (err instanceof Error && err.name === 'AbortError') {
+          return { ok: false, error: abortedError() };
+        }
+        return {
+          ok: false,
+          error: networkError(err instanceof Error ? err.message : 'Network request failed'),
+        };
+      }
+    },
+
+    async publishDecision(
+      decisionId: string,
+      channels: readonly string[],
+      approvedBy: string,
+      languages: readonly string[],
+      options?: RequestOptions,
+    ): Promise<ApiResult<{ readonly httpStatus: number; readonly body: unknown }>> {
+      try {
+        const response = await fetch(
+          resolveUrl(`decisions/${encodeURIComponent(decisionId)}/publish`),
+          {
+            method: 'POST',
+            headers: {
+              Accept: 'application/json',
+              'Content-Type': 'application/json',
+              ...(options?.authorizationHeader !== undefined
+                ? { Authorization: options.authorizationHeader }
+                : {}),
+            },
+            body: JSON.stringify({ channels, approved_by: approvedBy, languages }),
+            ...(options?.signal !== undefined ? { signal: options.signal } : {}),
+          },
+        );
+        let parsedBody: unknown;
+        try {
+          parsedBody = await response.json();
+        } catch {
+          parsedBody = null;
+        }
+        return { ok: true, data: { httpStatus: response.status, body: parsedBody } };
       } catch (err) {
         if (err instanceof Error && err.name === 'AbortError') {
           return { ok: false, error: abortedError() };

@@ -21,9 +21,13 @@ import type {
   SegmentClassification,
   SignalConflict,
   CascadingRisk,
+  CrowdPreWarning,
 } from '@city-commander/shared-schemas';
 import { RouteCandidateRole } from '@city-commander/shared-schemas';
 import { TRIGGER_STATUSES, isArticle2Triggered } from './article2.js';
+import { USER_COUNT_THRESHOLD, GROWTH_RATE_THRESHOLD } from './article3.js';
+import { DOME_GROWTH_THRESHOLD } from './article4.js';
+import { ROAMING_THRESHOLD } from './multilingual_trigger.js';
 
 // ─── R1: Self-Blocked Candidate Exclusion ─────────────────────────────────
 
@@ -250,5 +254,174 @@ export function detectCascadingRisk(
   return {
     event_ids: involved.map((i) => i.event_id),
     advisory_text: `偵測到 ${involved.length} 起鄰近未達 SOP 第 2 條門檻之事件，建議依通用防禦性原則提升為區域協調應變等級，儘速人工複核`,
+  };
+}
+
+// ─── R2 extension: Crowd (SOP-3/4/6) Threshold-Boundary Trend Pre-Warning ──
+
+/**
+ * Direction-aware generalization of R2's `detectPreWarning`. SOP-1's grey
+ * zone is entered from below (rising toward the 0.85 B-level threshold);
+ * SOP-4's dispersal grey zone is entered from above (falling toward the
+ * -0.20 threshold). `bandWidth` mirrors R2's fixed 0.05 for decimal-scale
+ * rate fields (Growth_Rate, Roaming_User_Pct); for User_Count — a large
+ * integer count, not a decimal rate — a proportional 5% of the threshold is
+ * used instead so the band stays the same order of magnitude relative to
+ * its threshold as R2's 0.05/0.85 (~5.9%) ratio.
+ *
+ * None of these bands are official SOP text — same as R2, any resulting
+ * `CrowdPreWarning` carries no `sop_authority` of its own (the field does
+ * not exist on this additive-only annotation type); callers surfacing it
+ * alongside SOP citations must not represent it as OFFICIAL_SOP.
+ */
+export type GreyZoneDirection = 'rising' | 'falling';
+
+export interface GreyZoneBandSpec {
+  readonly threshold: number;
+  readonly bandWidth: number;
+  readonly direction: GreyZoneDirection;
+}
+
+export interface NumericHistoryPoint {
+  readonly value: number;
+}
+
+/**
+ * `true` when `currentValue` sits in the band adjacent to `spec.threshold`
+ * (on the not-yet-triggered side) AND the recent history (time-ascending,
+ * at least 2 points required) moves strictly monotonically toward the
+ * threshold. Pure function; never interpolates missing history.
+ */
+export function detectGreyZonePreWarning(
+  currentValue: number,
+  recentHistory: readonly NumericHistoryPoint[],
+  spec: GreyZoneBandSpec,
+): boolean {
+  const inGreyZone =
+    spec.direction === 'rising'
+      ? currentValue >= spec.threshold - spec.bandWidth && currentValue < spec.threshold
+      : currentValue > spec.threshold && currentValue <= spec.threshold + spec.bandWidth;
+  if (!inGreyZone) return false;
+  if (recentHistory.length < 2) return false;
+
+  for (let i = 1; i < recentHistory.length; i++) {
+    const prev = recentHistory[i - 1]?.value;
+    const curr = recentHistory[i]?.value;
+    if (prev === undefined || curr === undefined) return false;
+    const movingTowardThreshold = spec.direction === 'rising' ? curr > prev : curr < prev;
+    if (!movingTowardThreshold) return false;
+  }
+  return true;
+}
+
+/** SOP-3 (art.3): User_Count grey zone below 25,000 (5% proportional band). */
+export const SOP3_USER_COUNT_GREY_ZONE: GreyZoneBandSpec = {
+  threshold: USER_COUNT_THRESHOLD,
+  bandWidth: USER_COUNT_THRESHOLD * 0.05,
+  direction: 'rising',
+};
+
+/** SOP-3 (art.3): Growth_Rate grey zone below 0.30. */
+export const SOP3_GROWTH_RATE_GREY_ZONE: GreyZoneBandSpec = {
+  threshold: GROWTH_RATE_THRESHOLD,
+  bandWidth: 0.05,
+  direction: 'rising',
+};
+
+/** SOP-4 (art.4): Growth_Rate grey zone above -0.20, falling toward dispersal. */
+export const SOP4_GROWTH_RATE_GREY_ZONE: GreyZoneBandSpec = {
+  threshold: DOME_GROWTH_THRESHOLD,
+  bandWidth: 0.05,
+  direction: 'falling',
+};
+
+/** SOP-6 (art.6): Roaming_User_Pct grey zone below 0.30, evaluated per in-scope station. */
+export const SOP6_ROAMING_GREY_ZONE: GreyZoneBandSpec = {
+  threshold: ROAMING_THRESHOLD,
+  bandWidth: 0.05,
+  direction: 'rising',
+};
+
+const SOP3_USER_COUNT_PRE_WARNING_TEXT =
+  '該基地台人數正朝 SOP 第 3 條門檻（25,000 人）持續上升，建議提前準備接駁資源，尚未達正式觸發標準';
+const SOP3_GROWTH_RATE_PRE_WARNING_TEXT =
+  '該基地台成長率正朝 SOP 第 3 條門檻（0.30）持續上升，建議提前準備接駁資源，尚未達正式觸發標準';
+const SOP4_GROWTH_RATE_PRE_WARNING_TEXT =
+  '巨蛋基地台成長率正朝 SOP 第 4 條疏散門檻（-0.20）持續下降，建議提前準備散場疏運資源，尚未達正式觸發標準';
+const SOP6_ROAMING_PRE_WARNING_TEXT =
+  '該基地台漫遊用戶比例正朝 SOP 第 6 條門檻（30%）持續上升，建議提前準備多語言廣播資源，尚未達正式觸發標準';
+
+/** SOP-3 User_Count pre-warning for a single station's current reading + history. */
+export function detectSop3UserCountPreWarning(
+  bsId: string,
+  currentUserCount: number,
+  recentHistory: readonly NumericHistoryPoint[],
+): CrowdPreWarning | null {
+  if (!detectGreyZonePreWarning(currentUserCount, recentHistory, SOP3_USER_COUNT_GREY_ZONE)) {
+    return null;
+  }
+  return {
+    bs_id: bsId,
+    article: 3,
+    field: 'User_Count',
+    advisory_text: SOP3_USER_COUNT_PRE_WARNING_TEXT,
+  };
+}
+
+/** SOP-3 Growth_Rate pre-warning for a single station's current reading + history. */
+export function detectSop3GrowthRatePreWarning(
+  bsId: string,
+  currentGrowthRate: number,
+  recentHistory: readonly NumericHistoryPoint[],
+): CrowdPreWarning | null {
+  if (!detectGreyZonePreWarning(currentGrowthRate, recentHistory, SOP3_GROWTH_RATE_GREY_ZONE)) {
+    return null;
+  }
+  return {
+    bs_id: bsId,
+    article: 3,
+    field: 'Growth_Rate',
+    advisory_text: SOP3_GROWTH_RATE_PRE_WARNING_TEXT,
+  };
+}
+
+/**
+ * SOP-4 Growth_Rate pre-warning. Only meaningful once the historical-peak
+ * precondition (`historical_peak >= DOME_PEAK_THRESHOLD`, art.4's other AND
+ * condition) already holds — otherwise the station isn't "waiting on
+ * Growth_Rate" at all, regardless of where Growth_Rate sits.
+ */
+export function detectSop4GrowthRatePreWarning(
+  bsId: string,
+  historicalPeakMet: boolean,
+  currentGrowthRate: number,
+  recentHistory: readonly NumericHistoryPoint[],
+): CrowdPreWarning | null {
+  if (!historicalPeakMet) return null;
+  if (!detectGreyZonePreWarning(currentGrowthRate, recentHistory, SOP4_GROWTH_RATE_GREY_ZONE)) {
+    return null;
+  }
+  return {
+    bs_id: bsId,
+    article: 4,
+    field: 'Growth_Rate',
+    advisory_text: SOP4_GROWTH_RATE_PRE_WARNING_TEXT,
+  };
+}
+
+/** SOP-6 Roaming_User_Pct pre-warning for a single in-scope station. */
+export function detectSop6RoamingPreWarning(
+  bsId: string,
+  currentRoamingPct: number,
+  recentHistory: readonly NumericHistoryPoint[],
+): CrowdPreWarning | null {
+  if (!detectGreyZonePreWarning(currentRoamingPct, recentHistory, SOP6_ROAMING_GREY_ZONE)) {
+    return null;
+  }
+  return {
+    bs_id: bsId,
+    article: 6,
+    field: 'Roaming_User_Pct',
+    advisory_text: SOP6_ROAMING_PRE_WARNING_TEXT,
   };
 }
