@@ -27,6 +27,7 @@ import {
 } from 'react';
 import { AnomalyPopup } from '../alerts/anomaly_popup.js';
 import { AnomalyDemoPopup } from '../alerts/anomaly_demo_popup.js';
+import { RoamingAlertModal, type RoamingAlertContent } from '../alerts/roaming_alert_modal.js';
 import { useAnomalyPopup } from '../alerts/use_anomaly_popup.js';
 import { useDemoAnomalyPopup } from '../alerts/use_anomaly_popup_demo.js';
 import { createApiClient } from '../api/client.js';
@@ -57,6 +58,11 @@ import { useRouteView } from '../decision/use_route_view.js';
 import { DemoDecisionPanel } from '../demo/demo_decision_panel.js';
 import { DemoTimeseriesPanel } from '../demo/demo_timeseries_panel.js';
 import { useDemoTimeseries } from '../demo/use_demo_timeseries.js';
+import {
+  buildDemoPlaybackFrames,
+  DEMO_PLAYBACK_END,
+  DEMO_PLAYBACK_START,
+} from '../demo/demo_timeline_range.js';
 import { CommandCenterShell } from '../layout/command_center_shell.js';
 import type { RoadMetricData, CrowdMetricData, RoamingMetricData } from '../layout/command_center_shell.js';
 import { GeographicMap } from '../map/geographic_map.js';
@@ -126,8 +132,12 @@ function DemoDashboardPage(): ReactNode {
   const [timelineIndex, setTimelineIndex] = useState<number | null>(null);
   const [timelinePlaying, setTimelinePlaying] = useState(false);
   const [selectedSegmentId, setSelectedSegmentId] = useState<string | null>(null);
+  const [roamingAlertOpen, setRoamingAlertOpen] = useState(false);
+  const [roamingPublishing, setRoamingPublishing] = useState(false);
+  const [roamingAlertContent, setRoamingAlertContent] = useState<RoamingAlertContent | null>(null);
 
   const playbackRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const seenRoamingAlertsRef = useRef<Set<string>>(new Set<string>());
 
   // Ingest each new timeseries snapshot into the anomaly auto-popup hook
   useEffect(() => {
@@ -141,24 +151,31 @@ function DemoDashboardPage(): ReactNode {
     setLastDecision(view);
   }, []);
 
-  // ── Timeline state: snapshots + index (drives activeSnapshot below) ─────────
-  const timestamps = demoTimeseries.timeline;
+  // ── Timeline state: extended 17:00–23:30 playback frames ─────────────────
   const snapshots = demoTimeseries.snapshots;
+  const playbackFrames = useMemo(
+    () => buildDemoPlaybackFrames(snapshots),
+    [snapshots],
+  );
+  const timestamps = useMemo(
+    () => playbackFrames.map((frame) => frame.timestamp),
+    [playbackFrames],
+  );
   const isLoading = demoTimeseries.state === 'loading';
 
-  // activeSnapshot is the ONE source of truth for every visible metric.
   const activeSnapshot =
-    timelineIndex !== null && timelineIndex >= 0 && timelineIndex < snapshots.length
-      ? snapshots[timelineIndex]
+    timelineIndex !== null &&
+    timelineIndex >= 0 &&
+    timelineIndex < playbackFrames.length
+      ? snapshots[playbackFrames[timelineIndex]?.snapshotIndex ?? 0] ?? null
       : snapshots.length > 0
         ? snapshots[snapshots.length - 1]
         : null;
 
-  // The timestamp paired with activeSnapshot — same index/fallback logic,
-  // derived locally (this component never calls useTimelinePlayback, so it
-  // has no `timeline.currentTimestamp` to reuse; see file-level doc comment).
   const currentTimestamp =
-    timelineIndex !== null && timelineIndex >= 0 && timelineIndex < timestamps.length
+    timelineIndex !== null &&
+    timelineIndex >= 0 &&
+    timelineIndex < timestamps.length
       ? timestamps[timelineIndex]
       : timestamps.length > 0
         ? timestamps[timestamps.length - 1]
@@ -226,6 +243,85 @@ function DemoDashboardPage(): ReactNode {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [timelinePlaying, timestamps.length]);
+
+  const ROAMING_ALERT_THRESHOLD = 0.30;
+
+  const buildRoamingAlertContent = useCallback(
+    (stationId: string, locationName: string, roamingPct: number): RoamingAlertContent => {
+      const pctLabel = `${Math.round(roamingPct * 100)}%`;
+      const decisionAlerts = lastDecision?.publicAlerts?.messages;
+      return {
+        stationId,
+        locationName,
+        roamingPct,
+        timestamp: currentTimestamp,
+        texts: {
+          zh:
+            decisionAlerts?.zh ??
+            `【緊急通報】${locationName || stationId} 漫遊用戶比例達 ${pctLabel}，已觸發 SOP 第 6 條。請啟動多語疏導廣播並調整現場交通指引。`,
+          en:
+            decisionAlerts?.en ??
+            `[URGENT] Roaming ratio at ${locationName || stationId} reached ${pctLabel}. SOP Article 6 triggered. Activate multilingual SMS/CMS alerts and update traffic guidance.`,
+          ja:
+            decisionAlerts?.ja ??
+            `【緊急】${locationName || stationId} のローミング比率が ${pctLabel} に達しました。SOP 第6条に基づき多言語緊急通報を開始してください。`,
+          ko:
+            decisionAlerts?.ko ??
+            `[긴급] ${locationName || stationId} 로밍 비율 ${pctLabel} 도달. SOP 6조 발동. 다국어 긴급 통보를 즉시 시작하십시오.`,
+        },
+      };
+    },
+    [currentTimestamp, lastDecision],
+  );
+
+  // During playback, surface a global multilingual alert when roaming ≥ 30%.
+  useEffect(() => {
+    if (!timelinePlaying || activeSnapshot === null || currentTimestamp === null) {
+      return;
+    }
+    const triggered = (activeSnapshot.crowd ?? [])
+      .filter((row) => row.roaming_pct_value >= ROAMING_ALERT_THRESHOLD)
+      .sort((a, b) => b.roaming_pct_value - a.roaming_pct_value);
+    if (triggered.length === 0) return;
+
+    const top = triggered[0];
+    const dedupeKey = `${currentTimestamp}|${top.BS_ID}|${top.roaming_pct_value}`;
+    if (seenRoamingAlertsRef.current.has(dedupeKey)) return;
+    seenRoamingAlertsRef.current.add(dedupeKey);
+
+    setRoamingAlertContent(
+      buildRoamingAlertContent(top.BS_ID, top.Location_Name, top.roaming_pct_value),
+    );
+    setRoamingAlertOpen(true);
+  }, [
+    timelinePlaying,
+    activeSnapshot,
+    currentTimestamp,
+    buildRoamingAlertContent,
+  ]);
+
+  const handleRoamingAlertDismiss = useCallback(() => {
+    setRoamingAlertOpen(false);
+  }, []);
+
+  const handleRoamingAlertPublish = useCallback(async () => {
+    if (lastDecision === null) {
+      setRoamingAlertOpen(false);
+      return;
+    }
+    setRoamingPublishing(true);
+    try {
+      await adapter.publishDecision(
+        lastDecision.decisionId,
+        ['sms', 'cms'],
+        'demo-commander',
+        ['zh', 'en', 'ja', 'ko'],
+      );
+    } finally {
+      setRoamingPublishing(false);
+      setRoamingAlertOpen(false);
+    }
+  }, [adapter, lastDecision]);
 
   // ── Metrics derived from activeSnapshot ───────────────────────────────────────
 
@@ -330,6 +426,8 @@ function DemoDashboardPage(): ReactNode {
       onTimelineNext={handleTimelineNext}
       onTimelinePlay={handleTimelinePlay}
       onTimelinePause={handleTimelinePause}
+      timelineRangeStart={DEMO_PLAYBACK_START}
+      timelineRangeEnd={DEMO_PLAYBACK_END}
       mapContent={
         <GeographicMap
           snapshot={mapSnapshot}
@@ -352,11 +450,20 @@ function DemoDashboardPage(): ReactNode {
       whatifContent={whatifContent}
       injectionContent={injectionContent}
       overlayContent={
-        <AnomalyDemoPopup
-          anomaly={anomalyDemo.current}
-          isOpen={anomalyDemo.isOpen}
-          onDismiss={anomalyDemo.dismiss}
-        />
+        <>
+          <AnomalyDemoPopup
+            anomaly={anomalyDemo.current}
+            isOpen={anomalyDemo.isOpen}
+            onDismiss={anomalyDemo.dismiss}
+          />
+          <RoamingAlertModal
+            alert={roamingAlertContent}
+            isOpen={roamingAlertOpen}
+            publishing={roamingPublishing}
+            onDismiss={handleRoamingAlertDismiss}
+            onConfirmPublish={handleRoamingAlertPublish}
+          />
+        </>
       }
     />
   );

@@ -3,27 +3,19 @@
  *
  * Renders the latest `/demo/incidents` response the Demo API Adapter cached
  * after an admin pressed "Inject" in the public demo. This panel is only
- * mounted when the dashboard is in `VITE_API_MODE=demo` — production mode
- * keeps the original `ReportPanel` + `AlertPanel` + `RoutePanel` + `EtePanel`
- * + `ExplanationChain` + `ExecutionStatusPanel` set driven by the canonical
- * `useDecisionReadModel`.
- *
- * The panel reads from the adapter's `DemoDecisionView`, which mirrors the
- * fields the demo backend actually returns (never inventing any). When the
- * adapter has no cached decision it renders an explicit empty state instead
- * of fabricating one.
- *
- * Module 5 publish (§10.11d, R11.6): the "發布警示" button is wired to
- * `DemoApiClient.publishDecision()`, which calls `POST /decisions/{id}/publish`
- * on the demo backend. The two-stage confirmation flow (preview → confirm) mirrors
- * the pattern in `multilingual_card_demo.tsx`.
+ * mounted when the dashboard is in `VITE_API_MODE=demo`.
  *
  * @module frontend/demo/demo_decision_panel
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useMemo, useState, type ReactNode } from 'react';
 import type { AdminToken } from '../auth/admin_session.js';
 import type { DemoApiClient, DemoDecisionView } from '../api/demo_api_adapter.js';
+import {
+  DEMO_INCIDENT_PRESETS,
+  formatPresetJson,
+  type DemoIncidentPreset,
+} from './demo_incident_presets.js';
 
 export interface DemoDecisionPanelProps {
   readonly adapter: DemoApiClient;
@@ -38,36 +30,23 @@ type InjectOutcome =
   | { readonly kind: 'ok'; readonly view: DemoDecisionView }
   | { readonly kind: 'error'; readonly message: string };
 
-type PublishStage = 'idle' | 'preview' | 'confirming' | 'success' | 'error';
-
-interface PublishResult {
-  readonly publishState: string;
-  readonly channels: readonly string[];
-  readonly languages: readonly string[];
-  readonly publishedAt: string;
-  readonly approvedBy: string;
-  readonly deliveryMode: string;
-}
-
 export function DemoDecisionPanel({
   adapter,
   injectedEventId,
   adminToken,
   onDecisionInjected,
 }: DemoDecisionPanelProps): ReactNode {
-  const [eventIdInput, setEventIdInput] = useState<string>(injectedEventId ?? 'TPE_2026_ACC_001');
+  const defaultPreset = DEMO_INCIDENT_PRESETS[0];
+  const [eventIdInput, setEventIdInput] = useState<string>(
+    injectedEventId ?? defaultPreset.eventId,
+  );
+  const [payloadJson, setPayloadJson] = useState<string>(formatPresetJson(defaultPreset));
   const [outcome, setOutcome] = useState<InjectOutcome>({ kind: 'idle' });
-  const [publishStage, setPublishStage] = useState<PublishStage>('idle');
-  const [publishResult, setPublishResult] = useState<PublishResult | null>(null);
-  const [publishError, setPublishError] = useState<string | null>(null);
-  const abortRef = useRef<AbortController | null>(null);
 
-  // M3: Abort in-flight publish request on unmount to prevent state
-  // updates on unmounted component and wasted network traffic.
-  useEffect(() => {
-    return () => {
-      abortRef.current?.abort();
-    };
+  const applyPreset = useCallback((preset: DemoIncidentPreset) => {
+    setEventIdInput(preset.eventId);
+    setPayloadJson(formatPresetJson(preset));
+    setOutcome({ kind: 'idle' });
   }, []);
 
   const onInject = useCallback(async () => {
@@ -105,95 +84,31 @@ export function DemoDecisionPanel({
     return null;
   }, [adapter, injectedEventId, outcome]);
 
-  const publishLanguages = useMemo(
-    () =>
-      lastView?.publicAlerts?.languages !== undefined && lastView.publicAlerts.languages.length > 0
-        ? lastView.publicAlerts.languages
-        : ['zh', 'en'],
-    [lastView],
-  );
-
-  // M2: Reset publish flow when the active decision changes to prevent
-  // stale preview — the user was reviewing event A's preview, but a new
-  // inject silently switched lastView to event B.
-  const lastDecisionId = lastView?.decisionId ?? null;
-  useEffect(() => {
-    if (publishStage !== 'idle') {
-      setPublishStage('idle');
-      setPublishResult(null);
-      setPublishError(null);
-    }
-  }, [lastDecisionId]);
-
-  const handlePublishClick = useCallback(() => {
-    setPublishStage('preview');
-    setPublishError(null);
-  }, []);
-
-  const handleConfirmPublish = useCallback(async () => {
-    if (lastView === null) return;
-
-    abortRef.current?.abort();
-    const controller = new AbortController();
-    abortRef.current = controller;
-
-    setPublishStage('confirming');
-    setPublishError(null);
-
-    const result = await adapter.publishDecision(
-      lastView.decisionId,
-      ['sms', 'cms'],
-      'demo-commander',
-      publishLanguages,
-      { signal: controller.signal },
-    );
-
-    if (controller.signal.aborted) return;
-
-    if (!result.ok) {
-      setPublishError(result.error.message);
-      setPublishStage('error');
-      return;
-    }
-
-    const body = result.data.body;
-    if (typeof body !== 'object' || body === null) {
-      setPublishError('後端回傳格式異常');
-      setPublishStage('error');
-      return;
-    }
-
-    const record = body as Record<string, unknown>;
-    setPublishResult({
-      publishState: String(record.publish_state ?? 'unknown'),
-      channels: Array.isArray(record.channels) ? (record.channels as readonly string[]) : [],
-      languages: Array.isArray(record.languages) ? (record.languages as readonly string[]) : [],
-      publishedAt: String(record.published_at ?? new Date().toISOString()),
-      approvedBy: String(record.approved_by ?? 'demo-commander'),
-      deliveryMode: String(record.delivery_mode ?? 'unknown'),
-    });
-    setPublishStage('success');
-  }, [adapter, lastView, publishLanguages]);
-
-  const handleDismissPublish = useCallback(() => {
-    abortRef.current?.abort();
-    setPublishStage('idle');
-    setPublishResult(null);
-    setPublishError(null);
-  }, []);
-
-  const publishDisabled = lastView === null;
-
   return (
     <div className="demo-decision-panel" data-testid="demo-decision-panel">
       <h3 className="demo-decision-panel__title">事件注入（Demo Mode）</h3>
       <p className="demo-decision-panel__hint">
-        POST /demo/incidents：demo 後端不要求管理員 JWT。注入事件後，可透過下方「發布警示」按鈕執行
-        模組 5 一鍵發布（POST /decisions/{'{id}'}/publish）。
+        POST /demo/incidents：選擇官方事件快捷鍵或編輯 Payload，一鍵注入決策流程。
       </p>
 
+      <div className="demo-decision-panel__shortcuts" role="group" aria-label="官方事件快捷鍵">
+        {DEMO_INCIDENT_PRESETS.map((preset) => (
+          <button
+            key={preset.eventId}
+            type="button"
+            className={`demo-decision-panel__shortcut${
+              eventIdInput === preset.eventId ? ' demo-decision-panel__shortcut--active' : ''
+            }`}
+            onClick={() => applyPreset(preset)}
+            data-testid={`demo-preset-${preset.eventId}`}
+          >
+            {preset.label}
+          </button>
+        ))}
+      </div>
+
       <div className="demo-decision-panel__form">
-        <label htmlFor="demo-decision-event-id">事件 ID</label>
+        <label htmlFor="demo-decision-event-id">事件 ID（event_id）</label>
         <input
           id="demo-decision-event-id"
           type="text"
@@ -202,6 +117,18 @@ export function DemoDecisionPanel({
           placeholder="TPE_2026_ACC_001"
           aria-label="demo 事件 ID"
         />
+
+        <label htmlFor="demo-decision-payload-json">Payload JSON（展示 / 複製用）</label>
+        <textarea
+          id="demo-decision-payload-json"
+          className="demo-decision-panel__payload"
+          value={payloadJson}
+          onChange={(e) => setPayloadJson(e.target.value)}
+          rows={8}
+          spellCheck={false}
+          aria-label="事件 Payload JSON"
+        />
+
         <button type="button" onClick={onInject} disabled={outcome.kind === 'in_flight'}>
           {outcome.kind === 'in_flight' ? '注入中…' : '注入事件'}
         </button>
@@ -218,124 +145,6 @@ export function DemoDecisionPanel({
       ) : (
         <p className="demo-decision-panel__empty">尚未注入事件。</p>
       )}
-
-      <div className="demo-decision-panel__publish" data-testid="demo-publish-section">
-        <h4 className="demo-decision-panel__publish-heading">
-          模組 5：數位通報與多語化
-        </h4>
-
-        {publishStage === 'idle' && (
-          <>
-            <button
-              type="button"
-              className="demo-decision-panel__publish-btn"
-              disabled={publishDisabled}
-              title={publishDisabled ? '請先注入事件再執行發布' : '發布警示'}
-              onClick={handlePublishClick}
-              data-testid="demo-publish-button"
-            >
-              發布警示
-            </button>
-            {publishDisabled && (
-              <p className="demo-decision-panel__publish-reason">
-                請先注入事件再執行發布
-              </p>
-            )}
-          </>
-        )}
-
-        {publishStage === 'preview' && lastView !== null && (
-          <div className="demo-decision-panel__publish-preview" data-testid="demo-publish-preview">
-            <p className="demo-decision-panel__publish-preview-title">待發布內容確認</p>
-            <dl className="demo-decision-panel__publish-preview-list">
-              <dt>決策 ID</dt>
-              <dd><code>{lastView.decisionId}</code></dd>
-              <dt>發布頻道</dt>
-              <dd>SMS、CMS</dd>
-              <dt>發布語言</dt>
-              <dd>{publishLanguages.join('、')}</dd>
-              <dt>核准人</dt>
-              <dd>demo-commander</dd>
-            </dl>
-            <div className="demo-decision-panel__publish-actions">
-              <button
-                type="button"
-                className="demo-decision-panel__publish-confirm"
-                onClick={handleConfirmPublish}
-              >
-                確認發布
-              </button>
-              <button
-                type="button"
-                className="demo-decision-panel__publish-cancel"
-                onClick={handleDismissPublish}
-              >
-                取消
-              </button>
-            </div>
-          </div>
-        )}
-
-        {publishStage === 'confirming' && (
-          <div className="demo-decision-panel__publish-confirming" data-testid="demo-publish-confirming">
-            <p>發布中…</p>
-          </div>
-        )}
-
-        {publishStage === 'success' && publishResult !== null && (
-          <div className="demo-decision-panel__publish-success" data-testid="demo-publish-success">
-            <p className="demo-decision-panel__publish-success-title">發布成功</p>
-            <dl className="demo-decision-panel__publish-success-list">
-              <dt>發布狀態</dt>
-              <dd>{publishResult.publishState}</dd>
-              <dt>頻道</dt>
-              <dd>{publishResult.channels.join('、')}</dd>
-              <dt>語言</dt>
-              <dd>{publishResult.languages.join('、')}</dd>
-              <dt>發布時間</dt>
-              <dd>{publishResult.publishedAt}</dd>
-              <dt>核准人</dt>
-              <dd>{publishResult.approvedBy}</dd>
-              <dt>派送模式</dt>
-              <dd>{publishResult.deliveryMode}</dd>
-            </dl>
-            {publishResult.deliveryMode === 'competition_demo_dispatch' && (
-              <p className="demo-decision-panel__publish-disclaimer">
-                競賽展示派送，未連接真實電信簡訊閘道
-              </p>
-            )}
-            <button
-              type="button"
-              className="demo-decision-panel__publish-close"
-              onClick={handleDismissPublish}
-            >
-              關閉
-            </button>
-          </div>
-        )}
-
-        {publishStage === 'error' && (
-          <div className="demo-decision-panel__publish-error" data-testid="demo-publish-error">
-            <p role="alert">發布失敗：{publishError}</p>
-            <div className="demo-decision-panel__publish-actions">
-              <button
-                type="button"
-                className="demo-decision-panel__publish-retry"
-                onClick={handlePublishClick}
-              >
-                重試
-              </button>
-              <button
-                type="button"
-                className="demo-decision-panel__publish-cancel"
-                onClick={handleDismissPublish}
-              >
-                取消
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
     </div>
   );
 }

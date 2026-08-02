@@ -53,16 +53,16 @@ interface NavItem {
   readonly id: string;
   readonly label: string;
   readonly icon: string;
+  readonly sectionId: string;
+  readonly moduleTab?: 'judgment' | 'routes' | 'reasoning' | 'recommendation' | 'multilingual';
 }
 
+/** Demo-focused nav — only sections that scroll or switch a live panel. */
 const NAV_ITEMS: NavItem[] = [
-  { id: 'dashboard', label: '儀表板', icon: '⬡' },
-  { id: 'traffic', label: '交通', icon: '⬢' },
-  { id: 'incident', label: '事件', icon: '◆' },
-  { id: 'timeline', label: '時間軸', icon: '◇' },
-  { id: 'ai', label: 'AI決策', icon: '◈' },
-  { id: 'whatif', label: 'What-if', icon: '◎' },
-  { id: 'settings', label: '設定', icon: '○' },
+  { id: 'dashboard', label: '儀表板', icon: '⬡', sectionId: 'dashboard' },
+  { id: 'traffic', label: '交通監控', icon: '⬢', sectionId: 'traffic' },
+  { id: 'incident', label: '事件決策', icon: '◈', sectionId: 'ai', moduleTab: 'judgment' },
+  { id: 'whatif', label: 'What-If', icon: '◎', sectionId: 'whatif' },
 ];
 
 interface NavSidebarProps {
@@ -174,6 +174,8 @@ interface TimelineBarProps {
   readonly currentIndex: number | null;
   readonly isPlaying: boolean;
   readonly loading: boolean;
+  readonly rangeStart?: string;
+  readonly rangeEnd?: string;
   readonly onSelect: (timestamp: string) => void;
   readonly onPrevious: () => void;
   readonly onNext: () => void;
@@ -204,6 +206,8 @@ function TimelineBar({
   currentIndex,
   isPlaying,
   loading,
+  rangeStart,
+  rangeEnd,
   onSelect,
   onPrevious,
   onNext,
@@ -301,6 +305,13 @@ function TimelineBar({
       </div>
 
       <div className="timeline-bar__info">
+        {(rangeStart !== undefined || rangeEnd !== undefined) && (
+          <span className="timeline-bar__range" aria-label="播放區間">
+            {rangeStart ? formatTimestamp(rangeStart) : '17:00:00'}
+            {' — '}
+            {rangeEnd ? formatTimestamp(rangeEnd) : '23:30:00'}
+          </span>
+        )}
         <span className="timeline-bar__current" aria-live="polite">
           <span className="timeline-bar__current-label">時間</span>
           <span className="timeline-bar__current-value">
@@ -792,6 +803,9 @@ export interface CommandCenterShellProps {
   readonly reasoningContent?: ReactNode;
   /** Anomaly demo popup overlay (optional) */
   readonly overlayContent?: ReactNode;
+  /** Optional playback range labels shown beside the timeline bar */
+  readonly timelineRangeStart?: string;
+  readonly timelineRangeEnd?: string;
 }
 
 // ─── Command Center Shell ─────────────────────────────────
@@ -821,6 +835,8 @@ export function CommandCenterShell({
   recommendationContent,
   reasoningContent,
   overlayContent,
+  timelineRangeStart,
+  timelineRangeEnd,
 }: CommandCenterShellProps): ReactNode {
   const [activeNav, setActiveNav] = useState('dashboard');
   const [injectionOpen, setInjectionOpen] = useState(false);
@@ -829,9 +845,13 @@ export function CommandCenterShell({
   >('judgment');
 
   const handleNavigate = useCallback((id: string) => {
+    const item = NAV_ITEMS.find((entry) => entry.id === id);
+    if (item === undefined) return;
     setActiveNav(id);
-    // Scroll to section - handled via CSS scroll-behavior or JS
-    const el = document.getElementById(`section-${id}`);
+    if (item.moduleTab !== undefined) {
+      setActiveModuleTab(item.moduleTab);
+    }
+    const el = document.getElementById(`section-${item.sectionId}`);
     if (el) {
       el.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
@@ -872,6 +892,8 @@ export function CommandCenterShell({
               currentIndex={timelineIndex}
               isPlaying={timelinePlaying}
               loading={timelineLoading}
+              rangeStart={timelineRangeStart}
+              rangeEnd={timelineRangeEnd}
               onSelect={onTimelineSelect}
               onPrevious={onTimelinePrevious}
               onNext={onTimelineNext}
