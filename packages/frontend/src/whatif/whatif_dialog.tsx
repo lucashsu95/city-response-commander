@@ -137,6 +137,7 @@ export function WhatIfDialog({ client }: WhatIfDialogProps): ReactNode {
           setErrorMessage(decoded.message);
           return;
         }
+        setQueryInput('');
         setResult(decoded.data);
         setPhase(decoded.kind);
       })
@@ -165,7 +166,7 @@ export function WhatIfDialog({ client }: WhatIfDialogProps): ReactNode {
         <code>does_not_mutate_state = true</code>）。所有計算皆為臨時性重跑，結果僅供參考。
       </p>
 
-      {phase === 'input' ? (
+      {phase === 'input' || phase === 'answered' || phase === 'clarification' ? (
         <form
           className="whatif-dialog__form"
           onSubmit={handleSubmitQuery}
