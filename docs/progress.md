@@ -38,6 +38,8 @@
 | 更新 source manifest hashes 以符合 demo-data-source/ 實際檔案 | Agent | ✅ |
 | 22 個整合驗證測試全部通過 | Agent | ✅ |
 | Commit: `8bb36f4` feat: integrate command center acceptance backend | Agent | ✅ |
+| 修正前端將 `Critical` 誤判為 SOP-6 多語通報，補上日／韓可用性回歸測試 | Agent | ✅ |
+| `npm run typecheck`、`npm run lint`、前端 build 與相關測試通過 | Agent | ✅ |
 
 ---
 

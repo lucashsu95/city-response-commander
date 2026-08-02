@@ -227,9 +227,9 @@ interface DemoIncidentsResponseBody {
       readonly ko?: string;
     };
   };
-  readonly multilingual_required?: boolean;
+  readonly multilingual_required?: boolean | null;
   readonly public_alerts?: {
-    readonly multilingual_required?: boolean;
+    readonly multilingual_required?: boolean | null;
     readonly languages?: readonly string[];
     readonly messages?: Readonly<Record<string, string>>;
   };
@@ -656,7 +656,7 @@ export function createDemoApiClient(config: DemoApiClientConfig): DemoApiClient 
         manual_confirmation_required: true,
       },
       cms_core_text: raw.cms_core_text,
-      multilingual_required: raw.multilingual_required ?? raw.severity === 'Critical',
+      multilingual_required: multilingualRequiredFromBackend(raw),
       provisional: false,
       policy: {
         classification: 'critical',
@@ -763,7 +763,7 @@ export function createDemoApiClient(config: DemoApiClientConfig): DemoApiClient 
         messages: raw.public_alerts.messages ?? {},
       };
     }
-    if (raw.multilingual_required !== undefined) {
+    if (raw.multilingual_required !== undefined && raw.multilingual_required !== null) {
       return {
         multilingual_required: raw.multilingual_required,
         languages: ['zh', 'en'],
@@ -771,6 +771,18 @@ export function createDemoApiClient(config: DemoApiClientConfig): DemoApiClient 
       };
     }
     return null;
+  }
+
+  /**
+   * The demo backend owns the multilingual trigger decision. Severity is not
+   * a proxy for SOP-6, so a Critical incident without a multilingual alert
+   * must not make the UI display the 30% roaming threshold badge.
+   */
+  function multilingualRequiredFromBackend(raw: DemoIncidentsResponseBody): boolean {
+    if (raw.public_alerts !== undefined && raw.public_alerts !== null) {
+      return raw.public_alerts.multilingual_required ?? false;
+    }
+    return raw.multilingual_required ?? false;
   }
 
   function toDecisionView(raw: DemoIncidentsResponseBody): DemoDecisionView {
@@ -804,7 +816,7 @@ export function createDemoApiClient(config: DemoApiClientConfig): DemoApiClient 
       routeReasoningTrace: raw.route_reasoning_trace ?? null,
       eteCalculation: raw.ete_calculation ?? null,
       elapsedMs: raw.elapsed_ms ?? null,
-      multilingualRequired: raw.multilingual_required ?? raw.severity === 'Critical',
+      multilingualRequired: multilingualRequiredFromBackend(raw),
       publicAlerts,
       recommendation,
       evidenceTrace: raw.evidence_trace,

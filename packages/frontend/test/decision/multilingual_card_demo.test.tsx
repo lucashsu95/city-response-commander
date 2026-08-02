@@ -37,4 +37,23 @@ describe('MultilingualCardDemo — four-language alerts', () => {
     fireEvent.click(koreanTab);
     expect(screen.getByRole('tabpanel').textContent).toContain('한국어 경고');
   });
+
+  it('does not show the SOP-6 threshold badge when the backend says no multilingual alert', () => {
+    const adapter = {
+      publishDecision: vi.fn(),
+    } as unknown as DemoApiClient;
+    const decision = {
+      ...createDecision(),
+      multilingualRequired: false,
+      publicAlerts: {
+        multilingual_required: false,
+        languages: ['zh', 'en'],
+        messages: { zh: '中文警示', en: 'English alert' },
+      },
+    } as DemoDecisionView;
+
+    render(<MultilingualCardDemo decision={decision} adapter={adapter} />);
+
+    expect(screen.queryByText('漫遊率已達 30% 通報門檻')).toBeNull();
+  });
 });
