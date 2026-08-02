@@ -71,6 +71,8 @@ export interface DataSourceProvider {
 export interface IngestionOptions {
   /** Override expected hashes (from config) */
   expectedHashes?: Record<string, string>;
+  /** Skip hash verification entirely — used in demo mode where S3 data is trusted */
+  skipVerification?: boolean;
 }
 
 // ─── File Name Constants ───────────────────────────────────
@@ -105,6 +107,7 @@ export function ingestData(
 
   const gateResult: ManifestGateResult = runManifestGateSync(bufferProvider, {
     expectedHashes: options?.expectedHashes,
+    skipVerification: options?.skipVerification,
   });
 
   // If gate fails: return error result with data_status='insufficient_data' and stop

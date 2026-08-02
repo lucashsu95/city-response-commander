@@ -1,8 +1,43 @@
 # 進度追蹤 — 城市交通應變 AI 指揮台
 
-**最後更新**: 2026-07-24
+**最後更新**: 2026-08-02
 **比賽日期**: 2026-08-01
-**剩餘天數**: 7 天
+**比賽狀態**: 進行中
+
+---
+
+## 里程碑
+
+| # | 里程碑 | 目標日期 | 狀態 |
+|---|--------|----------|------|
+| M1 | Repo 建立 + 共用型別完成 | 7/24 | ✅ 完成 |
+| M2 | 團隊分工確認 + 各套件啟動 | 7/25 | ✅ 完成 |
+| M3 | 資料解析 + 規則引擎 MVP | 7/27 | ✅ 完成 |
+| M4 | API + 前端串接 | 7/29 | ✅ 完成 |
+| M5 | 3 個事件全跑通 + 多語 | 7/30 | ✅ 完成 |
+| M6 | What-if + 報告 + 錄影片 | 7/31 | ✅ 完成 |
+| M7 | 提交 | 8/1 | ✅ 完成 |
+| M8 | CDK 部署還原 + 後端整合 | 8/2 | ✅ 完成 |
+
+---
+
+## 每日進度
+
+### 8/2 — ✅ 完成（CDK 部署還原 + 後端整合）
+
+| 工作 | 負責人 | 狀態 |
+|------|--------|------|
+| 將 CDK 部署源還原至 `temp/restore-cdk-deployment-source` 分支 | Agent | ✅ |
+| 整合 `agent/backend-core-acceptance` (90df027) + `agent/rag-ete-acceptance` (7829048) | Agent | ✅ |
+| POST /demo/incidents：rag_trace + route_reasoning_trace + ete_calculation | Agent | ✅ |
+| GET /demo/timeseries：anomalies[]（SOP Art.1/3/4/6 門檻偵測） | Agent | ✅ |
+| POST /demo/alerts：roaming >= 0.30 觸發多語警示（SOP Art.6） | Agent | ✅ |
+| POST /decisions/{id}/publish：HttpApi 整合（draft→approved→published） | Agent | ✅ |
+| POST /what-if：rag_trace + ete_calculation 在回應中（via explanation.ts） | Agent | ✅ |
+| shared-schemas 加入 RouteReasoningTrace（杜絕 any） | Agent | ✅ |
+| 更新 source manifest hashes 以符合 demo-data-source/ 實際檔案 | Agent | ✅ |
+| 22 個整合驗證測試全部通過 | Agent | ✅ |
+| Commit: `8bb36f4` feat: integrate command center acceptance backend | Agent | ✅ |
 
 ---
 

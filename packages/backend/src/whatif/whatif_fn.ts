@@ -57,6 +57,15 @@ export interface WhatIfFnDependencies {
   readonly sopRetriever: SopRetriever;
   /** Member-1-owned single facade for baseline loading and full deterministic reruns. */
   readonly ruleEngineFacade: RuleEngineWhatIfFacade;
+  /**
+   * Authority label for the SOP retriever.
+   * - "aws_bedrock_kb"             → real managed AWS Bedrock Knowledge Base
+   * - "local_sop_knowledge_base"  → in-memory SOP (emergency_traffic_sop.txt)
+   *
+   * This MUST reflect the actual retriever in use — never claim AWS KB
+   * when using a local SOP.
+   */
+  readonly retrieverType: 'aws_bedrock_kb' | 'local_sop_knowledge_base';
 }
 
 // ─── HTTP helpers ─────────────────────────────────────────────────────────────
@@ -236,7 +245,7 @@ function extractRequestId(event: APIGatewayProxyEventV2): string {
 export function createWhatIfHandler(
   deps: WhatIfFnDependencies,
 ): (event: APIGatewayProxyEventV2) => Promise<APIGatewayProxyResultV2> {
-  const { bedrockInvoker, sopRetriever, ruleEngineFacade } = deps;
+  const { bedrockInvoker, sopRetriever, ruleEngineFacade, retrieverType } = deps;
 
   return async function whatIfHandler(
     event: APIGatewayProxyEventV2,
@@ -323,11 +332,12 @@ export function createWhatIfHandler(
         rawQuestion,
         sopRetriever,
         bedrockInvoker,
+        retrieverType,
       });
 
       // ── 組裝最終 WhatIfResponse ──────────────────────────────────────────
       // 所有決定性欄位來自 stage 3（LLM-prohibited）
-      // explanation_text 來自 stage 4（LLM-writable）
+      // explanation_text / rag_trace / ete_calculation 來自 stage 4
       const response: WhatIfResponse = {
         schema_version: SCHEMA_VER,
         trace_id: traceId,
@@ -350,6 +360,12 @@ export function createWhatIfHandler(
         })),
         // LLM-writable：stage 4 Bedrock 或 template fallback
         explanation_text: explanationResult.explanation_text,
+        // rag_trace：SOP retrieval provenance（deterministic, no LLM authorship）
+        rag_trace: explanationResult.rag_trace,
+        // ete_calculation：SOP-7 公式代入追蹤（deterministic, no LLM authorship）
+        ...(explanationResult.ete_calculation !== null && {
+          ete_calculation: explanationResult.ete_calculation,
+        }),
         // does_not_mutate_state: const true（靜態型別保證）
         does_not_mutate_state: true,
         provisional: true,

@@ -108,6 +108,7 @@ export class DemoBackendStack extends Stack {
         DEMO_DATA_BUCKET: dataBucket.bucketName,
         BEDROCK_REGION: 'us-west-2',
         DEMO_MODE: 'true',
+        DEMO_SKIP_HASH_VERIFICATION: 'true',
         AWS_NODEJS_CONNECTION_REUSE_ENABLED: '1',
       },
     });
@@ -160,6 +161,8 @@ export class DemoBackendStack extends Stack {
         // /what-if. This setting is only used by the demo Lambda; the
         // production stack does not set it.
         DEMO_PUBLIC_WHATIF: 'true',
+        // Bypass source manifest hash verification in demo mode since S3 data is trusted.
+        DEMO_SKIP_HASH_VERIFICATION: 'true',
         AWS_NODEJS_CONNECTION_REUSE_ENABLED: '1',
       },
     });
@@ -208,6 +211,13 @@ export class DemoBackendStack extends Stack {
     });
     httpApi.addRoutes({
       path: '/demo/alerts',
+      methods: [HttpMethod.POST],
+      integration: demoIntegration,
+    });
+
+    // One-click publish for demo decisions (in-memory store, no DynamoDB)
+    httpApi.addRoutes({
+      path: '/decisions/{id}/publish',
       methods: [HttpMethod.POST],
       integration: demoIntegration,
     });

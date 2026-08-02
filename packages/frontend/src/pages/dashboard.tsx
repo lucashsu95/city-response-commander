@@ -24,7 +24,9 @@ import {
   type ReactNode,
 } from 'react';
 import { AnomalyPopup } from '../alerts/anomaly_popup.js';
+import { AnomalyDemoPopup } from '../alerts/anomaly_demo_popup.js';
 import { useAnomalyPopup } from '../alerts/use_anomaly_popup.js';
+import { useDemoAnomalyPopup } from '../alerts/use_anomaly_popup_demo.js';
 import { createApiClient } from '../api/client.js';
 import { createDemoApiClient } from '../api/demo_api_adapter.js';
 import type { DemoApiClient, DemoDecisionView } from '../api/demo_api_adapter.js';
@@ -37,6 +39,11 @@ import { ExecutionStatusPanel } from '../decision/execution_status.js';
 import { decodeProcessingFailed } from '../decision/execution_model.js';
 import type { ProcessingFailedView } from '../decision/execution_model.js';
 import { ExplanationChain } from '../decision/explanation_chain.js';
+import { AiDecisionDrawerDemo } from '../decision/ai_decision_drawer_demo.js';
+import { ControlCenterRecommendationPanel } from '../decision/control_center_recommendation_panel.js';
+import { AiDecisionCardDemo } from '../decision/ai_decision_card_demo.js';
+import { RouteAdviceCardDemo } from '../decision/route_advice_card_demo.js';
+import { MultilingualCardDemo } from '../decision/multilingual_card_demo.js';
 import { ReportPanel } from '../decision/report_panel.js';
 import { RoutePanel } from '../decision/route_panel.js';
 import { useDecisionReadModel } from '../decision/use_decision_read_model.js';
@@ -111,6 +118,9 @@ function DemoCommandCenterPage({
 
   const demoTimeseries = useDemoTimeseries(adapter);
 
+  // Auto-popup hook for demo-mode anomalies from /demo/timeseries
+  const anomalyDemo = useDemoAnomalyPopup();
+
   const [injectedEventId, setInjectedEventId] = useState<string | null>(null);
   const [lastDecision, setLastDecision] = useState<DemoDecisionView | null>(null);
   const [timelineIndex, setTimelineIndex] = useState<number | null>(null);
@@ -119,6 +129,13 @@ function DemoCommandCenterPage({
 
   // Playback timer
   const playbackRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Ingest each new timeseries snapshot into the anomaly auto-popup hook
+  useEffect(() => {
+    if (demoTimeseries.snapshot !== null) {
+      anomalyDemo.ingestSnapshot(demoTimeseries.snapshot);
+    }
+  }, [demoTimeseries.snapshot, anomalyDemo]);
 
   const handleDecisionInjected = useCallback((view: DemoDecisionView) => {
     setInjectedEventId(view.eventId);
@@ -231,146 +248,21 @@ function DemoCommandCenterPage({
       .sort((a, b) => (b.roamingPct ?? 0) - (a.roamingPct ?? 0));
   }, [demoTimeseries.snapshot]);
 
-  // AI decision card content from last decision
-  const aiDecisionContent = useMemo(() => {
-    const view = lastDecision;
-    if (!view) {
-      return (
-        <div className="ai-card ai-card--empty">
-          <p className="ai-card__empty-text">尚無決策資料，請注入突發事件</p>
-        </div>
-      );
-    }
-    return (
-      <div className="ai-card ai-card--decision">
-        <div className="ai-card__header">
-          <span className="ai-card__icon" aria-hidden="true">◈</span>
-          <h3 className="ai-card__title">AI 決策推理</h3>
-        </div>
-        <div className="ai-card__body">
-          <div className="ai-card__field">
-            <span className="ai-card__field-label">事故等級</span>
-            <span
-              className="ai-card__field-value ai-card__severity"
-              style={{
-                color: view.severity === 'Critical' ? '#dc2626'
-                  : view.severity === 'High' ? '#f97316'
-                  : view.severity === 'Medium' ? '#eab308'
-                  : '#64748b',
-              }}
-            >
-              {view.severity}
-            </span>
-          </div>
-          <div className="ai-card__field">
-            <span className="ai-card__field-label">事件類型</span>
-            <span className="ai-card__field-value">{view.incidentType}</span>
-          </div>
-          <div className="ai-card__field">
-            <span className="ai-card__field-label">ETE</span>
-            <span className="ai-card__field-value">{view.eteMinutes} 分鐘</span>
-          </div>
-          <div className="ai-card__field">
-            <span className="ai-card__field-label">觸發 SOP</span>
-            <span className="ai-card__field-value">
-              {view.triggeredArticles.length > 0
-                ? view.triggeredArticles.map((a) => `第 ${a} 條`).join('、')
-                : '後端未提供'}
-            </span>
-          </div>
-          {view.cmsCoreText && (
-            <div className="ai-card__text-block">
-              <span className="ai-card__field-label">AI 推論摘要</span>
-              <p className="ai-card__text">{view.cmsCoreText}</p>
-            </div>
-          )}
-          <div className="ai-card__field ai-card__field--source">
-            <span className="ai-card__field-label">文字來源</span>
-            <span className="ai-card__field-value ai-card__source">{view.textSource}</span>
-          </div>
-        </div>
-      </div>
-    );
-  }, [lastDecision]);
+  // AI decision card — reads all fields from DemoDecisionView (ETE, recovery_at, SOP, RAG, etc.)
+  const aiDecisionContent = <AiDecisionCardDemo decision={lastDecision} />;
 
-  // Route advice content
-  const routeAdviceContent = useMemo(() => {
-    const view = lastDecision;
-    if (!view) {
-      return (
-        <div className="ai-card ai-card--empty">
-          <p className="ai-card__empty-text">尚無疏散路線資料</p>
-        </div>
-      );
-    }
-    return (
-      <div className="ai-card ai-card--routes">
-        <div className="ai-card__header">
-          <span className="ai-card__icon" aria-hidden="true">⬢</span>
-          <h3 className="ai-card__title">推薦疏散路線</h3>
-        </div>
-        <div className="ai-card__body">
-          {view.primaryEvacuation ? (
-            <div className="ai-route ai-route--primary">
-              <span className="ai-route__badge ai-route__badge--primary">主</span>
-              <span className="ai-route__name">{view.primaryEvacuation}</span>
-            </div>
-          ) : (
-            <div className="ai-route ai-route--empty">後端未提供主疏散路線</div>
-          )}
-          {view.secondaryEvacuation.length > 0 && (
-            <div className="ai-route-group">
-              <span className="ai-route-group__label">次要疏散</span>
-              {view.secondaryEvacuation.map((s) => (
-                <div key={s} className="ai-route ai-route--secondary">
-                  <span className="ai-route__badge ai-route__badge--secondary">次</span>
-                  <span className="ai-route__name">{s}</span>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  }, [lastDecision]);
+  // Route advice — primary, secondary, and excluded routes from API
+  const routeAdviceContent = <RouteAdviceCardDemo decision={lastDecision} />;
 
-  // Multilingual content
-  const multilingualContent = useMemo(() => {
-    const view = lastDecision;
-    return (
-      <div className="ai-card ai-card--multilingual">
-        <div className="ai-card__header">
-          <span className="ai-card__icon" aria-hidden="true">◎</span>
-          <h3 className="ai-card__title">多語通報</h3>
-        </div>
-        <div className="ai-card__body">
-          {view?.cmsCoreText ? (
-            <div className="ai-multilingual-tabs">
-              {(['中文', 'English', '日本語', '한국어'] as const).map((lang, i) => (
-                <div key={lang} className="ai-multilingual-tab">
-                  <span className="ai-multilingual-tab__label">{lang}</span>
-                  <p className="ai-multilingual-tab__text">
-                    {i === 0 ? view.cmsCoreText : '後端未提供'}
-                  </p>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="ai-card__empty-text">後端未提供多語通報內容</p>
-          )}
-          <button
-            type="button"
-            className="ai-card__publish-btn"
-            disabled
-            title="發布功能尚未接線"
-          >
-            發布警示
-          </button>
-          <p className="ai-card__publish-note">發布功能尚未接線</p>
-        </div>
-      </div>
-    );
-  }, [lastDecision]);
+  // Control Center Recommendation panel — appears after injection
+  const recommendationContent = lastDecision?.recommendation
+    ? <ControlCenterRecommendationPanel recommendation={lastDecision.recommendation} />
+    : null;
+
+  // Multilingual card with two-stage publish flow
+  const multilingualContent = (
+    <MultilingualCardDemo decision={lastDecision} adapter={adapter} />
+  );
 
   // What-if dialog
   const whatifContent = useMemo(() => (
@@ -424,9 +316,17 @@ function DemoCommandCenterPage({
       roamingMetrics={roamingMetrics}
       aiDecisionContent={aiDecisionContent}
       routeAdviceContent={routeAdviceContent}
+      recommendationContent={recommendationContent}
       multilingualContent={multilingualContent}
       whatifContent={whatifContent}
       injectionContent={injectionContent}
+      overlayContent={
+        <AnomalyDemoPopup
+          anomaly={anomalyDemo.current}
+          isOpen={anomalyDemo.isOpen}
+          onDismiss={anomalyDemo.dismiss}
+        />
+      }
     />
   );
 }
