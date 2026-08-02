@@ -387,7 +387,7 @@ function generateMultilingualAlert(params: {
   locationName?: string;
   languages?: readonly string[];
 }): { messages: Record<string, string>; multilingual_required: boolean } {
-  const langs = params.languages ?? ['zh', 'en'];
+  const langs = params.languages ?? ['zh', 'en', 'ja', 'ko'];
   const pct = (params.roamingPct * 100).toFixed(1);
   const messages: Record<string, string> = {};
 
@@ -1575,7 +1575,9 @@ function handleAlert(body: string | null | undefined): APIGatewayProxyResult {
 
   const stationId = String(parsed.station_id);
   const roamingUserPct = Number(parsed.roaming_user_pct ?? 0);
-  const languages: string[] = Array.isArray(parsed.languages) ? parsed.languages : ['zh', 'en'];
+  const languages: string[] = Array.isArray(parsed.languages)
+    ? parsed.languages.map(String)
+    : ['zh', 'en', 'ja', 'ko'];
   const triggered = roamingUserPct >= SOP_ART6_ROAMING_THRESHOLD;
 
   // Look up station location name if data is available

@@ -37,6 +37,13 @@ interface PublishResult {
 const LANGUAGE_LABELS = ['中文', 'English', '日本語', '한국어'] as const;
 type Language = typeof LANGUAGE_LABELS[number];
 
+const LANGUAGE_CODES: Record<Language, 'zh' | 'en' | 'ja' | 'ko'> = {
+  中文: 'zh',
+  English: 'en',
+  日本語: 'ja',
+  한국어: 'ko',
+};
+
 function getAlertContent(
   decision: DemoDecisionView,
   lang: Language,
@@ -59,7 +66,8 @@ function getAvailableLanguages(decision: DemoDecisionView): Language[] {
   const msgs = alerts.messages;
   return LANGUAGE_LABELS.filter((l) => {
     if (l === '中文' || l === 'English') return true;
-    return msgs[l] != null && msgs[l] !== '';
+    const code = LANGUAGE_CODES[l];
+    return msgs[code] != null && msgs[code] !== '';
   });
 }
 
