@@ -1031,10 +1031,16 @@ export function createDemoApiClient(config: DemoApiClientConfig): DemoApiClient 
         } catch {
           parsedBody = null;
         }
+        if (!response.ok) {
+          throw httpError(response.status, response.statusText);
+        }
         return { ok: true, data: { httpStatus: response.status, body: parsedBody } };
       } catch (err) {
         if (err instanceof Error && err.name === 'AbortError') {
           return { ok: false, error: abortedError() };
+        }
+        if (typeof err === 'object' && err !== null && 'code' in err && err.code === 'HTTP_ERROR') {
+          return { ok: false, error: err as HttpError };
         }
         return {
           ok: false,
