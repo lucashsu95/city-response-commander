@@ -13,6 +13,10 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { DemoTimeseriesResponse } from '../api/demo_api_adapter.js';
+import { normalizeDemoTimestamp } from '../demo/demo_timeline_range.js';
+
+/** Demo finale slot — SOP Art.6 roaming alert is surfaced here during playback. */
+export const DEMO_ART6_ALERT_TIMESTAMP = '2026-05-20 23:30';
 
 // ─── Presentation Model ─────────────────────────────────────────
 
@@ -37,11 +41,33 @@ export interface DemoAnomalyPopupState {
   readonly isOpen: boolean;
 }
 
+export interface DemoAnomalyIngestContext {
+  /** Only surface anomalies while the operator is actively playing the timeline. */
+  readonly playbackActive: boolean;
+  /** Current playback timestamp label (e.g. `2026-05-20 23:00`). */
+  readonly currentTimestamp: string | null;
+}
+
 export interface DemoAnomalyPopupController extends DemoAnomalyPopupState {
-  /** Called with each new demo timeseries snapshot. Issues no HTTP request. */
-  ingestSnapshot(snapshot: DemoTimeseriesResponse): void;
+  /**
+   * Evaluates anomalies for the active playback frame only.
+   * Does not fire on initial page load or while paused.
+   */
+  ingestSnapshot(snapshot: DemoTimeseriesResponse, context: DemoAnomalyIngestContext): void;
   /** Closes the popup without forgetting the identity. */
   dismiss(): void;
+}
+
+function meetsThreshold(raw: {
+  readonly type: string;
+  readonly unit: string;
+  readonly observed_value: number;
+  readonly threshold: number;
+}): boolean {
+  if (raw.type === 'article6_roaming' || raw.unit === 'roaming_pct') {
+    return raw.observed_value >= raw.threshold;
+  }
+  return raw.observed_value >= raw.threshold;
 }
 
 function toPresentation(raw: {
@@ -101,31 +127,48 @@ export function useDemoAnomalyPopup(): DemoAnomalyPopupController {
   }, []);
 
   const ingestSnapshot = useCallback(
-    (snapshot: DemoTimeseriesResponse) => {
+    (snapshot: DemoTimeseriesResponse, context: DemoAnomalyIngestContext) => {
       if (disposedRef.current) return;
+      if (!context.playbackActive || context.currentTimestamp === null) return;
+
+      const currentNorm = normalizeDemoTimestamp(context.currentTimestamp);
+      if (currentNorm === null) return;
+
       const anomalies = snapshot.anomalies;
       if (anomalies === undefined || anomalies === null) return;
+
       for (const raw of anomalies) {
         if (typeof raw !== 'object' || raw === null) continue;
         if (seenRef.current.has(raw.id)) continue;
-        const presentation = toPresentation(
-          raw as {
-            readonly id: string;
-            readonly type: string;
-            readonly severity: string;
-            readonly source: string;
-            readonly station_id?: string;
-            readonly segment_id?: string;
-            readonly observed_value: number;
-            readonly threshold: number;
-            readonly unit: string;
-            readonly triggered_article: number;
-            readonly summary_zh: string;
-            readonly detected_at: string;
-          },
-        );
-        present(presentation);
-        return; // Only one new anomaly per snapshot
+
+        const typed = raw as {
+          readonly id: string;
+          readonly type: string;
+          readonly severity: string;
+          readonly source: string;
+          readonly station_id?: string;
+          readonly segment_id?: string;
+          readonly observed_value: number;
+          readonly threshold: number;
+          readonly unit: string;
+          readonly triggered_article: number;
+          readonly summary_zh: string;
+          readonly detected_at: string;
+        };
+
+        if (!meetsThreshold(typed)) continue;
+
+        const isArticle6 = typed.type === 'article6_roaming' || typed.unit === 'roaming_pct';
+        if (isArticle6) {
+          // Finale demo beat: surface Art.6 only when playback reaches 23:30.
+          if (currentNorm !== DEMO_ART6_ALERT_TIMESTAMP) continue;
+        } else {
+          const detectedNorm = normalizeDemoTimestamp(typed.detected_at);
+          if (detectedNorm !== currentNorm) continue;
+        }
+
+        present(toPresentation(typed));
+        return; // Only one new anomaly per playback frame
       }
     },
     [present],

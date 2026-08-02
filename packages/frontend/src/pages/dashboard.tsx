@@ -62,7 +62,9 @@ import {
   buildDemoPlaybackFrames,
   DEMO_PLAYBACK_END,
   DEMO_PLAYBACK_START,
+  resolveSnapshotForPlaybackFrame,
 } from '../demo/demo_timeline_range.js';
+import { DEMO_ART6_ALERT_TIMESTAMP } from '../alerts/use_anomaly_popup_demo.js';
 import { CommandCenterShell } from '../layout/command_center_shell.js';
 import type { RoadMetricData, CrowdMetricData, RoamingMetricData } from '../layout/command_center_shell.js';
 import { GeographicMap } from '../map/geographic_map.js';
@@ -139,13 +141,6 @@ function DemoDashboardPage(): ReactNode {
   const playbackRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const seenRoamingAlertsRef = useRef<Set<string>>(new Set<string>());
 
-  // Ingest each new timeseries snapshot into the anomaly auto-popup hook
-  useEffect(() => {
-    if (demoTimeseries.snapshot !== null) {
-      anomalyDemo.ingestSnapshot(demoTimeseries.snapshot);
-    }
-  }, [demoTimeseries.snapshot, anomalyDemo]);
-
   const handleDecisionInjected = useCallback((view: DemoDecisionView) => {
     setInjectedEventId(view.eventId);
     setLastDecision(view);
@@ -163,23 +158,22 @@ function DemoDashboardPage(): ReactNode {
   );
   const isLoading = demoTimeseries.state === 'loading';
 
-  const activeSnapshot =
+  const activePlaybackFrame =
     timelineIndex !== null &&
     timelineIndex >= 0 &&
     timelineIndex < playbackFrames.length
-      ? snapshots[playbackFrames[timelineIndex]?.snapshotIndex ?? 0] ?? null
-      : snapshots.length > 0
-        ? snapshots[snapshots.length - 1]
-        : null;
+      ? playbackFrames[timelineIndex] ?? null
+      : null;
+
+  const activeSnapshot = resolveSnapshotForPlaybackFrame(snapshots, activePlaybackFrame);
 
   const currentTimestamp =
-    timelineIndex !== null &&
+    activePlaybackFrame?.timestamp ??
+    (timelineIndex !== null &&
     timelineIndex >= 0 &&
     timelineIndex < timestamps.length
       ? timestamps[timelineIndex]
-      : timestamps.length > 0
-        ? timestamps[timestamps.length - 1]
-        : null;
+      : null);
 
   // ── Timeline controls ────────────────────────────────────────────────────────
   const handleTimelineSelect = useCallback(
@@ -274,29 +268,74 @@ function DemoDashboardPage(): ReactNode {
     [currentTimestamp, lastDecision],
   );
 
-  // During playback, surface a global multilingual alert when roaming ≥ 30%.
+  // During playback only: surface anomalies whose detected_at matches the active frame.
   useEffect(() => {
-    if (!timelinePlaying || activeSnapshot === null || currentTimestamp === null) {
+    if (!timelinePlaying || demoTimeseries.snapshot === null || currentTimestamp === null) {
       return;
     }
-    const triggered = (activeSnapshot.crowd ?? [])
+    anomalyDemo.ingestSnapshot(demoTimeseries.snapshot, {
+      playbackActive: true,
+      currentTimestamp,
+    });
+  }, [timelinePlaying, currentTimestamp, demoTimeseries.snapshot, anomalyDemo]);
+
+  // During playback, surface multilingual alert at the 23:30 finale when roaming ≥ 30%.
+  useEffect(() => {
+    if (!timelinePlaying || currentTimestamp === null) {
+      return;
+    }
+    if (currentTimestamp !== DEMO_ART6_ALERT_TIMESTAMP) {
+      return;
+    }
+
+    let stationId: string | null = null;
+    let locationName = '';
+    let roamingPct: number | null = null;
+
+    const triggeredCrowd = (activeSnapshot?.crowd ?? [])
       .filter((row) => row.roaming_pct_value >= ROAMING_ALERT_THRESHOLD)
       .sort((a, b) => b.roaming_pct_value - a.roaming_pct_value);
-    if (triggered.length === 0) return;
+    if (triggeredCrowd.length > 0) {
+      stationId = triggeredCrowd[0].BS_ID;
+      locationName = triggeredCrowd[0].Location_Name;
+      roamingPct = triggeredCrowd[0].roaming_pct_value;
+    } else {
+      const anomalies = demoTimeseries.snapshot?.anomalies ?? [];
+      for (const raw of anomalies) {
+        if (typeof raw !== 'object' || raw === null) continue;
+        const row = raw as {
+          readonly type?: string;
+          readonly unit?: string;
+          readonly station_id?: string;
+          readonly observed_value?: number;
+          readonly threshold?: number;
+          readonly summary_zh?: string;
+        };
+        const isArticle6 = row.type === 'article6_roaming' || row.unit === 'roaming_pct';
+        const observed = row.observed_value ?? 0;
+        const threshold = row.threshold ?? ROAMING_ALERT_THRESHOLD;
+        if (!isArticle6 || observed < threshold) continue;
+        stationId = row.station_id ?? null;
+        locationName =
+          row.summary_zh?.match(/】(.+?)（/)?.[1]?.trim() ?? row.station_id ?? '';
+        roamingPct = observed;
+        break;
+      }
+    }
 
-    const top = triggered[0];
-    const dedupeKey = `${currentTimestamp}|${top.BS_ID}|${top.roaming_pct_value}`;
+    if (stationId === null || roamingPct === null) return;
+
+    const dedupeKey = `${currentTimestamp}|${stationId}|${roamingPct}`;
     if (seenRoamingAlertsRef.current.has(dedupeKey)) return;
     seenRoamingAlertsRef.current.add(dedupeKey);
 
-    setRoamingAlertContent(
-      buildRoamingAlertContent(top.BS_ID, top.Location_Name, top.roaming_pct_value),
-    );
+    setRoamingAlertContent(buildRoamingAlertContent(stationId, locationName, roamingPct));
     setRoamingAlertOpen(true);
   }, [
     timelinePlaying,
     activeSnapshot,
     currentTimestamp,
+    demoTimeseries.snapshot,
     buildRoamingAlertContent,
   ]);
 

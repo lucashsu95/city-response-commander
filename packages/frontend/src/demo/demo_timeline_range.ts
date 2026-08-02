@@ -1,9 +1,8 @@
 /**
  * Demo timeline playback range — extends visible playback to 17:00–23:30.
  *
- * The demo backend may return a shorter `timeline[]`; this module generates
- * half-hour slots for the command-center slider and maps each slot to the
- * nearest available snapshot index.
+ * Generates 15-minute slots for the command-center slider and maps each slot
+ * to crowd/traffic rows whose `timestamp_raw` matches that frame.
  *
  * @module frontend/demo/demo_timeline_range
  */
@@ -12,23 +11,41 @@ import type { DemoTimeseriesResponse } from '../api/demo_api_adapter.js';
 
 export const DEMO_PLAYBACK_START = '2026-05-20 17:00';
 export const DEMO_PLAYBACK_END = '2026-05-20 23:30';
+export const DEMO_PLAYBACK_STEP_MINUTES = 15;
 
 export interface DemoPlaybackFrame {
   readonly timestamp: string;
   readonly snapshotIndex: number;
 }
 
-function parseToMinutes(value: string): number | null {
+type DemoSnapshotEntry = DemoTimeseriesResponse['snapshots'][number];
+type DemoTrafficRow = DemoSnapshotEntry['traffic'][number];
+type DemoCrowdRow = DemoSnapshotEntry['crowd'][number];
+
+/** Normalizes demo timestamps so `2026/5/20 23:30` matches `2026-05-20 23:30`. */
+export function normalizeDemoTimestamp(value: string): string | null {
   const trimmed = value.trim();
   const isoMatch = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})/);
   if (isoMatch) {
-    return Number(isoMatch[4]) * 60 + Number(isoMatch[5]);
+    return `${isoMatch[1]}-${isoMatch[2]}-${isoMatch[3]} ${isoMatch[4]}:${isoMatch[5]}`;
   }
   const slashMatch = trimmed.match(/^(\d{4})\/(\d+)\/(\d+)\s+(\d+):(\d+)/);
   if (slashMatch) {
-    return Number(slashMatch[4]) * 60 + Number(slashMatch[5]);
+    const month = slashMatch[2].padStart(2, '0');
+    const day = slashMatch[3].padStart(2, '0');
+    const hour = slashMatch[4].padStart(2, '0');
+    const minute = slashMatch[5].padStart(2, '0');
+    return `${slashMatch[1]}-${month}-${day} ${hour}:${minute}`;
   }
   return null;
+}
+
+function parseToMinutes(value: string): number | null {
+  const normalized = normalizeDemoTimestamp(value);
+  if (normalized === null) return null;
+  const match = normalized.match(/^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2})/);
+  if (!match) return null;
+  return Number(match[4]) * 60 + Number(match[5]);
 }
 
 function minutesToLabel(minutes: number): string {
@@ -37,31 +54,80 @@ function minutesToLabel(minutes: number): string {
   return `2026-05-20 ${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
 }
 
-function generateHalfHourSlots(start: string, end: string): readonly string[] {
+function generatePlaybackSlots(
+  start: string,
+  end: string,
+  stepMinutes: number,
+): readonly string[] {
   const startMinutes = parseToMinutes(start);
   const endMinutes = parseToMinutes(end);
   if (startMinutes === null || endMinutes === null || endMinutes < startMinutes) {
     return [];
   }
   const slots: string[] = [];
-  for (let m = startMinutes; m <= endMinutes; m += 30) {
+  for (let m = startMinutes; m <= endMinutes; m += stepMinutes) {
     slots.push(minutesToLabel(m));
   }
   return slots;
 }
 
+function collectRowsForTimestamp<T extends { readonly timestamp_raw: string }>(
+  snapshots: readonly DemoSnapshotEntry[],
+  pick: (snapshot: DemoSnapshotEntry) => readonly T[],
+  timestamp: string,
+): readonly T[] {
+  const target = normalizeDemoTimestamp(timestamp);
+  if (target === null) return [];
+
+  const rows: T[] = [];
+  for (const snapshot of snapshots) {
+    for (const row of pick(snapshot)) {
+      if (normalizeDemoTimestamp(row.timestamp_raw) === target) {
+        rows.push(row);
+      }
+    }
+  }
+  return rows;
+}
+
 /**
- * Builds playback frames from 17:00 through 23:30 (30-minute steps).
- * Each frame points at the latest snapshot whose time is <= the slot time.
+ * Returns crowd/traffic rows for the active 15-minute playback frame.
+ * Falls back to the nearest snapshot when no exact rows exist for that slot.
+ */
+export function resolveSnapshotForPlaybackFrame(
+  snapshots: readonly DemoSnapshotEntry[],
+  frame: DemoPlaybackFrame | null,
+): DemoSnapshotEntry | null {
+  if (frame === null || snapshots.length === 0) return null;
+
+  const traffic = collectRowsForTimestamp(snapshots, (s) => s.traffic, frame.timestamp);
+  const crowd = collectRowsForTimestamp(snapshots, (s) => s.crowd, frame.timestamp);
+
+  if (traffic.length > 0 || crowd.length > 0) {
+    return {
+      timestamp_display: frame.timestamp,
+      traffic,
+      crowd,
+    };
+  }
+
+  return snapshots[frame.snapshotIndex] ?? snapshots[snapshots.length - 1] ?? null;
+}
+
+/**
+ * Builds playback frames from 17:00 through 23:30 (15-minute steps).
  */
 export function buildDemoPlaybackFrames(
-  snapshots: readonly DemoTimeseriesResponse['snapshots'][number][],
+  snapshots: readonly DemoSnapshotEntry[],
 ): readonly DemoPlaybackFrame[] {
+  const slots = generatePlaybackSlots(
+    DEMO_PLAYBACK_START,
+    DEMO_PLAYBACK_END,
+    DEMO_PLAYBACK_STEP_MINUTES,
+  );
+
   if (snapshots.length === 0) {
-    return generateHalfHourSlots(DEMO_PLAYBACK_START, DEMO_PLAYBACK_END).map((timestamp) => ({
-      timestamp,
-      snapshotIndex: 0,
-    }));
+    return slots.map((timestamp) => ({ timestamp, snapshotIndex: 0 }));
   }
 
   const indexed = snapshots
@@ -71,8 +137,6 @@ export function buildDemoPlaybackFrames(
     }))
     .filter((entry): entry is { index: number; minutes: number } => entry.minutes !== null)
     .sort((a, b) => a.minutes - b.minutes);
-
-  const slots = generateHalfHourSlots(DEMO_PLAYBACK_START, DEMO_PLAYBACK_END);
 
   return slots.map((timestamp) => {
     const slotMinutes = parseToMinutes(timestamp)!;
